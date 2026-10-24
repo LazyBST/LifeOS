@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Wallet,
   Library,
+  BookOpen,
   BarChart3,
   Settings,
   ChevronLeft,
@@ -23,6 +24,7 @@ const STATIC_LINKS = [
   { href: '/habits', label: 'Habits', icon: CheckCircle2 },
   { href: '/books', label: 'Books', icon: Library },
   { href: '/money', label: 'Money', icon: Wallet },
+  { href: '/journal', label: 'Journal', icon: BookOpen },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 

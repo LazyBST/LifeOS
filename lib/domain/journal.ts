@@ -60,3 +60,19 @@ export async function setMood(date: string, mood: number): Promise<JournalEntry>
   if (error) throw new Error(`journal_mood: ${error.message}`);
   return data as JournalEntry;
 }
+
+/** Whole history, newest first, paged past PostgREST's 1000-row cap. */
+export async function listAllJournal(): Promise<JournalEntry[]> {
+  const out: JournalEntry[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await admin()
+      .from('journal_entries')
+      .select('*')
+      .order('entry_date', { ascending: false })
+      .range(from, from + 999);
+    if (error) throw new Error(`journal_entries: ${error.message}`);
+    out.push(...(data as JournalEntry[]));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
