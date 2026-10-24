@@ -13,6 +13,8 @@ import {
   createHabit,
   habitStatuses,
   linkHabit,
+  setHabitDay,
+  type DayState,
   toggleHabitDay,
   unlinkHabit,
   updateHabit,
@@ -99,5 +101,14 @@ export async function createAndLinkHabitAction(name: string, type: HabitLinkType
     await linkHabit(habit.id, type, entityId);
     revalidatePath('/', 'layout');
     return habit;
+  });
+}
+
+export async function setHabitDayAction(habitId: string, date: string, state: DayState): Promise<ActionResult<null>> {
+  return run(async () => {
+    await requireUser();
+    await setHabitDay(habitId, date, state);
+    revalidatePath('/', 'layout');
+    return null;
   });
 }

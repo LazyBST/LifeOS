@@ -87,11 +87,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               options={areas.map((a) => ({ value: a.id, label: a.name }))}
               save={{ entity: 'goal', id: goal.id, field: 'area_id', mode: 'nullable' }}
             />
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="field">
               Start
               <InlineDate value={goal.start_date} save={{ entity: 'goal', id: goal.id, field: 'start_date', mode: 'nullable' }} />
             </span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="field">
               Target
               <InlineDate value={goal.target_date} save={{ entity: 'goal', id: goal.id, field: 'target_date', mode: 'nullable' }} />
             </span>
@@ -121,7 +121,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <LinkedBooks entityType="goal" entityId={goal.id} title="Books for this goal" />
 
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">Projects</h2>
+        <h2 className="text-sm font-semibold">Projects</h2>
         <AddProject goalId={goal.id} />
       </div>
 
@@ -151,8 +151,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </EntityGroup>
       </div>
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Notes</h2>
+      <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold">Notes</h2>
         <NotesEditor type="goal" id={goal.id} initial={notes} />
       </section>
     </div>

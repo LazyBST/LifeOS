@@ -15,11 +15,12 @@ export function scheduleLabel(days: number[] | null): string {
 export function toRow(s: HabitStatus, met: Map<string, number>, today: string): HabitRowData {
   const target = Number(s.target_value);
   return {
-    id: s.id, name: s.name, emoji: s.emoji, kind: s.kind, target, unit: s.unit, value: s.value, done: s.done,
+    id: s.id, name: s.name, emoji: s.emoji, kind: s.kind, target, unit: s.unit, value: Math.max(0, s.value), done: s.done,
     streak: s.current_streak, longest: s.longest_streak, schedule: scheduleLabel(s.days_of_week), today,
     week: Array.from({ length: 7 }, (_, i) => {
       const date = addDays(today, i - 6);
-      return { date, due: habitDueOn(s, date), done: (met.get(`${s.id}|${date}`) ?? 0) >= target };
+      const v = met.get(`${s.id}|${date}`);
+      return { date, due: habitDueOn(s, date), done: (v ?? 0) >= target, missed: v !== undefined && v < 0 };
     }),
   };
 }

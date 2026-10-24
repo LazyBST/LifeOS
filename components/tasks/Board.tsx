@@ -30,11 +30,12 @@ export type BoardProps = {
   tasks: TaskListItem[];
   onMove: (id: string, status: TaskStatus, sortOrder?: number) => void;
   onComplete: (id: string) => void;
+  onDelete?: (id: string) => void;
   onCreate: (input: TaskCreateInput) => void;
   createDefaults?: TaskCreateInput;
 };
 
-export function Board({ tasks, onMove, onComplete, onCreate, createDefaults }: BoardProps) {
+export function Board({ tasks, onMove, onComplete, onDelete, onCreate, createDefaults }: BoardProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -98,6 +99,7 @@ export function Board({ tasks, onMove, onComplete, onCreate, createDefaults }: B
             def={def}
             tasks={columns[def.key] ?? []}
             onCreate={onCreate}
+            onDelete={onDelete}
             createDefaults={createDefaults}
           />
         ))}
@@ -111,11 +113,13 @@ function Column({
   def,
   tasks,
   onCreate,
+  onDelete,
   createDefaults,
 }: {
   def: StatusDef;
   tasks: TaskListItem[];
   onCreate: (input: TaskCreateInput) => void;
+  onDelete?: (id: string) => void;
   createDefaults?: TaskCreateInput;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: def.key, data: { status: def.key } });
@@ -123,7 +127,7 @@ function Column({
     <div
       ref={setNodeRef}
       style={statusVars(def)}
-      className={`flex min-h-40 w-[300px] shrink-0 flex-col gap-2 rounded-md p-2 pt-3 transition-shadow
+      className={`flex min-h-40 min-w-[240px] flex-1 basis-0 flex-col gap-2 rounded-lg p-2 pt-3 transition-shadow
         bg-[color-mix(in_srgb,var(--st-bg)_70%,white)] dark:bg-[color-mix(in_srgb,var(--st)_11%,var(--card))]
         ${isOver ? 'ring-2 ring-[#4c9aff]' : ''}`}
     >
@@ -137,7 +141,7 @@ function Column({
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col gap-2">
           {tasks.map((t) => (
-            <SortableCard key={t.id} task={t} />
+            <SortableCard key={t.id} task={t} onDelete={onDelete} />
           ))}
         </div>
       </SortableContext>
@@ -149,7 +153,7 @@ function Column({
   );
 }
 
-function SortableCard({ task }: { task: TaskListItem }) {
+function SortableCard({ task, onDelete }: { task: TaskListItem; onDelete?: (id: string) => void }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { status: task.status },
@@ -161,7 +165,7 @@ function SortableCard({ task }: { task: TaskListItem }) {
   };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCard task={task} />
+      <TaskCard task={task} onDelete={onDelete} />
     </div>
   );
 }

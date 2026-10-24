@@ -41,12 +41,12 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
         title={<InlineText value={book.title} save={save('title')} textClassName="text-xl font-semibold" />}
         meta={
           <>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">Author <InlineText value={book.author ?? ''} placeholder="—" save={save('author', 'nullable')} className="w-40" /></span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">Status <InlineSelect value={book.status} options={statusOptions} save={save('status')} /></span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">Area <InlineSelect value={book.area_id} clearable options={areas.map((a) => ({ value: a.id, label: a.name }))} save={save('area_id', 'nullable')} placeholder="None" /></span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">Pages <InlineText value={book.total_pages != null ? String(book.total_pages) : ''} placeholder="—" save={save('total_pages', 'int')} className="w-16" /></span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">Start <InlineDate value={book.start_date} save={save('start_date', 'nullable')} /></span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">Finish by <InlineDate value={book.target_date} save={save('target_date', 'nullable')} /></span>
+            <span className="field">Author <InlineText value={book.author ?? ''} placeholder="—" save={save('author', 'nullable')} className="w-40" /></span>
+            <span className="field">Status <InlineSelect value={book.status} options={statusOptions} save={save('status')} /></span>
+            <span className="field">Area <InlineSelect value={book.area_id} clearable options={areas.map((a) => ({ value: a.id, label: a.name }))} save={save('area_id', 'nullable')} placeholder="None" /></span>
+            <span className="field">Pages <InlineText value={book.total_pages != null ? String(book.total_pages) : ''} placeholder="—" save={save('total_pages', 'int')} className="w-16" /></span>
+            <span className="field">Start <InlineDate value={book.start_date} save={save('start_date', 'nullable')} /></span>
+            <span className="field">Finish by <InlineDate value={book.target_date} save={save('target_date', 'nullable')} /></span>
           </>
         }
       />
@@ -86,7 +86,7 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
         />
       </section>
 
-      <section className="space-y-2">
+      <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Reading log</h2>
         {log.length === 0 ? <p className="text-sm text-muted-foreground">Nothing logged yet.</p> : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-card text-sm">
@@ -97,7 +97,7 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
         )}
       </section>
 
-      <section className="space-y-2">
+      <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Notes and highlights</h2>
         <NotesEditor type="book" id={id} initial={book.notes_md} />
       </section>

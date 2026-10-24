@@ -9,6 +9,7 @@ import {
   completeTask,
   createTask,
   deleteTask,
+  restoreTask,
   listTasks,
   moveTask,
   reopenTask,
@@ -102,6 +103,15 @@ export async function deleteTaskAction(id: string): Promise<ActionResult<Task>> 
     const task = await deleteTask(id);
     revalidatePath('/', 'layout');
     return task;
+  });
+}
+
+export async function restoreTaskAction(id: string): Promise<ActionResult<null>> {
+  return run(async () => {
+    await requireUser();
+    await restoreTask(id);
+    revalidatePath('/', 'layout');
+    return null;
   });
 }
 

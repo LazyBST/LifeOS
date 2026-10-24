@@ -88,11 +88,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               options={areas.map((a) => ({ value: a.id, label: a.name }))}
               save={{ entity: 'project', id: project.id, field: 'area_id', mode: 'nullable' }}
             />
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="field">
               Start
               <InlineDate value={project.start_date} save={{ entity: 'project', id: project.id, field: 'start_date', mode: 'nullable' }} />
             </span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="field">
               Target
               <InlineDate value={project.target_date} save={{ entity: 'project', id: project.id, field: 'target_date', mode: 'nullable' }} />
             </span>
@@ -126,8 +126,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
       <LinkedBooks entityType="project" entityId={project.id} title="Books for this project" />
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Notes</h2>
+      <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold">Notes</h2>
         <NotesEditor type="project" id={project.id} initial={notes} />
       </section>
     </div>

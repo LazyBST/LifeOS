@@ -229,12 +229,25 @@ export async function deleteTask(id: UUID): Promise<Task> {
     event: 'deleted',
     estimate_min: (data as Task).estimate_min,
   });
-  await admin().from('tasks').update({ deleted_at: now }).eq('parent_task_id', id).is('deleted_at', null);
+  // subtasks at every depth go with it, stamped identically so a restore brings back exactly those
+  let level: string[] = [id];
+  for (let depth = 0; depth < MAX_SUBTASK_DEPTH + 1 && level.length; depth++) {
+    const { data: kids } = await admin().from('tasks').update({ deleted_at: now }).in('parent_task_id', level).is('deleted_at', null).select('id');
+    level = (kids ?? []).map((k: { id: string }) => k.id);
+  }
   return data as Task;
 }
 
+/** Undo a delete: the task and the subtasks that were deleted along with it. */
 export async function restoreTask(id: UUID): Promise<void> {
+  const { data: t } = await admin().from('tasks').select('deleted_at').eq('id', id).maybeSingle();
+  const stamp = t?.deleted_at as string | null | undefined;
   await admin().from('tasks').update({ deleted_at: null }).eq('id', id);
+  let level: string[] = [id];
+  for (let depth = 0; depth < MAX_SUBTASK_DEPTH + 1 && level.length && stamp; depth++) {
+    const { data: kids } = await admin().from('tasks').update({ deleted_at: null }).in('parent_task_id', level).eq('deleted_at', stamp).select('id');
+    level = (kids ?? []).map((k: { id: string }) => k.id);
+  }
 }
 
 /** Board drag-and-drop: move a card to a column and position. */

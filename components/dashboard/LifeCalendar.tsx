@@ -9,7 +9,7 @@ import { getDayDetailAction, getLifeCalendarAction, setBirthDateAction, type Lif
 import type { DetailItem } from '@/lib/domain/lifecal';
 import Link from 'next/link';
 import {
-  cellStat, classify, monthName, rowsFor, spanOf, weeksLived,
+  cellStat, classify, monthName, pct as scorePct, rowsFor, spanOf, weeksLived,
   type Cell, type DotColor, type Gran, type View,
 } from '@/lib/domain/lifecal-math';
 import { addDays } from '@/lib/time';
@@ -183,7 +183,8 @@ export function LifeCalendar() {
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {areas.map((a) => {
             const t = data.areas[a.id];
-            const p = t && t.total > 0 ? Math.round((t.done / t.total) * 100) : null;
+            const sc = scorePct(t);
+            const p = sc === null ? null : Math.round(sc * 100);
             const c = classify(t);
             return (
               <button key={a.id} onClick={() => setAreaId(areaId === a.id ? null : a.id)} className="rounded-lg border border-border p-2 text-left hover:bg-muted/50">
@@ -204,7 +205,7 @@ export function LifeCalendar() {
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-[12px] text-muted-foreground">
-        {([['green', '70%+ done'], ['yellow', '50–70%'], ['red', 'under 50%'], ['empty', 'no data']] as [DotColor, string][]).map(([k, l]) => (
+        {([['green', 'score 70%+'], ['yellow', '50–70%'], ['red', 'under 50%'], ['empty', 'no data']] as [DotColor, string][]).map(([k, l]) => (
           <span key={k} className="flex items-center gap-1"><span className={`inline-block size-2.5 rounded-full border ${COLORS[k]}`} />{l}</span>
         ))}
         {data?.birth_date && <span className="ml-auto">{weeksLived(data.birth_date, data.today).toLocaleString()} weeks lived{loading ? ' · loading…' : ''}</span>}
@@ -217,54 +218,61 @@ function Dot({ cell, data, className, selected, onSelect }: { cell: Cell; data: 
   const stat = data ? cellStat(cell, data.days, data.today) : undefined;
   const color = classify(stat);
   const isNow = !!data && cell.from <= data.today && cell.to >= data.today;
-  const label = stat ? `${cell.label}: ${stat.done}/${stat.total} done (${Math.round((stat.done / stat.total) * 100)}%)` : `${cell.label}: no data`;
+  const score = scorePct(stat);
+  const label = stat ? `${cell.label}: ${stat.done} done, ${stat.pushed ?? 0} pushed, of ${stat.total} · score ${Math.round((score ?? 0) * 100)}%` : `${cell.label}: no data`;
   return <button type="button" onClick={onSelect} aria-pressed={selected} title={label} aria-label={label} className={`${className} shrink-0 rounded-full border ${COLORS[color]} ${isNow ? 'ring-2 ring-primary ring-offset-1 ring-offset-card' : ''} ${selected ? 'outline outline-2 outline-offset-2 outline-foreground' : 'hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-foreground/40'}`} />;
 }
 
 function DayPanel({ cell, items, areas, onClose }: { cell: Cell; items: DetailItem[] | null; areas: Area[]; onClose: () => void }) {
   const am = new Map(areas.map((a) => [a.id, a]));
-  const done = items?.filter((i) => i.done).length ?? 0;
+  const done = items?.filter((i) => i.outcome === 'done').length ?? 0;
+  const pushed = items?.filter((i) => i.outcome === 'pushed').length ?? 0;
   const total = items?.length ?? 0;
-  const pctVal = total ? Math.round((done / total) * 100) : null;
-  const byArea = new Map<string, { name: string; color: string; done: number; total: number }>();
+  const sc = scorePct(total ? { total, done, pushed } : undefined);
+  const pctVal = sc === null ? null : Math.round(sc * 100);
+  const byArea = new Map<string, { name: string; color: string; done: number; pushed: number; total: number }>();
   for (const it of items ?? []) {
     const a = it.area_id ? am.get(it.area_id) : null;
     const k = it.area_id ?? 'none';
-    const e = byArea.get(k) ?? { name: a?.name ?? 'No area', color: a ? areaColor(a) : '#94a3b8', done: 0, total: 0 };
-    e.total += 1; if (it.done) e.done += 1; byArea.set(k, e);
+    const e = byArea.get(k) ?? { name: a?.name ?? 'No area', color: a ? areaColor(a) : '#94a3b8', done: 0, pushed: 0, total: 0 };
+    e.total += 1; if (it.outcome === 'done') e.done += 1; if (it.outcome === 'pushed') e.pushed += 1; byArea.set(k, e);
   }
   const multi = cell.from !== cell.to;
   return (
     <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 text-sm">
       <div className="flex items-center gap-2">
         <div className="font-semibold">{cell.label}{multi ? ` · ${cell.from} → ${cell.to}` : ` · ${cell.from}`}</div>
-        {items && <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${pctVal === null ? 'bg-muted text-muted-foreground' : pctVal >= 70 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : pctVal >= 50 ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'}`}>{pctVal === null ? 'nothing scheduled' : `${pctVal}% · ${done}/${total}`}</span>}
+        {items && <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${pctVal === null ? 'bg-muted text-muted-foreground' : pctVal >= 70 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : pctVal >= 50 ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'}`}>{pctVal === null ? 'nothing scheduled' : `score ${pctVal}% · ${done} done · ${pushed} pushed of ${total}`}</span>}
         <button type="button" onClick={onClose} className="ml-auto rounded px-2 text-muted-foreground hover:bg-muted" aria-label="Close">×</button>
       </div>
       {items === null ? <p className="mt-2 text-xs text-muted-foreground">Loading…</p> : total === 0 ? <p className="mt-2 text-xs text-muted-foreground">No tasks or habits were scheduled then.</p> : (
         <>
           <div className="mt-2 flex flex-wrap gap-2">
             {[...byArea.values()].map((a) => (
-              <span key={a.name} className="flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-0.5 text-xs"><span className="size-2 rounded-full" style={{ backgroundColor: a.color }} />{a.name} <b>{Math.round((a.done / a.total) * 100)}%</b><span className="text-muted-foreground">{a.done}/{a.total}</span></span>
+              <span key={a.name} className="flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-0.5 text-xs"><span className="size-2 rounded-full" style={{ backgroundColor: a.color }} />{a.name} <b>{Math.round((scorePct(a) ?? 0) * 100)}%</b><span className="text-muted-foreground">{a.done} done · {a.pushed} pushed</span></span>
             ))}
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {([['Not done', false], ['Done', true]] as const).map(([label, flag]) => (
-              <div key={label}>
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label} · {items.filter((i) => i.done === flag).length}</div>
-                <ul className="space-y-1">
-                  {items.filter((i) => i.done === flag).slice(0, 40).map((i) => (
-                    <li key={`${i.kind}-${i.id}-${i.date}`} className="flex items-center gap-1.5">
-                      <span className={flag ? 'text-emerald-600' : 'text-red-500'}>{flag ? '✓' : '✕'}</span>
-                      <span className="rounded bg-muted px-1 text-[10px] font-semibold uppercase text-muted-foreground">{i.kind}</span>
-                      {i.href ? <Link href={i.href} className="truncate hover:underline">{i.title}</Link> : <span className="truncate">{i.title}</span>}
-                      {multi && <span className="ml-auto shrink-0 text-xs text-muted-foreground">{i.date.slice(5)}</span>}
-                    </li>
-                  ))}
-                  {items.filter((i) => i.done === flag).length === 0 && <li className="text-xs text-muted-foreground">None</li>}
-                </ul>
-              </div>
-            ))}
+            {([['Pushed (−1 each)', 'pushed', '✕', 'text-red-500'], ['Still open today', 'pending', '•', 'text-muted-foreground'], ['Done', 'done', '✓', 'text-emerald-600']] as const).map(([label, outcome, mark, markCls]) => {
+              const group = items.filter((i) => i.outcome === outcome);
+              if (group.length === 0 && outcome === 'pending') return null;
+              return (
+                <div key={outcome}>
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label} · {group.length}</div>
+                  <ul className="space-y-1">
+                    {group.slice(0, 40).map((i) => (
+                      <li key={`${i.kind}-${i.id}-${i.date}`} className="flex items-center gap-1.5">
+                        <span className={markCls}>{mark}</span>
+                        <span className="rounded bg-muted px-1 text-[10px] font-semibold uppercase text-muted-foreground">{i.kind}</span>
+                        {i.href ? <Link href={i.href} className="truncate hover:underline">{i.title}</Link> : <span className="truncate">{i.title}</span>}
+                        {multi && <span className="ml-auto shrink-0 text-xs text-muted-foreground">{i.date.slice(5)}</span>}
+                      </li>
+                    ))}
+                    {group.length === 0 && <li className="text-xs text-muted-foreground">None</li>}
+                  </ul>
+                </div>
+              );
+            })}
           </div>
         </>
       )}

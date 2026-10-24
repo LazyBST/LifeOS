@@ -1,14 +1,16 @@
 // Pure maths for the life calendar widget. One dot per day, week or month; its colour is the
 // share of that period's scheduled items that got done (green >= 70%, yellow 50-70%, red < 50%).
 import { addDays, daysBetween } from '@/lib/time';
+import { dayScore } from './schedule-math';
 
-export type DayStat = { total: number; done: number };
+/** pushed = scheduled that day but not finished that day (moved, overdue, finished late, habit not ticked): it counts as −1 */
+export type DayStat = { total: number; done: number; pushed?: number };
 export type DotColor = 'green' | 'yellow' | 'red' | 'empty';
 export const GREEN_MIN = 0.7;
 export const YELLOW_MIN = 0.5;
 
 export function pct(s: DayStat | undefined): number | null {
-  return s && s.total > 0 ? s.done / s.total : null;
+  return dayScore(s ? { total: s.total, done: s.done, pushed: s.pushed ?? 0 } : undefined);
 }
 
 /** Empty when there is no data, or the period is entirely in the future. */
@@ -21,7 +23,7 @@ export function classify(s: DayStat | undefined): DotColor {
 }
 
 export function sumStats(stats: (DayStat | undefined)[]): DayStat {
-  return stats.reduce<DayStat>((a, s) => (s ? { total: a.total + s.total, done: a.done + s.done } : a), { total: 0, done: 0 });
+  return stats.reduce<DayStat>((a, s) => (s ? { total: a.total + s.total, done: a.done + s.done, pushed: (a.pushed ?? 0) + (s.pushed ?? 0) } : a), { total: 0, done: 0, pushed: 0 });
 }
 
 export type View = 'life' | 'year' | 'month' | 'week';

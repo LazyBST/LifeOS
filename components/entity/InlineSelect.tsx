@@ -59,7 +59,9 @@ export function InlineSelect({
       disabled={saving}
     >
       <SelectTrigger size="sm" className={cn('h-7 text-sm', className)}>
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={placeholder}>
+          {(v: string | null) => (v ? options.find((o) => o.value === v)?.label ?? placeholder : placeholder)}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {clearable && <SelectItem value="__none__">None</SelectItem>}

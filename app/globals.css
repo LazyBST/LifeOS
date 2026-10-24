@@ -172,3 +172,7 @@
 :root:not(.dark) [class~="bg-card"][class*="border-border"] {
   box-shadow: 0 1px 3px rgba(27, 31, 42, 0.08), 0 1px 1px rgba(27, 31, 42, 0.04);
 }
+
+/* A property in an entity header: small label above its control. */
+.field { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-foreground); }
+.field > * { font-size: 14px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--foreground); }

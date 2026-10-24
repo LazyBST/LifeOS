@@ -81,120 +81,86 @@ export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) 
   const lockedGoal = 'goal_id' in base;
   const lockedProject = 'project_id' in base;
 
+  const sel = 'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus:border-ring';
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-2">
-      {!lockedArea && (
-        <select
-          className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-          value={filters.area_id ?? ''}
-          onChange={(e) => patch({ area_id: e.target.value || undefined })}
-          aria-label="Area"
-        >
-          <option value="">All areas</option>
-          {areas.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-      )}
-      {!lockedGoal && (
-        <select
-          className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-          value={filters.goal_id ?? ''}
-          onChange={(e) => patch({ goal_id: e.target.value || undefined, project_id: undefined })}
-          aria-label="Goal"
-        >
-          <option value="">All goals</option>
-          {goals.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.emoji ? `${g.emoji} ` : ''}
-              {g.title}
-            </option>
-          ))}
-        </select>
-      )}
-      {!lockedProject && (
-        <select
-          className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-          value={filters.project_id ?? ''}
-          onChange={(e) => patch({ project_id: e.target.value || undefined })}
-          aria-label="Project"
-        >
-          <option value="">All projects</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title}
-            </option>
-          ))}
-        </select>
-      )}
-      <div className="flex items-center gap-1">
-        {PRIORITIES.map((p) => (
-          <Badge
-            key={p}
-            variant={filters.priority?.includes(p) ? 'default' : 'outline'}
-            className="h-7 cursor-pointer select-none px-2"
-            onClick={() => togglePriority(p)}
+    <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="Search">
+          <Input placeholder="Title contains…" className="h-9" value={search} onChange={(e) => onSearchChange(e.target.value)} />
+        </Field>
+        {!lockedArea && (
+          <Field label="Area">
+            <select className={sel} value={filters.area_id ?? ''} onChange={(e) => patch({ area_id: e.target.value || undefined })} aria-label="Area">
+              <option value="">All areas</option>
+              {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </Field>
+        )}
+        {!lockedGoal && (
+          <Field label="Goal">
+            <select className={sel} value={filters.goal_id ?? ''} onChange={(e) => patch({ goal_id: e.target.value || undefined, project_id: undefined })} aria-label="Goal">
+              <option value="">All goals</option>
+              {goals.map((g) => <option key={g.id} value={g.id}>{g.emoji ? `${g.emoji} ` : ''}{g.title}</option>)}
+            </select>
+          </Field>
+        )}
+        {!lockedProject && (
+          <Field label="Project">
+            <select className={sel} value={filters.project_id ?? ''} onChange={(e) => patch({ project_id: e.target.value || undefined })} aria-label="Project">
+              <option value="">All projects</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+          </Field>
+        )}
+        <Field label="Due">
+          <select
+            className={sel}
+            value={filters.due ?? ''}
+            onChange={(e) => { const value = e.target.value as DuePreset | ''; patch({ due: value || undefined, due_from: undefined, due_to: undefined }); }}
+            aria-label="Due"
           >
-            {p}
-          </Badge>
-        ))}
+            {DUE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </Field>
+        {filters.due === 'custom' && (
+          <Field label="Between">
+            <div className="flex items-center gap-1.5">
+              <Input type="date" className="h-9" value={filters.due_from ?? ''} onChange={(e) => patch({ due_from: e.target.value || undefined })} />
+              <span className="text-xs text-muted-foreground">to</span>
+              <Input type="date" className="h-9" value={filters.due_to ?? ''} onChange={(e) => patch({ due_to: e.target.value || undefined })} />
+            </div>
+          </Field>
+        )}
+        <Field label="Tag">
+          <Input placeholder="e.g. urgent" className="h-9" value={filters.tag ?? ''} onChange={(e) => patch({ tag: e.target.value || undefined })} />
+        </Field>
       </div>
-      <div className="flex items-center gap-1">
-        {statusOptions.map((s) => (
-          <Badge
-            key={s.key}
-            variant={filters.status?.includes(s.key) ? 'default' : 'outline'}
-            className="h-7 cursor-pointer select-none px-2"
-            onClick={() => toggleStatus(s.key)}
-          >
-            {s.label}
-          </Badge>
-        ))}
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+        <Field label="Priority">
+          <div className="flex items-center gap-1">
+            {PRIORITIES.map((p) => (
+              <Badge key={p} variant={filters.priority?.includes(p) ? 'default' : 'outline'} className="h-7 cursor-pointer select-none px-2.5" onClick={() => togglePriority(p)}>{p}</Badge>
+            ))}
+          </div>
+        </Field>
+        <Field label="Status">
+          <div className="flex flex-wrap items-center gap-1">
+            {statusOptions.map((s) => (
+              <Badge key={s.key} variant={filters.status?.includes(s.key) ? 'default' : 'outline'} className="h-7 cursor-pointer select-none px-2.5" onClick={() => toggleStatus(s.key)}>{s.label}</Badge>
+            ))}
+          </div>
+        </Field>
+        <Button size="sm" variant="ghost" className="ml-auto" onClick={onClear}>Clear all</Button>
       </div>
-      <select
-        className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-        value={filters.due ?? ''}
-        onChange={(e) => {
-          const value = e.target.value as DuePreset | '';
-          patch({ due: value || undefined, due_from: undefined, due_to: undefined });
-        }}
-        aria-label="Due"
-      >
-        {DUE_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {filters.due === 'custom' && (
-        <div className="flex items-center gap-1">
-          <Input
-            type="date"
-            className="h-8 w-32"
-            value={filters.due_from ?? ''}
-            onChange={(e) => patch({ due_from: e.target.value || undefined })}
-          />
-          <span className="text-xs text-muted-foreground">to</span>
-          <Input
-            type="date"
-            className="h-8 w-32"
-            value={filters.due_to ?? ''}
-            onChange={(e) => patch({ due_to: e.target.value || undefined })}
-          />
-        </div>
-      )}
-      <Input
-        placeholder="Tag"
-        className="h-8 w-24"
-        value={filters.tag ?? ''}
-        onChange={(e) => patch({ tag: e.target.value || undefined })}
-      />
-      <Input placeholder="Search..." className="h-8 w-40" value={search} onChange={(e) => onSearchChange(e.target.value)} />
-      <Button size="sm" variant="ghost" onClick={onClear}>
-        Clear
-      </Button>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+      {children}
     </div>
   );
 }

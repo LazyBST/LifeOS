@@ -44,7 +44,7 @@ export function PropertiesHeader({
         {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
       </div>
       {trail}
-      {meta && <div className="flex flex-wrap items-center gap-2.5">{meta}</div>}
+      {meta && <div className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">{meta}</div>}
       {children}
     </header>
   );

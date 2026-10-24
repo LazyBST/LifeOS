@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Trash2 } from 'lucide-react';
 import { dueLabel, isOverdue } from '@/lib/time';
 import { statusFor, isDone, type StatusDef } from '@/lib/types/statuses';
 import { StatusLabel } from '@/components/status/StatusLabel';
@@ -17,6 +18,7 @@ export type TaskListProps = {
   group: GroupByKey;
   onSortChange: (sort: TaskSortKey, dir: 'asc' | 'desc') => void;
   onToggleComplete: (task: TaskListItem) => void;
+  onDelete?: (id: string) => void;
   onCreate: (input: TaskCreateInput) => void;
   createDefaults?: TaskCreateInput;
 };
@@ -71,6 +73,7 @@ export function TaskList({
   group,
   onSortChange,
   onToggleComplete,
+  onDelete,
   onCreate,
   createDefaults,
 }: TaskListProps) {
@@ -111,7 +114,7 @@ export function TaskList({
   return (
     <div className="flex flex-col gap-2">
       <InlineAddTask placeholder="Add task" onCreate={(title) => onCreate({ ...createDefaults, title })} />
-      <div className="hidden grid-cols-[1.5rem_1fr_5rem_7rem_6rem_4rem] gap-2 border-b border-border/60 px-2 py-1 text-xs font-medium text-muted-foreground sm:grid">
+      <div className="hidden grid-cols-[1.5rem_1fr_5rem_7rem_6rem_4rem_2rem] gap-2 border-b border-border/60 px-2 py-1 text-xs font-medium text-muted-foreground sm:grid">
         <span />
         {HEADERS.map((h) => (
           <button key={h.key} type="button" className="text-left hover:text-foreground" onClick={() => handleHeaderClick(h.key)}>
@@ -120,6 +123,7 @@ export function TaskList({
           </button>
         ))}
         <span>Est.</span>
+        <span />
       </div>
       {groups.map((g) => (
         <div key={g.key} className="flex flex-col gap-1">
@@ -135,7 +139,7 @@ export function TaskList({
             </button>
           )}
           {!collapsed.has(g.key) &&
-            g.items.map((task) => <Row key={task.id} task={task} onToggleComplete={onToggleComplete} />)}
+            g.items.map((task) => <Row key={task.id} task={task} onToggleComplete={onToggleComplete} onDelete={onDelete} />)}
         </div>
       ))}
       {sorted.length === 0 && (
@@ -145,7 +149,7 @@ export function TaskList({
   );
 }
 
-function Row({ task, onToggleComplete }: { task: TaskListItem; onToggleComplete: (task: TaskListItem) => void }) {
+function Row({ task, onToggleComplete, onDelete }: { task: TaskListItem; onToggleComplete: (task: TaskListItem) => void; onDelete?: (id: string) => void }) {
   const statuses = useStatuses();
   const st = statusFor(statuses, task.status);
   const done = isDone(statuses, task.status);
@@ -154,7 +158,7 @@ function Row({ task, onToggleComplete }: { task: TaskListItem; onToggleComplete:
   const path = [task.goal_title, task.project_title].filter(Boolean).join(' > ');
   return (
     <div
-      className="grid min-h-11 grid-cols-[1.5rem_1fr_5rem_7rem_6rem_4rem] items-center gap-2 rounded-md border border-border/50 px-2 py-1.5 text-sm"
+      className="grid min-h-11 grid-cols-[1.5rem_1fr_5rem_7rem_6rem_4rem_2rem] items-center gap-2 rounded-md border border-border/50 px-2 py-1.5 text-sm"
       style={{ borderLeftColor: task.area_color, borderLeftWidth: 3 }}
     >
       <input
@@ -174,6 +178,9 @@ function Row({ task, onToggleComplete }: { task: TaskListItem; onToggleComplete:
         {due ?? '—'}
       </span>
       <span className="text-xs text-muted-foreground">{task.estimate_min ? `${task.estimate_min}m` : '—'}</span>
+      {onDelete ? (
+        <button type="button" aria-label={`Delete ${task.title}`} title="Delete task" onClick={() => onDelete(task.id)} className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/20"><Trash2 className="size-4" /></button>
+      ) : <span />}
     </div>
   );
 }

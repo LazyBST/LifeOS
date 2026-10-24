@@ -16,15 +16,25 @@ describe('classify: 70% green, 50-70% yellow, <50% red, no data empty', () => {
   });
 });
 
+describe('pushed items count as -1', () => {
+  it('score = (done - pushed) / scheduled', () => {
+    expect(classify({ total: 4, done: 4, pushed: 0 })).toBe('green');
+    expect(classify({ total: 5, done: 4, pushed: 0 })).toBe('green');
+    expect(classify({ total: 4, done: 3, pushed: 1 })).toBe('yellow'); // (3-1)/4 = 50%
+    expect(classify({ total: 4, done: 3, pushed: 1 })).not.toBe('green'); // 75% done, but one was pushed
+    expect(classify({ total: 4, done: 2, pushed: 2 })).toBe('red');
+  });
+});
+
 describe('cell aggregation', () => {
   const days = { '2026-10-19': { total: 4, done: 4 }, '2026-10-20': { total: 6, done: 0 } };
   const cell = { key: 'w', label: 'w', from: '2026-10-19', to: '2026-10-25' };
   it('sums done and total over the days of the cell', () => {
-    expect(cellStat(cell, days, '2026-10-30')).toEqual({ total: 10, done: 4 });
+    expect(cellStat(cell, days, '2026-10-30')).toMatchObject({ total: 10, done: 4 });
   });
   it('a future cell is empty and today caps a partial one', () => {
     expect(cellStat(cell, days, '2026-10-18')).toBeUndefined();
-    expect(cellStat(cell, days, '2026-10-19')).toEqual({ total: 4, done: 4 });
+    expect(cellStat(cell, days, '2026-10-19')).toMatchObject({ total: 4, done: 4 });
   });
   it('days without data stay empty', () => {
     expect(cellStat({ key: 'd', label: 'd', from: '2026-10-21', to: '2026-10-21' }, days, '2026-10-30')).toBeUndefined();

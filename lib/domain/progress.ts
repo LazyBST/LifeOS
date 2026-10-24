@@ -100,7 +100,7 @@ export function habitStreak(args: {
     if (!due(d)) continue;
     if (met(d)) current += 1;
     // today not yet checked in does not break a streak that is otherwise alive
-    else if (i === 0) continue;
+    else if (i === 0 && checkins[d] === undefined) continue; // an explicit miss (-1) today does break it
     else break;
   }
 

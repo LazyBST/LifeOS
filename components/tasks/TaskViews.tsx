@@ -48,6 +48,7 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
     createTask,
     completeTask,
     reopenTask,
+    deleteTask,
     moveTask,
   } = useTaskViewState({ base, scope, defaultView, defaultGroup, defaultPreset });
 
@@ -109,6 +110,7 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
           tasks={tasks}
           onMove={moveTask}
           onComplete={completeTask}
+          onDelete={(id) => void deleteTask(id)}
           onCreate={createTask}
           createDefaults={effectiveCreateDefaults}
         />
@@ -120,6 +122,7 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
           group={state.group}
           onSortChange={setSort}
           onToggleComplete={(t) => (t.status === 'done' ? reopenTask(t.id) : completeTask(t.id))}
+          onDelete={(id) => void deleteTask(id)}
           onCreate={createTask}
           createDefaults={effectiveCreateDefaults}
         />

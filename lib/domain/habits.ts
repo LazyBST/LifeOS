@@ -30,6 +30,8 @@ export type HabitStatus = Habit & {
   /** today's (or `date`'s) check-in value, 0 when none */
   value: number;
   done: boolean;
+  /** marked missed by hand today */
+  missed: boolean;
   current_streak: number;
   longest_streak: number;
 };
@@ -160,8 +162,9 @@ export async function habitStatuses(date = istDate()): Promise<HabitStatus[]> {
     return {
       ...h,
       due: habitDueOn(h, date),
-      value,
+      value: Math.max(0, value),
       done: value >= Number(h.target_value),
+      missed: value < 0,
       current_streak: current,
       longest_streak: longest,
     };
@@ -174,7 +177,7 @@ export async function habitsNeedingNudge(now = new Date()): Promise<Habit[]> {
   const { time, date } = istParts(now);
   const statuses = await habitStatuses(date);
   const nudge = statuses.filter(
-    (h) => h.due && !h.done && h.reminder_time && h.reminder_time.slice(0, 5) === time,
+    (h) => h.due && !h.done && !h.missed && h.reminder_time && h.reminder_time.slice(0, 5) === time,
   );
   const habits = await listHabits();
   const byId = new Map(habits.map((h) => [h.id, h]));
@@ -216,4 +219,15 @@ export async function toggleHabitDay(habitId: UUID, date: string): Promise<{ don
   const met = Number(data?.value ?? 0) >= Number(habit.target_value);
   await checkinHabit(habitId, { date, value: met ? 0 : Number(habit.target_value), note: met ? undefined : date === istDate() ? undefined : 'edited later' });
   return { done: !met };
+}
+
+export type DayState = 'done' | 'missed' | 'clear';
+
+/** Set a day by hand: done, marked missed (stored as -1, which breaks the streak straight away), or cleared back to undecided. */
+export async function setHabitDay(habitId: UUID, date: string, state: DayState): Promise<void> {
+  const habit = await getHabit(habitId);
+  if (!habit) throw new Error(`No habit ${habitId}`);
+  if (date > istDate()) throw new Error('You cannot check in a future day.');
+  const value = state === 'done' ? Number(habit.target_value) : state === 'missed' ? -1 : 0;
+  await checkinHabit(habitId, { date, value, note: state === 'missed' ? 'missed' : date === istDate() ? undefined : 'edited later' });
 }

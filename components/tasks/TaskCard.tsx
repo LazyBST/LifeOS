@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { CheckSquare, ListTree } from 'lucide-react';
+import { CheckSquare, ListTree, Trash2 } from 'lucide-react';
 import { dueLabel, isOverdue } from '@/lib/time';
 import { isDone, statusFor } from '@/lib/types/statuses';
 import { useStatuses } from '@/components/status/StatusProvider';
@@ -17,7 +17,7 @@ function fmtEstimate(min: number) {
 }
 
 /** Jira-style issue card: title, project lozenge tinted by Area, key, due and estimate pills, priority. */
-export function TaskCard({ task, dragging = false }: { task: TaskListItem; dragging?: boolean }) {
+export function TaskCard({ task, dragging = false, onDelete }: { task: TaskListItem; dragging?: boolean; onDelete?: (id: string) => void }) {
   const statuses = useStatuses();
   const st = statusFor(statuses, task.status);
   const done = isDone(statuses, task.status);
@@ -25,6 +25,19 @@ export function TaskCard({ task, dragging = false }: { task: TaskListItem; dragg
   const overdue = isOverdue(task.due_date) && !done;
   const label = task.project_title ?? task.goal_title;
   return (
+    <div className="group/card relative">
+    {onDelete && (
+      <button
+        type="button"
+        aria-label={`Delete ${task.title}`}
+        title="Delete task"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(task.id); }}
+        className="absolute top-1.5 right-1.5 z-10 flex size-6 items-center justify-center rounded-md bg-card/90 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 group-hover/card:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:bg-red-500/20"
+      >
+        <Trash2 className="size-3.5" />
+      </button>
+    )}
     <Link
       href={`/tasks/${task.id}`}
       draggable={false}
@@ -86,6 +99,7 @@ export function TaskCard({ task, dragging = false }: { task: TaskListItem; dragg
         </span>
       </span>
     </Link>
+    </div>
   );
 }
 

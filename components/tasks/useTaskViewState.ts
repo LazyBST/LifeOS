@@ -3,6 +3,7 @@
 // state, plus data fetching and optimistic mutations through the server
 // actions in app/actions/tasks.ts (spec section 6, docs/CONTRACTS.md).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   DEFAULT_VIEW_STATE,
@@ -19,6 +20,7 @@ import {
   completeTaskAction,
   createTaskAction,
   deleteTaskAction,
+  restoreTaskAction,
   listTasksAction,
   moveTaskAction,
   reopenTaskAction,
@@ -127,6 +129,8 @@ export function useTaskViewState(opts: {
   }, [state, scope, pathname]);
 
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
+  const tasksRef = useRef<TaskListItem[]>([]);
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -224,8 +228,16 @@ export function useTaskViewState(opts: {
 
   const deleteTask = useCallback(
     async (id: string) => {
+      const gone = tasksRef.current.find((t) => t.id === id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
       const res = await deleteTaskAction(id);
+      if (!res.ok) toast.error(res.error);
+      else {
+        toast.success(`Deleted “${gone?.title ?? 'task'}”`, {
+          duration: 8000,
+          action: { label: 'Undo', onClick: async () => { await restoreTaskAction(id); refetch(); } },
+        });
+      }
       refetch();
       return res;
     },

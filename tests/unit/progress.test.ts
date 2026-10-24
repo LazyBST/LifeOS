@@ -160,3 +160,13 @@ describe('habitStreak', () => {
     expect(streak.longest).toBe(4);
   });
 });
+
+describe('habit streak with an explicit miss today', () => {
+  const base = { today: '2026-10-25', daysOfWeek: null, target: 1 };
+  it('today unchecked leaves the streak alive; marking it missed (-1) breaks it', () => {
+    const checkins = { '2026-10-24': 1, '2026-10-23': 1, '2026-10-22': 1 };
+    expect(habitStreak({ ...base, checkins }).current).toBe(3);
+    expect(habitStreak({ ...base, checkins: { ...checkins, '2026-10-25': -1 } }).current).toBe(0);
+    expect(habitStreak({ ...base, checkins: { ...checkins, '2026-10-25': 1 } }).current).toBe(4);
+  });
+});

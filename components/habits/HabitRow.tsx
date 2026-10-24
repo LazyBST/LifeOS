@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { checkinHabitAction, toggleHabitDayAction } from '@/app/actions/habits';
+import { checkinHabitAction, setHabitDayAction } from '@/app/actions/habits';
 
-export type WeekDay = { date: string; due: boolean; done: boolean };
+export type WeekDay = { date: string; due: boolean; done: boolean; /** marked missed by hand */ missed: boolean };
 export type HabitRowData = {
   id: string; name: string; emoji: string | null; kind: 'boolean' | 'count'; target: number; unit: string | null;
   value: number; done: boolean; streak: number; longest: number; schedule: string; week: WeekDay[]; today: string;
@@ -28,21 +28,24 @@ export function HabitRow({ h, onUnlink }: { h: HabitRowData; onUnlink?: () => vo
   useEffect(() => { setWeek(h.week); setValue(h.value); setDraft(String(h.value)); }, [h.week, h.value]);
 
   const todayDone = week.find((d) => d.date === h.today)?.done ?? false;
+  const todayMissed = week.find((d) => d.date === h.today)?.missed ?? false;
   const doneCount = week.filter((d) => d.due && d.done).length;
   const dueCount = week.filter((d) => d.due).length;
 
-  function toggleDay(date: string) {
-    setWeek((w) => w.map((d) => (d.date === date ? { ...d, done: !d.done } : d)));
+  function setDay(date: string, state: 'done' | 'missed' | 'clear') {
+    setWeek((w) => w.map((d) => (d.date === date ? { ...d, done: state === 'done', missed: state === 'missed' } : d)));
     start(async () => {
-      const r = await toggleHabitDayAction(h.id, date);
+      const r = await setHabitDayAction(h.id, date, state);
       if (!r.ok) { toast.error(r.error); setWeek(h.week); }
       router.refresh();
     });
   }
+  const toggleDay = (date: string) => setDay(date, week.find((d) => d.date === date)?.done ? 'clear' : 'done');
+
   function setCount(n: number) {
     const v = Math.max(0, n);
     setValue(v); setDraft(String(v));
-    setWeek((w) => w.map((d) => (d.date === h.today ? { ...d, done: v >= h.target } : d)));
+    setWeek((w) => w.map((d) => (d.date === h.today ? { ...d, done: v >= h.target, missed: false } : d)));
     start(async () => {
       const r = await checkinHabitAction(h.id, { value: v });
       if (!r.ok) toast.error(r.error);
@@ -59,6 +62,13 @@ export function HabitRow({ h, onUnlink }: { h: HabitRowData; onUnlink?: () => vo
           aria-label={todayDone ? `Uncheck ${h.name} for today` : `Check ${h.name} for today`}
           className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[12px] font-bold transition-colors ${todayDone ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-input text-transparent hover:border-emerald-500 hover:text-emerald-500'}`}
         >✓</button>
+        <button
+          type="button"
+          onClick={() => setDay(h.today, todayMissed ? 'clear' : 'missed')}
+          aria-label={todayMissed ? `Undo missed for ${h.name}` : `Mark ${h.name} as missed today`}
+          title={todayMissed ? 'Marked missed: click to undo' : 'Mark as missed today (breaks the streak)'}
+          className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[12px] font-bold transition-colors ${todayMissed ? 'border-red-500 bg-red-500 text-white' : 'border-input text-transparent hover:border-red-500 hover:text-red-500'}`}
+        >✕</button>
         <button type="button" onClick={() => setOpen((o) => !o)} className="min-w-0 flex-1 truncate text-left text-sm font-medium" title="Details">
           {h.emoji ? `${h.emoji} ` : ''}{h.name}
           {h.kind === 'count' && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{value}/{h.target}{h.unit ? ` ${h.unit}` : ''}</span>}
@@ -69,10 +79,11 @@ export function HabitRow({ h, onUnlink }: { h: HabitRowData; onUnlink?: () => vo
               key={d.date}
               type="button"
               onClick={() => toggleDay(d.date)}
-              title={`${d.date}${d.due ? (d.done ? ' · done' : d.date === h.today ? ' · today' : ' · missed') : ' · not due'} (tap to change)`}
+              title={`${d.date}${d.due ? (d.done ? ' · done' : d.missed ? ' · marked missed' : d.date === h.today ? ' · today' : ' · missed') : ' · not due'} (tap to change)`}
               className={`size-[18px] rounded-[5px] text-[9px] font-bold leading-none transition-colors ${
                 !d.due ? 'border border-dashed border-border text-muted-foreground/50'
                 : d.done ? 'bg-emerald-500 text-white'
+                : d.missed ? 'bg-red-500 text-white'
                 : d.date === h.today ? 'border border-input text-muted-foreground'
                 : 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-300'
               }`}

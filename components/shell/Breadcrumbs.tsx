@@ -15,7 +15,7 @@ export type BreadcrumbItem = {
 export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
   if (items.length === 0) return null;
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-muted-foreground">
+    <nav aria-label="Breadcrumb" className="field">
       {items.map((item, i) => {
         const isLast = i === items.length - 1;
         return (

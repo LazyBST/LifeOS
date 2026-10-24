@@ -3,6 +3,7 @@ import { getTask, breadcrumbFor } from '@/lib/domain/tasks';
 import { areaSlug, listAreas } from '@/lib/domain/areas';
 import { readNotes } from '@/lib/domain/notes';
 import { admin } from '@/lib/supabase/admin';
+import { DeleteTaskButton } from '@/components/entity/DeleteTaskButton';
 import { Trail, type TrailItem } from '@/components/entity/Trail';
 import { areaColor } from '@/lib/domain/areas-colors';
 import { SetPageContext } from '@/components/chat/page-context';
@@ -77,6 +78,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         ctx={{ route: `/tasks/${task.id}`, entity_type: 'task', entity_id: task.id, area_id: task.area_id }}
       />
       <PropertiesHeader
+        actions={<DeleteTaskButton id={task.id} title={task.title} backTo={task.parent_task_id ? `/tasks/${task.parent_task_id}` : task.project_id ? `/projects/${task.project_id}` : task.goal_id ? `/goals/${task.goal_id}` : '/'} />}
         trail={<Trail items={trailItems} />}
         title={
           <InlineText
@@ -104,11 +106,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               options={areas.map((a) => ({ value: a.id, label: a.name }))}
               save={{ entity: 'task', id: task.id, field: 'area_id', mode: 'nullable' }}
             />
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="field">
               Due
               <DueDateTime taskId={task.id} dueDate={task.due_date} dueAt={task.due_at} />
             </span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="field">
               Duration (min)
               <InlineText
                 value={task.duration_min != null ? String(task.duration_min) : ''}
@@ -117,7 +119,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 className="w-16"
               />
             </span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="field">
               Estimate (min)
               <InlineText
                 value={task.estimate_min != null ? String(task.estimate_min) : ''}
@@ -126,7 +128,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 className="w-16"
               />
             </span>
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="field">
               Tags
               <InlineText
                 value={task.tags.join(', ')}
@@ -145,25 +147,25 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
       <LinkedBooks entityType="task" entityId={task.id} title="Books for this task" />
 
-      <section className="space-y-2">
+      <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Subtasks</h2>
         <TaskViews base={{ parent_task_id: task.id }} scope={`subtasks:${task.id}`} createDefaults={{ parent_task_id: task.id }} defaultView="board" defaultPreset="all" hidePresets />
       </section>
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Notes</h2>
+      <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold">Notes</h2>
         <NotesEditor type="task" id={task.id} initial={notes} />
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg ring-1 ring-foreground/10 p-3">
-          <h3 className="text-xs font-medium text-muted-foreground">Reminder</h3>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Reminder</h3>
           <p className="mt-1 text-sm">
             {reminder ? `${reminder.text} · ${formatDate(reminder.remind_at.slice(0, 10))}` : 'None'}
           </p>
         </div>
-        <div className="rounded-lg ring-1 ring-foreground/10 p-3">
-          <h3 className="text-xs font-medium text-muted-foreground">Calendar event</h3>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Calendar event</h3>
           <p className="mt-1 text-sm">{gcalEventId ? `Linked (${gcalEventId})` : 'None'}</p>
         </div>
       </section>
