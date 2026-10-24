@@ -25,12 +25,6 @@ export const env = {
   get cronSecret() {
     return need('CRON_SECRET');
   },
-  /** Bearer secret for the MCP endpoint (/api/mcp). Must be long and random. */
-  get mcpApiKey() {
-    const k = need('MCP_API_KEY');
-    if (k.length < 32) throw new Error('MCP_API_KEY must be at least 32 characters.');
-    return k;
-  },
   get ownerEmail() {
     return need('OWNER_EMAIL').toLowerCase();
   },

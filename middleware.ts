@@ -15,7 +15,6 @@ const PUBLIC_PATHS = [
   '/auth',
   '/api/cron',
   '/api/notify',
-  '/api/mcp', // authenticates itself with a bearer key
   '/manifest.webmanifest',
   '/sw.js',
   '/icons',
