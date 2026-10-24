@@ -18,30 +18,27 @@ async function paged<T>(build: (from: number, to: number) => PromiseLike<{ data:
   return out;
 }
 
+export type Item = { date: string; area_id: string | null; done: boolean };
+
 /**
- * Per day: how many things were scheduled across every area of life, and how many got done.
- * Units follow the progress rule: a task with subtasks counts as its subtasks, a task without
- * counts as one. Habits due that day count as one unit each. Days with nothing scheduled are omitted.
+ * Every scheduled unit across all areas of life, one item each. Units follow the progress rule: a task
+ * with subtasks counts as its subtasks, a task without counts as one. Habits due that day count as one
+ * each.
  */
-export async function daySummaries(from: string, to: string): Promise<Record<string, DayStat>> {
+export async function dayItems(from: string, to: string): Promise<Item[]> {
   const today = istDate();
-  const days: Record<string, DayStat> = {};
-  const bump = (d: string, done: boolean) => {
-    const s = (days[d] ??= { total: 0, done: 0 });
-    s.total += 1;
-    if (done) s.done += 1;
-  };
+  const items: Item[] = [];
 
   const [tasks, parents] = await Promise.all([
-    paged<{ id: string; due_date: string; status: string }>((a, b) =>
-      admin().from('tasks').select('id,due_date,status').is('deleted_at', null).gte('due_date', from).lte('due_date', to).order('id').range(a, b)),
+    paged<{ id: string; due_date: string; status: string; area_id: string | null }>((a, b) =>
+      admin().from('tasks').select('id,due_date,status,area_id').is('deleted_at', null).gte('due_date', from).lte('due_date', to).order('id').range(a, b)),
     paged<{ parent_task_id: string }>((a, b) =>
       admin().from('tasks').select('parent_task_id').is('deleted_at', null).not('parent_task_id', 'is', null).order('id').range(a, b)),
   ]);
   const hasChildren = new Set(parents.map((p) => p.parent_task_id));
-  for (const t of tasks) if (!hasChildren.has(t.id)) bump(t.due_date, t.status === 'done');
+  for (const t of tasks) if (!hasChildren.has(t.id)) items.push({ date: t.due_date, area_id: t.area_id, done: t.status === 'done' });
 
-  const habits = (await listHabits(true)).filter((h) => h.kind === 'boolean' || h.kind === 'count');
+  const habits = await listHabits(true);
   if (habits.length) {
     const last = to < today ? to : today;
     const checkins = await paged<{ habit_id: string; checkin_date: string; value: number }>((a, b) =>
@@ -52,11 +49,35 @@ export async function daySummaries(from: string, to: string): Promise<Record<str
         if (h.created_at.slice(0, 10) > d) continue;
         if (h.archived_at && h.archived_at.slice(0, 10) <= d) continue;
         if (!habitDueOn(h, d)) continue;
-        bump(d, (met.get(`${h.id}|${d}`) ?? 0) >= Number(h.target_value));
+        items.push({ date: d, area_id: h.area_id, done: (met.get(`${h.id}|${d}`) ?? 0) >= Number(h.target_value) });
       }
     }
   }
+  return items;
+}
+
+/** Per-day stats, optionally for a single Area. Days with nothing scheduled are omitted. */
+export function summarise(items: Item[], areaId?: string | null): Record<string, DayStat> {
+  const days: Record<string, DayStat> = {};
+  for (const it of items) {
+    if (areaId && it.area_id !== areaId) continue;
+    const s = (days[it.date] ??= { total: 0, done: 0 });
+    s.total += 1;
+    if (it.done) s.done += 1;
+  }
   return days;
+}
+
+/** done/total per area over the loaded span (the per-area analytics). Key 'none' = no area. */
+export function areaTotals(items: Item[], today: string): Record<string, DayStat> {
+  const out: Record<string, DayStat> = {};
+  for (const it of items) {
+    if (it.date > today) continue;
+    const s = (out[it.area_id ?? 'none'] ??= { total: 0, done: 0 });
+    s.total += 1;
+    if (it.done) s.done += 1;
+  }
+  return out;
 }
 
 export async function lifeCalendarSettings(): Promise<{ birth_date: string | null; lifespan_years: number }> {

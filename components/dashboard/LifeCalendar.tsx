@@ -3,12 +3,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { listAreasAction } from '@/app/actions/lookup';
+import type { Area } from '@/lib/types/db';
 import { getLifeCalendarAction, setBirthDateAction, type LifeCalendarData } from '@/app/actions/lifecal';
 import {
   cellStat, classify, monthName, rowsFor, spanOf, weeksLived,
   type Cell, type DotColor, type Gran, type View,
 } from '@/lib/domain/lifecal-math';
 import { addDays } from '@/lib/time';
+import { areaColor } from '@/lib/domain/areas-colors';
 
 const COLORS: Record<DotColor, string> = {
   green: 'bg-emerald-500 border-emerald-500',
@@ -42,6 +45,8 @@ export function LifeCalendar() {
   const [cursor, setCursor] = useState('');
   const [birthInput, setBirthInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [areaId, setAreaId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -52,11 +57,11 @@ export function LifeCalendar() {
     } catch {}
   }, []);
 
-  const load = useCallback(async (v: View, g: Gran, c: string, birth: string | null, lifespan: number) => {
+  const load = useCallback(async (v: View, g: Gran, c: string, birth: string | null, lifespan: number, area: string | null) => {
     const rows = rowsFor(v, g, c || '2000-01-01', birth, lifespan);
     const span = spanOf(rows);
     setLoading(true);
-    const res = await getLifeCalendarAction(span ?? undefined);
+    const res = await getLifeCalendarAction(span ?? undefined, area);
     setLoading(false);
     if (!res.ok) { toast.error(res.error); return; }
     setData(res.data);
@@ -64,10 +69,14 @@ export function LifeCalendar() {
   }, []);
 
   useEffect(() => {
-    void load(view, gran, cursor, data?.birth_date ?? null, data?.lifespan_years ?? 80);
+    void load(view, gran, cursor, data?.birth_date ?? null, data?.lifespan_years ?? 80, areaId);
     // data is deliberately not a dependency: it is the result of this load
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, gran, cursor]);
+  }, [view, gran, cursor, areaId]);
+
+  useEffect(() => {
+    void listAreasAction().then((r) => r.ok && setAreas(r.data));
+  }, []);
 
   const rows = useMemo(
     () => (data && cursor ? rowsFor(view, gran, cursor, data.birth_date, data.lifespan_years) : []),
@@ -79,7 +88,7 @@ export function LifeCalendar() {
     if (!res.ok) { toast.error(res.error); return; }
     setView('life');
     setData((d) => (d ? { ...d, birth_date: res.data.birth_date } : d));
-    void load('life', gran, cursor, res.data.birth_date, data?.lifespan_years ?? 80);
+    void load('life', gran, cursor, res.data.birth_date, data?.lifespan_years ?? 80, areaId);
   }
 
   const needsBirth = view === 'life' && data && !data.birth_date;
@@ -88,10 +97,9 @@ export function LifeCalendar() {
   const dot = view === 'life' ? 'size-2' : view === 'year' && gran === 'sub' ? 'size-6' : view === 'week' ? 'size-8' : view === 'month' && gran === 'sub' ? 'size-8' : 'size-3.5';
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4">
+    <section>
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold">Life calendar</h2>
-        <span className="text-xs text-muted-foreground">{title(cursor || '2000-01-01', view)}</span>
+        <span className="text-sm font-medium">{title(cursor || '2000-01-01', view)}</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {hasSub && (
             <div className="flex rounded-lg bg-muted p-0.5 text-xs">
@@ -121,6 +129,19 @@ export function LifeCalendar() {
         </div>
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {[{ id: null as string | null, name: 'All areas', color: '#64748b' }, ...areas.map((a) => ({ id: a.id as string | null, name: a.name, color: areaColor(a) }))].map((a) => (
+          <button
+            key={a.id ?? 'all'}
+            onClick={() => setAreaId(a.id)}
+            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${areaId === a.id ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:bg-muted'}`}
+          >
+            <span className="size-2 rounded-full" style={{ backgroundColor: a.color }} />
+            {a.name}
+          </button>
+        ))}
+      </div>
+
       {needsBirth ? (
         <div className="mt-4 flex flex-col gap-2 rounded-lg border border-dashed border-border p-4 text-sm">
           <p>When were you born? Your life becomes one dot per week across {data?.lifespan_years ?? 80} years.</p>
@@ -141,6 +162,26 @@ export function LifeCalendar() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {data && areas.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {areas.map((a) => {
+            const t = data.areas[a.id];
+            const p = t && t.total > 0 ? Math.round((t.done / t.total) * 100) : null;
+            const c = classify(t);
+            return (
+              <button key={a.id} onClick={() => setAreaId(areaId === a.id ? null : a.id)} className="rounded-lg border border-border p-2 text-left hover:bg-muted/50">
+                <div className="flex items-center gap-1.5 text-xs font-medium"><span className="size-2 rounded-full" style={{ backgroundColor: areaColor(a) }} />{a.name}</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className={`inline-block size-3 rounded-full border ${COLORS[c]}`} />
+                  <span className="text-sm font-semibold">{p === null ? '—' : `${p}%`}</span>
+                  <span className="text-[11px] text-muted-foreground">{t ? `${t.done}/${t.total}` : 'no data'}</span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 

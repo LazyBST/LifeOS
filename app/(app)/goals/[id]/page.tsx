@@ -5,6 +5,8 @@ import { listAreas, areaSlug } from '@/lib/domain/areas';
 import { listProjects } from '@/lib/domain/projects';
 import { listTasks } from '@/lib/domain/tasks';
 import { goalForecast } from '@/lib/domain/analytics';
+import { ledgerForGoal, slipCount } from '@/lib/domain/ledger';
+import { LedgerSection } from '@/components/ledger/LedgerSection';
 import { readNotes } from '@/lib/domain/notes';
 import { Breadcrumbs } from '@/components/shell/Breadcrumbs';
 import { SetPageContext } from '@/components/chat/page-context';
@@ -31,6 +33,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const [goal, areas] = await Promise.all([getGoal(id), listAreas()]);
   if (!goal) notFound();
 
+  const [ledger, slips] = await Promise.all([ledgerForGoal(id), slipCount('goal', id)]);
   const [projects, forecast, notes, goalTasks] = await Promise.all([
     listProjects({ goal_id: goal.id }),
     goalForecast(goal.id),
@@ -114,6 +117,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <p className="text-xs text-destructive">Projected finish is after the target date.</p>
         )}
       </PropertiesHeader>
+
+      <LedgerSection name={goal.title} agreed={goal.original_target_date ?? goal.target_date} current={goal.target_date} completedOn={goal.completed_on ?? null} ledger={ledger} slips={slips} />
 
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-muted-foreground">Projects</h2>

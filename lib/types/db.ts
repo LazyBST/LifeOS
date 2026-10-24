@@ -32,6 +32,7 @@ export type AppConfig = {
   default_estimate_min: number;
   birth_date?: DateStr | null;
   lifespan_years?: number;
+  calendar_embed_url?: string | null;
 };
 
 export type Area = {
@@ -51,6 +52,8 @@ export type Goal = {
   priority: Priority;
   start_date: DateStr | null;
   target_date: DateStr | null;
+  original_target_date?: DateStr | null;
+  completed_on?: DateStr | null;
   notes_md: string;
   created_at: Instant;
   updated_at: Instant;
@@ -68,6 +71,8 @@ export type Project = {
   priority: Priority;
   start_date: DateStr | null;
   target_date: DateStr | null;
+  original_target_date?: DateStr | null;
+  completed_on?: DateStr | null;
   notes_md: string;
   created_at: Instant;
   updated_at: Instant;
@@ -77,6 +82,7 @@ export type Project = {
 export type Task = {
   id: UUID;
   task_no: number;
+  original_due_date?: DateStr | null;
   title: string;
   goal_id: UUID | null;
   project_id: UUID | null;

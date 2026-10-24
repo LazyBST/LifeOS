@@ -12,6 +12,9 @@ import { DueDateTime } from '@/components/entity/DueDateTime';
 import { SubtaskList } from '@/components/entity/SubtaskList';
 import { NotesEditor } from '@/components/notes/NotesEditor';
 import { updateTaskAction } from '@/app/actions/tasks';
+import { ledgerForTask, slipCount } from '@/lib/domain/ledger';
+import { istDay } from '@/lib/domain/ledger-math';
+import { LedgerSection } from '@/components/ledger/LedgerSection';
 import { PRIORITIES } from '@/lib/types/db';
 import { listStatuses } from '@/lib/domain/statuses';
 import { statusesFor } from '@/lib/types/statuses';
@@ -24,10 +27,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const [task, areas] = await Promise.all([getTask(id), listAreas()]);
   if (!task) notFound();
 
-  const [breadcrumb, subtasks, notes] = await Promise.all([
+  const [breadcrumb, subtasks, notes, ledger, slips] = await Promise.all([
     breadcrumbFor(task),
     listSubtasks(task.id),
     readNotes('task', task.id),
+    ledgerForTask(task),
+    slipCount('task', task.id),
   ]);
 
   let reminder: { text: string; remind_at: string } | null = null;
@@ -148,6 +153,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           </>
         }
       />
+
+      <LedgerSection name={task.title} agreed={task.original_due_date ?? task.due_date} current={task.due_date} completedOn={task.completed_at ? istDay(task.completed_at) : null} ledger={ledger} slips={slips} />
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-muted-foreground">Subtasks</h2>

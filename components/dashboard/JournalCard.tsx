@@ -1,3 +1,4 @@
+import { WidgetCard } from './WidgetCard';
 import { getJournal, listJournal } from '@/lib/domain/journal';
 import { addDays, istDate } from '@/lib/time';
 import { JournalEditor } from '@/components/journal/JournalEditor';
@@ -20,8 +21,7 @@ export async function JournalCard() {
   const data = await loadJournal();
   const today = istDate();
   return (
-    <div className="rounded-xl border border-border bg-card p-3">
-      <h2 className="mb-2 text-sm font-semibold">Journal</h2>
+    <WidgetCard title="Journal" sub="Today’s entry and mood">
       <JournalEditor date={today} initialEntry={data?.entry ?? null} compact />
       {data && data.recent.length > 0 && (
         <details className="mt-3">
@@ -33,7 +33,7 @@ export async function JournalCard() {
           </div>
         </details>
       )}
-    </div>
+    </WidgetCard>
   );
 }
 

@@ -15,6 +15,8 @@ import { InlineDate } from '@/components/entity/InlineDate';
 import { NotesEditor } from '@/components/notes/NotesEditor';
 import { TaskViews } from '@/components/tasks/TaskViews';
 import { updateProjectAction } from '@/app/actions/projects';
+import { ledgerForProject, slipCount } from '@/lib/domain/ledger';
+import { LedgerSection } from '@/components/ledger/LedgerSection';
 import { PRIORITIES } from '@/lib/types/db';
 import { listStatuses } from '@/lib/domain/statuses';
 import { statusesFor } from '@/lib/types/statuses';
@@ -27,6 +29,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const [project, areas] = await Promise.all([getProject(id), listAreas()]);
   if (!project) notFound();
 
+  const [ledger, slips] = await Promise.all([ledgerForProject(id), slipCount('project', id)]);
   const [goal, notes, forecasts] = await Promise.all([
     getGoal(project.goal_id),
     readNotes('project', project.id),
@@ -114,6 +117,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           }
         />
       </PropertiesHeader>
+
+      <LedgerSection name={project.title} agreed={project.original_target_date ?? project.target_date} current={project.target_date} completedOn={project.completed_on ?? null} ledger={ledger} slips={slips} />
 
       <TaskViews
         base={{ project_id: project.id }}

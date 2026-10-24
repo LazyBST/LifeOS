@@ -16,6 +16,7 @@ const MIGRATION_FILES = [
   '0005_rls.sql',
   '0006_statuses.sql',
   '0007_life_calendar.sql',
+  '0008_deadlines_priorities.sql',
 ];
 
 // Supabase provides these for free; PGlite does not, so we stub the minimum

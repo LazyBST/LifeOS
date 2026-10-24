@@ -29,10 +29,13 @@ run each file from `supabase/migrations/` **one at a time, in this order**:
    Google token store and the calendar outbox trigger
 4. `0004_analytics.sql` — the analytics views
 5. `0005_rls.sql` — row level security on every table
+6. `0006_statuses.sql` — the `statuses` table that defines every status, its colours and board columns
+7. `0007_life_calendar.sql` — birth date and lifespan for the life calendar
+8. `0008_deadlines_priorities.sql` — first agreed deadlines and their change log, completion dates, daily top 3, journal improvement, calendar embed link
 
 Then, only if you want test data to click around in:
 
-6. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
+9. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
    two goals, three projects, about a dozen tasks, three habits, five
    transactions and two journal entries.
 
