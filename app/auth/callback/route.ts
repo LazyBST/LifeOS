@@ -6,7 +6,12 @@ import { requestOrigin } from '@/lib/origin';
  *  rule via lib/auth.ts. Redirects to /login with a specific reason on failure. */
 export async function GET(request: NextRequest) {
   const origin = await requestOrigin();
-  const fail = (reason: string) => NextResponse.redirect(new URL(`/login?error=${reason}`, origin));
+  const fail = (reason: string, detail?: string) => {
+    const u = new URL('/login', origin);
+    u.searchParams.set('error', reason);
+    if (detail) u.searchParams.set('detail', detail.slice(0, 160));
+    return NextResponse.redirect(u);
+  };
 
   const code = request.nextUrl.searchParams.get('code');
   if (code) {
@@ -14,7 +19,7 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       console.error('[auth/callback] code exchange failed:', error.message);
-      return fail('exchange_failed');
+      return fail('exchange_failed', error.message);
     }
   }
 

@@ -15,9 +15,9 @@ const MESSAGES: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; detail?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, detail } = await searchParams;
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -30,6 +30,7 @@ export default async function LoginPage({
           {error && (
             <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
               {MESSAGES[error] ?? 'Sign-in failed.'}
+              {detail ? ` (${detail})` : ''}
             </p>
           )}
           <Button size="lg" className="touch-target" nativeButton={false} render={<a href="/auth/signin" />}>
