@@ -53,13 +53,14 @@ export function isConfigured(): boolean {
   return !!clientId() && !!clientSecret();
 }
 
-function redirectUri(): string {
-  return `${env.appUrl}/api/google/callback`;
+/** The address Google sends you back to after consent. It must match one of the Authorized redirect URIs exactly. */
+export function googleRedirectUri(origin?: string): string {
+  return `${(origin ?? env.appUrl).replace(/\/+$/, '')}/api/google/callback`;
 }
 
-function newOAuthClient(): OAuth2Client {
+function newOAuthClient(origin?: string): OAuth2Client {
   if (!isConfigured()) throw new Error('Google is not configured');
-  return new google.auth.OAuth2(clientId(), clientSecret(), redirectUri());
+  return new google.auth.OAuth2(clientId(), clientSecret(), googleRedirectUri(origin));
 }
 
 async function getTokenRow(): Promise<TokenRow | null> {
@@ -68,8 +69,8 @@ async function getTokenRow(): Promise<TokenRow | null> {
 }
 
 /** OAuth consent URL. Always requests a refresh token (spec section 9 setup). */
-export function authUrl(): string {
-  const client = newOAuthClient();
+export function authUrl(origin?: string): string {
+  const client = newOAuthClient(origin);
   return client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
@@ -82,8 +83,8 @@ export function authUrl(): string {
  * single-row `google_tokens` table. The refresh token is a secret: it is
  * never logged and never returned from this function.
  */
-export async function exchangeCode(code: string): Promise<void> {
-  const client = newOAuthClient();
+export async function exchangeCode(code: string, origin?: string): Promise<void> {
+  const client = newOAuthClient(origin);
   const { tokens } = await client.getToken(code);
 
   if (!tokens.refresh_token) {

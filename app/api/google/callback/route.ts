@@ -4,10 +4,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
 import { exchangeCode } from '@/lib/google/auth';
+import { requestOrigin } from '@/lib/origin';
 import { ensureLifeosCalendar, ensurePrimaryCached } from '@/lib/google/calendar';
 
-function settingsRedirect(request: NextRequest, params: Record<string, string>): NextResponse {
-  const url = new URL('/settings', request.url);
+async function settingsRedirect(request: NextRequest, params: Record<string, string>): Promise<NextResponse> {
+  const url = new URL('/settings', await requestOrigin());
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   return NextResponse.redirect(url);
 }
@@ -26,25 +27,26 @@ export async function GET(request: NextRequest) {
   try {
     await requireUser();
   } catch {
-    return settingsRedirect(request, { google: 'error', reason: 'unauthenticated' });
+    return await settingsRedirect(request, { google: 'error', reason: 'unauthenticated' });
   }
 
   const code = request.nextUrl.searchParams.get('code');
   const error = request.nextUrl.searchParams.get('error');
   if (error) {
-    return settingsRedirect(request, { google: 'error', reason: error.slice(0, 60) });
+    return await settingsRedirect(request, { google: 'error', reason: error.slice(0, 60) });
   }
   if (!code) {
-    return settingsRedirect(request, { google: 'error', reason: 'missing_code' });
+    return await settingsRedirect(request, { google: 'error', reason: 'missing_code' });
   }
 
   try {
-    await exchangeCode(code);
+    await exchangeCode(code, await requestOrigin());
     await ensureLifeosCalendar();
     await ensurePrimaryCached();
   } catch (err) {
-    return settingsRedirect(request, { google: 'error', reason: reasonFor(err) });
+    const detail = err instanceof Error ? err.message.replace(/[^\w .,:;/'()-]/g, '').slice(0, 140) : '';
+    return await settingsRedirect(request, { google: 'error', reason: reasonFor(err), ...(detail ? { detail } : {}) });
   }
 
-  return settingsRedirect(request, { google: 'connected' });
+  return await settingsRedirect(request, { google: 'connected' });
 }

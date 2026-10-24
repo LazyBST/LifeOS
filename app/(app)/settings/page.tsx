@@ -6,7 +6,8 @@ import { GoogleSyncNow } from '@/components/settings/GoogleSyncNow';
 import { getConfig } from '@/lib/domain/config';
 import { admin } from '@/lib/supabase/admin';
 import { keyEnvName } from '@/lib/agent/model';
-import { hasTasksScope, hasCalendarWriteScope } from '@/lib/google/auth';
+import { hasTasksScope, hasCalendarWriteScope, googleRedirectUri, isConfigured } from '@/lib/google/auth';
+import { requestOrigin } from '@/lib/origin';
 import type { Account, Category } from '@/lib/types/db';
 
 async function loadAccounts(): Promise<Account[]> {
@@ -80,7 +81,19 @@ async function loadTasksSync() {
   }
 }
 
-export default async function SettingsPage() {
+const REASONS: Record<string, string> = {
+  redirect_uri_mismatch: 'Google does not recognise this app’s return address. Add the redirect address shown below to your OAuth client in Google Cloud, exactly as written.',
+  invalid_scope: 'Google rejected one of the permissions. In Google Cloud, add the calendar and tasks scopes to the consent screen.',
+  access_denied: 'You declined access (or this Google account is not allowed on the consent screen).',
+  not_configured: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not set on the server.',
+  no_refresh_token: 'Google did not give a refresh token. Revoke LifeOS at myaccount.google.com/permissions, then connect again.',
+  unauthenticated: 'You were signed out. Sign in again and retry.',
+  missing_code: 'Google did not send back a code. Try connecting again.',
+};
+
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ google?: string; reason?: string; detail?: string }> }) {
+  const sp = await searchParams;
+  const redirectUri = googleRedirectUri(await requestOrigin());
   const [tasksSync, calState] = await Promise.all([loadTasksSync(), loadCalendarState()]);
   const [config, accounts, categories, google, lastSyncError] = await Promise.all([
     getConfig(),
@@ -116,6 +129,21 @@ export default async function SettingsPage() {
 
       <section className="rounded-xl border border-border bg-card p-3">
         <h2 className="mb-2 text-sm font-semibold">Google Calendar</h2>
+        {sp.google === 'connected' && <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">Google connected.</p>}
+        {sp.google === 'error' && (
+          <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
+            <p className="font-medium">Could not connect Google{sp.reason ? ` (${sp.reason})` : ''}.</p>
+            {sp.reason && REASONS[sp.reason] && <p className="mt-1">{REASONS[sp.reason]}</p>}
+            {sp.detail && <p className="mt-1 text-xs opacity-80">{sp.detail}</p>}
+          </div>
+        )}
+        {isConfigured() && !google.connected && (
+          <div className="mb-3 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+            <p>Before connecting, this exact address must be listed under <b>Authorized redirect URIs</b> for your OAuth client in Google Cloud (APIs &amp; Services → Credentials):</p>
+            <p className="mt-1 select-all break-all rounded bg-muted px-2 py-1 font-mono text-foreground">{redirectUri}</p>
+            <p className="mt-1">“Access blocked: This app’s request is invalid” almost always means it is missing or differs by even one character (http vs https, a trailing slash, another domain).</p>
+          </div>
+        )}
         <GoogleConnect
           connected={google.connected}
           connectedEmail={google.connectedEmail}

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
 import { authUrl, disconnect, isConfigured } from '@/lib/google/auth';
+import { requestOrigin } from '@/lib/origin';
 
 export async function GET() {
   try {
@@ -19,7 +20,8 @@ export async function GET() {
     );
   }
 
-  return NextResponse.redirect(authUrl());
+  // the redirect address comes from the address you are using, not from a setting that may be stale
+  return NextResponse.redirect(authUrl(await requestOrigin()));
 }
 
 export async function POST(request: NextRequest) {
