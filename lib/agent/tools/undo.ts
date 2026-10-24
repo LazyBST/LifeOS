@@ -10,7 +10,11 @@ import { deleteGoal, restoreGoal, updateGoal, type GoalPatch } from '@/lib/domai
 import { deleteProject, restoreProject, updateProject, type ProjectPatch } from '@/lib/domain/projects';
 import { deleteTask, restoreTask, updateTask, type TaskPatch } from '@/lib/domain/tasks';
 import { setNotes } from '@/lib/domain/notes';
-import type { AgentAction, Goal, Project, Task } from '@/lib/types/db';
+import { archiveHabit, updateHabit, type HabitPatch } from '@/lib/domain/habits';
+import { writeJournal } from '@/lib/domain/journal';
+import { cancelReminder } from '@/lib/domain/reminders';
+import { admin } from '@/lib/supabase/admin';
+import type { AgentAction, Goal, Habit, HabitCheckin, Project, Reminder, Task } from '@/lib/types/db';
 
 function goalPatch(g: Goal): GoalPatch {
   return {
@@ -25,6 +29,14 @@ function projectPatch(p: Project): ProjectPatch {
     goal_id: p.goal_id, title: p.title, emoji: p.emoji, description: p.description, area_id: p.area_id,
     status: p.status, priority: p.priority, start_date: p.start_date, target_date: p.target_date,
     notes_md: p.notes_md,
+  };
+}
+
+function habitPatch(h: Habit): HabitPatch {
+  return {
+    name: h.name, emoji: h.emoji, time_of_day: h.time_of_day, kind: h.kind, target_value: h.target_value,
+    unit: h.unit, days_of_week: h.days_of_week, reminder_time: h.reminder_time, area_id: h.area_id,
+    goal_id: h.goal_id, archived_at: h.archived_at,
   };
 }
 
@@ -90,6 +102,40 @@ async function reverseOne(action: AgentAction): Promise<string> {
       const before = action.before as { type: 'goal' | 'project' | 'task'; id: string; before: string };
       await setNotes(before.type, before.id, before.before);
       return 'Reverted a note';
+    }
+    case 'habit_create': {
+      const after = action.after as Habit;
+      await archiveHabit(after.id);
+      return `Archived habit "${after.name}"`;
+    }
+    case 'habit_update': {
+      const before = action.before as Habit;
+      await updateHabit(before.id, habitPatch(before));
+      return `Reverted habit "${before.name}"`;
+    }
+    case 'habit_checkin': {
+      const before = action.before as HabitCheckin | null;
+      const after = action.after as HabitCheckin;
+      if (before) {
+        await admin().from('habit_checkins').update({ value: before.value, note: before.note }).eq('id', after.id);
+        return 'Reverted a habit check-in';
+      }
+      await admin().from('habit_checkins').delete().eq('id', after.id);
+      return 'Removed a habit check-in';
+    }
+    case 'journal_write': {
+      const before = action.before as { date: string; before: string | null; mood: number | null };
+      if (before.before === null) {
+        await admin().from('journal_entries').delete().eq('entry_date', before.date);
+        return 'Removed a journal entry';
+      }
+      await writeJournal({ date: before.date, body_md: before.before, mood: before.mood, mode: 'replace' });
+      return 'Reverted a journal entry';
+    }
+    case 'reminder_create': {
+      const after = action.after as Reminder;
+      await cancelReminder(after.id);
+      return `Cancelled reminder "${after.text}"`;
     }
     default:
       return `Nothing to undo for "${action.tool}"`;

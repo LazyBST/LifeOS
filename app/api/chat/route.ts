@@ -6,6 +6,9 @@ import { admin } from '@/lib/supabase/admin';
 import { runAgent, recentlyTouched } from '@/lib/agent/chat';
 import { newAccumulator, runTool } from '@/lib/agent/registry';
 import type { ToolContext } from '@/lib/agent/types';
+import { consumeJournalReply, pendingJournalFor } from '@/lib/jobs/pending-reply';
+import { setMood } from '@/lib/domain/journal';
+import { istDate } from '@/lib/time';
 import type { ChatContent, ChatMessage, EntityType, PageContext } from '@/lib/types/db';
 
 const ENTITY_TYPES: EntityType[] = ['goal', 'project', 'task', 'area', 'habit', 'none'];
@@ -96,6 +99,16 @@ export async function POST(req: NextRequest) {
         const messageId = await insertMessage('assistant', { text: msg }, page);
         return NextResponse.json({ reply: msg, cards: [], pending, messageId });
       }
+      // The nightly review's mood follow-up is answered here rather than by a
+      // tool call: `journal_write` needs a body, and this stage only sets the
+      // mood (spec section 8).
+      if (pending.tool === 'journal_write' && pending.field === 'mood') {
+        const date = (pending.input.date as string) ?? undefined;
+        await setMood(date ?? istDate(), Number(choice.id));
+        const msg = `Mood ${choice.id} saved. Good night.`;
+        const messageId = await insertMessage('assistant', { text: msg, pending: null }, page);
+        return NextResponse.json({ reply: msg, cards: [], pending: null, messageId });
+      }
       const ctx: ToolContext = { page, channel: 'web', recent: await recentlyTouched(), now: new Date() };
       const acc = newAccumulator(Boolean(confirmed));
       const filledInput = { ...pending.input, [pending.field]: choice.id };
@@ -103,6 +116,17 @@ export async function POST(req: NextRequest) {
       const content: ChatContent = { text: outcome.message, cards: outcome.cards, pending: outcome.pending ?? null };
       const messageId = await insertMessage('assistant', content, page);
       return NextResponse.json({ reply: outcome.message, cards: outcome.cards ?? [], pending: outcome.pending ?? null, messageId });
+    }
+
+    // After the nightly review, the next free-text reply is the day's journal
+    // entry, saved without consulting the model (spec section 8).
+    if (!indexMatch && (await pendingJournalFor(new Date()))) {
+      const journal = await consumeJournalReply(text, new Date());
+      if (journal) {
+        const content: ChatContent = { text: journal.reply, pending: journal.pending };
+        const messageId = await insertMessage('assistant', content, page);
+        return NextResponse.json({ reply: journal.reply, cards: [], pending: journal.pending, messageId });
+      }
     }
 
     const result = await runAgent({ text, page, channel: 'web', confirmed: Boolean(confirmed) });

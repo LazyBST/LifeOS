@@ -1,30 +1,37 @@
-import { admin } from '@/lib/supabase/admin';
-import { istDate } from '@/lib/time';
+import { getJournal, listJournal } from '@/lib/domain/journal';
+import { addDays, istDate } from '@/lib/time';
+import { JournalEditor } from '@/components/journal/JournalEditor';
+import { JournalList } from '@/components/journal/JournalList';
 import type { JournalEntry } from '@/lib/types/db';
 
-async function loadJournal(): Promise<JournalEntry | null> {
+async function loadJournal(): Promise<{ entry: JournalEntry | null; recent: JournalEntry[] } | null> {
   try {
-    const { data } = await admin().from('journal_entries').select('*').eq('entry_date', istDate()).maybeSingle();
-    return (data as JournalEntry) ?? null;
+    const today = istDate();
+    const [entry, recent] = await Promise.all([getJournal(today), listJournal(addDays(today, -13), today)]);
+    return { entry, recent: recent.filter((e) => e.entry_date !== today) };
   } catch {
-    // journal is Part 2; render an empty state until the table exists
+    // journal table may not exist yet; render an empty editor
     return null;
   }
 }
 
-/** Today's journal entry and mood, or a prompt (spec section 6). */
+/** Today's journal entry inline, with a compact history below (spec section 6). */
 export async function JournalCard() {
-  const entry = await loadJournal();
+  const data = await loadJournal();
+  const today = istDate();
   return (
     <div className="rounded-xl border border-border bg-card p-3">
       <h2 className="mb-2 text-sm font-semibold">Journal</h2>
-      {!entry || !entry.body_md ? (
-        <p className="text-sm text-muted-foreground">No entry yet today. How was your day?</p>
-      ) : (
-        <div className="flex flex-col gap-1">
-          {entry.mood != null && <span className="text-xs text-muted-foreground">Mood: {entry.mood}/5</span>}
-          <p className="line-clamp-3 text-sm">{entry.body_md}</p>
-        </div>
+      <JournalEditor date={today} initialEntry={data?.entry ?? null} compact />
+      {data && data.recent.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+            Last 14 days
+          </summary>
+          <div className="mt-2">
+            <JournalList entries={data.recent} />
+          </div>
+        </details>
       )}
     </div>
   );

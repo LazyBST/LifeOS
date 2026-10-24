@@ -4,6 +4,7 @@ import { areaByName } from './areas';
 import { getProject } from './projects';
 import { getGoal } from './goals';
 import { addDays, istDate } from '@/lib/time';
+import { syncTaskReminders } from './reminders';
 import type { TaskFilters } from '@/lib/types/filters';
 import type { DateStr, Priority, Task, TaskStatus, UUID } from '@/lib/types/db';
 
@@ -135,7 +136,11 @@ export async function createTask(input: TaskInput): Promise<Task> {
   // the DB triggers fix up goal_id / area_id from the parent (spec section 4)
   const { data, error } = await admin().from('tasks').insert(row).select('*').single();
   if (error) throw new Error(`task_create: ${error.message}`);
-  return data as Task;
+  const task = data as Task;
+  // A task with a clock time gets its reminder pair now, so cancelling or
+  // moving the task later updates them (spec section 8).
+  if (task.due_at) await syncTaskReminders(task);
+  return task;
 }
 
 export async function updateTask(id: UUID, patch: TaskPatch): Promise<Task> {
@@ -159,7 +164,11 @@ export async function updateTask(id: UUID, patch: TaskPatch): Promise<Task> {
   }
   const { data, error } = await admin().from('tasks').update(row).eq('id', id).select('*').single();
   if (error) throw new Error(`task_update: ${error.message}`);
-  return data as Task;
+  const task = data as Task;
+  if (row.due_at !== undefined || row.status !== undefined || row.title !== undefined) {
+    await syncTaskReminders(task);
+  }
+  return task;
 }
 
 export async function completeTask(id: UUID, completedAt?: string | null): Promise<Task> {
@@ -189,6 +198,7 @@ export async function deleteTask(id: UUID): Promise<Task> {
     .select('*')
     .single();
   if (error) throw new Error(`task_delete: ${error.message}`);
+  await syncTaskReminders(data as Task);
   await admin().from('task_events').insert({
     task_id: id,
     goal_id: (data as Task).goal_id,

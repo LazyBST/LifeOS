@@ -17,6 +17,7 @@ import { coreTools } from './tools/core';
 import { entityTools } from './tools/entities';
 import { notesTools } from './tools/notes';
 import { undoTools } from './tools/undo';
+import { dailyTools } from './tools/daily';
 
 function toRegistry(defs: ToolDef[]): ToolRegistry {
   const out: ToolRegistry = {};
@@ -37,7 +38,8 @@ export const registry: ToolRegistry = registerTools(
   notesTools,
   undoTools,
   // PART 2/3 PLUG-IN POINT:
-  // reminderTools, habitTools, journalTools, moneyTools, reportTools,
+  dailyTools,
+  // moneyTools, reportTools,
 );
 
 /** Tools that never write and never count against the "more than 3 entities"

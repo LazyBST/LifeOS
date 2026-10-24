@@ -151,3 +151,30 @@ Each takes `(input)` or `(id, patch)` matching the domain types.
 
 `app/actions/lookup.ts` — `listAreasAction()`, `listGoalsAction()`,
 `listProjectsAction(goalId?: string)` for filter-bar dropdowns.
+
+---
+
+# Part 2 contracts
+
+New shared modules (already written — import, never edit):
+
+| File | What it gives you |
+| --- | --- |
+| `lib/domain/habits.ts` | `listHabits`, `getHabit`, `createHabit`, `updateHabit`, `archiveHabit`, `checkinHabit`, `habitStatuses(date)`, `streakFor`, `habitDueOn`, `checkinsBetween`, `habitsNeedingNudge`, types `HabitInput`/`HabitPatch`/`HabitStatus` |
+| `lib/domain/journal.ts` | `getJournal`, `listJournal`, `writeJournal({date,body_md,mood,mode})`, `setMood` |
+| `lib/domain/reminders.ts` | `createReminder`, `listReminders`, `cancelReminder`, `dueReminders`, `markSent`, `rollForward`, `nextOccurrence`, `syncTaskReminders(task)` |
+| `lib/push/send.ts` | `sendPush(payload)` — VAPID web-push to every stored subscription, deletes 404/410 ones. Never throws. |
+| `lib/notify.ts` | `notify({title, body, tag, url, actions, id, cards, bypassQuietHours})` — **the only** delivery path: always writes the message to `chat_messages` with `channel:'system'`, then pushes unless push is off or it is quiet hours. Also `inQuietHours()`. |
+
+Rules for Part 2:
+
+- Every proactive message goes through `notify()`. Do not call `sendPush`
+  directly and do not insert `chat_messages` rows for notifications yourself.
+- Notification action buttons (`Done`, `Snooze 1h`, `Tomorrow`, …) are handled
+  by `POST /api/notify/action` **without the LLM**: parse `{action, id}` and
+  call the domain function directly.
+- Every cron job claims an idempotency key first:
+  `insert into job_runs (job_key) values ('morning:2026-10-25') on conflict do nothing returning job_key`
+  — no row returned means another tick already did it.
+- Google Calendar, push and the LLM are all optional at runtime: a missing
+  env var must degrade gracefully, never crash the tick.

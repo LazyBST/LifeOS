@@ -8,6 +8,11 @@ export default defineConfig({
     testTimeout: 30_000,
   },
   resolve: {
-    alias: { '@': path.resolve(__dirname, '.') },
+    alias: {
+      '@': path.resolve(__dirname, '.'),
+      // Tests import server-only domain modules directly; in Node this guard
+      // module throws, so point it at its own no-op build.
+      'server-only': path.resolve(__dirname, 'node_modules/server-only/empty.js'),
+    },
   },
 });

@@ -1,0 +1,506 @@
+import 'server-only';
+import type { calendar_v3 } from 'googleapis';
+import { admin } from '@/lib/supabase/admin';
+import { env } from '@/lib/env';
+import { notify } from '@/lib/notify';
+import { getTask, createTask, updateTask } from '@/lib/domain/tasks';
+import type { Task } from '@/lib/types/db';
+import { isConfigured, authedClient } from './auth';
+import {
+  ensureLifeosCalendar,
+  ensurePrimaryCached,
+  insertEvent,
+  patchEvent,
+  deleteEvent,
+  listEvents,
+  httpStatus,
+} from './calendar';
+
+const MAX_ATTEMPTS = 6;
+const DONE_COLOR_ID = '8'; // grey, for a completed task's event (spec section 9)
+const OUTBOX_BATCH = 20;
+const PRIMARY_CALENDAR_ID = 'primary';
+const FULL_RESYNC_PAST_DAYS = 30;
+const FULL_RESYNC_FUTURE_DAYS = 180;
+
+type OutboxRow = {
+  id: number;
+  task_id: string;
+  op: 'upsert' | 'delete';
+  attempts: number;
+  last_error: string | null;
+  enqueued_at: string;
+  done_at: string | null;
+};
+
+type LinkRow = {
+  task_id: string;
+  google_calendar_id: string;
+  google_event_id: string;
+  etag: string | null;
+  google_updated_at: string | null;
+  local_updated_at: string | null;
+  last_synced_at: string | null;
+};
+
+/** Google is optional at runtime: callers (the cron tick) must never break
+ * because it is unconfigured or the owner hasn't connected an account. */
+async function connected(): Promise<boolean> {
+  if (!isConfigured()) return false;
+  try {
+    await authedClient();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function minutesBetween(startIso: string, endIso: string): number {
+  return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60_000);
+}
+
+function stripDoneMark(summary: string): string {
+  return summary.startsWith('✓ ') ? summary.slice(2) : summary;
+}
+
+function eventBodyForTask(task: Task): calendar_v3.Schema$Event {
+  const start = task.due_at!;
+  const durationMin = task.duration_min ?? 30;
+  const end = new Date(new Date(start).getTime() + durationMin * 60_000).toISOString();
+  const done = task.status === 'done';
+  return {
+    summary: `${done ? '✓ ' : ''}${task.title}`,
+    description: `${env.appUrl}/tasks/${task.id}`,
+    start: { dateTime: start },
+    end: { dateTime: end },
+    colorId: done ? DONE_COLOR_ID : null,
+    extendedProperties: { private: { lifeos_task_id: task.id } },
+  };
+}
+
+/** Exponential backoff gate: attempt N waits roughly 2^N minutes since the
+ * row was first enqueued. gcal_outbox has no "next attempt" column, so this
+ * is an approximation against `enqueued_at`, good enough against a 10
+ * minute cron cadence. */
+function backoffReady(row: OutboxRow): boolean {
+  if (row.attempts <= 0) return true;
+  const waitMs = Math.min(2 ** row.attempts, 24 * 60) * 60_000;
+  return Date.now() - new Date(row.enqueued_at).getTime() >= waitMs;
+}
+
+async function getLink(taskId: string): Promise<LinkRow | null> {
+  const { data } = await admin().from('gcal_links').select('*').eq('task_id', taskId).maybeSingle();
+  return (data as LinkRow) ?? null;
+}
+
+async function deleteLink(taskId: string): Promise<void> {
+  await admin().from('gcal_links').delete().eq('task_id', taskId);
+}
+
+/**
+ * The write we are about to make (or just made) to a task from a remote
+ * Google change will, via the `tasks_gcal_ai` trigger, enqueue a fresh
+ * `gcal_outbox` row. Mark it done immediately so `drainOutbox` doesn't push
+ * our own remote-origin edit straight back to Google — that is the simplest
+ * echo suppression available without a "source" column on tasks.
+ */
+async function suppressEcho(taskId: string): Promise<void> {
+  await admin().from('gcal_outbox').update({ done_at: new Date().toISOString() }).eq('task_id', taskId).is('done_at', null);
+}
+
+async function processOutboxRow(row: OutboxRow): Promise<void> {
+  const calendarId = await ensureLifeosCalendar();
+  const link = await getLink(row.task_id);
+
+  if (row.op === 'delete') {
+    if (link) {
+      await deleteEvent(calendarId, link.google_event_id);
+      await deleteLink(row.task_id);
+    }
+    return;
+  }
+
+  const task = await getTask(row.task_id);
+  if (!task || !task.due_at) {
+    // the task was hard-deleted, or due_at was cleared again after this row
+    // was enqueued: nothing to push, and any stale event should go away.
+    if (link) {
+      await deleteEvent(calendarId, link.google_event_id).catch(() => undefined);
+      await deleteLink(row.task_id);
+    }
+    return;
+  }
+
+  const body = eventBodyForTask(task);
+  const now = new Date().toISOString();
+
+  if (!link) {
+    const event = await insertEvent(calendarId, body);
+    if (!event.id) throw new Error('Google did not return an event id');
+    const { error } = await admin().from('gcal_links').insert({
+      task_id: task.id,
+      google_calendar_id: calendarId,
+      google_event_id: event.id,
+      etag: event.etag ?? null,
+      google_updated_at: event.updated ?? null,
+      local_updated_at: now,
+      last_synced_at: now,
+    });
+    if (error) throw new Error(`gcal_links: ${error.message}`);
+  } else {
+    const event = await patchEvent(calendarId, link.google_event_id, body);
+    const { error } = await admin()
+      .from('gcal_links')
+      .update({
+        etag: event.etag ?? null,
+        google_updated_at: event.updated ?? null,
+        local_updated_at: now,
+        last_synced_at: now,
+      })
+      .eq('task_id', task.id);
+    if (error) throw new Error(`gcal_links: ${error.message}`);
+  }
+}
+
+/** App -> Google. Drains up to 20 un-done outbox rows, oldest first. */
+export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
+  if (!(await connected())) return { pushed: 0, failed: 0 };
+  try {
+    return await drainOutboxInner();
+  } catch (err) {
+    // The cron tick must never break because Google (or Supabase) had a bad moment.
+    console.error('drainOutbox failed', err instanceof Error ? err.message : err);
+    return { pushed: 0, failed: 0 };
+  }
+}
+
+async function drainOutboxInner(): Promise<{ pushed: number; failed: number }> {
+  const { data, error } = await admin()
+    .from('gcal_outbox')
+    .select('*')
+    .is('done_at', null)
+    .order('enqueued_at', { ascending: true })
+    .limit(OUTBOX_BATCH);
+  if (error) return { pushed: 0, failed: 0 };
+
+  const rows = (data ?? []) as OutboxRow[];
+  let pushed = 0;
+  let failed = 0;
+
+  for (const row of rows) {
+    if (!backoffReady(row)) continue;
+    try {
+      await processOutboxRow(row);
+      await admin().from('gcal_outbox').update({ done_at: new Date().toISOString() }).eq('id', row.id);
+      pushed += 1;
+    } catch (err) {
+      const attempts = row.attempts + 1;
+      const message = err instanceof Error ? err.message : String(err);
+      failed += 1;
+      if (attempts >= MAX_ATTEMPTS) {
+        await admin()
+          .from('gcal_outbox')
+          .update({ attempts, last_error: message, done_at: new Date().toISOString() })
+          .eq('id', row.id);
+        await notify({
+          title: 'Google Calendar sync is failing',
+          body: `A task could not be synced after ${attempts} attempts: ${message}`,
+          tag: 'gcal-sync-failed',
+        });
+      } else {
+        await admin().from('gcal_outbox').update({ attempts, last_error: message }).eq('id', row.id);
+      }
+    }
+  }
+
+  return { pushed, failed };
+}
+
+async function getSyncToken(calendarId: string): Promise<string | null> {
+  const { data } = await admin().from('gcal_calendars').select('sync_token').eq('google_calendar_id', calendarId).maybeSingle();
+  return (data as { sync_token: string | null } | null)?.sync_token ?? null;
+}
+
+async function setSyncToken(calendarId: string, token: string | null): Promise<void> {
+  await admin().from('gcal_calendars').update({ sync_token: token }).eq('google_calendar_id', calendarId);
+}
+
+function fullResyncWindow(): { timeMin: string; timeMax: string } {
+  const now = Date.now();
+  return {
+    timeMin: new Date(now - FULL_RESYNC_PAST_DAYS * 86_400_000).toISOString(),
+    timeMax: new Date(now + FULL_RESYNC_FUTURE_DAYS * 86_400_000).toISOString(),
+  };
+}
+
+/** Lists events for a calendar, transparently doing a full resync on a
+ * stale/expired sync token (HTTP 410), as spec section 9 requires. */
+async function listEventsResilient(calendarId: string): Promise<{ events: calendar_v3.Schema$Event[]; nextSyncToken: string | null }> {
+  const syncToken = await getSyncToken(calendarId);
+  try {
+    if (syncToken) return await listEvents({ calendarId, syncToken });
+    return await listEvents({ calendarId, ...fullResyncWindow() });
+  } catch (err) {
+    if (httpStatus(err) === 410) {
+      await setSyncToken(calendarId, null);
+      return await listEvents({ calendarId, ...fullResyncWindow() });
+    }
+    throw err;
+  }
+}
+
+async function findLinkByEventId(eventId: string): Promise<LinkRow | null> {
+  const { data } = await admin().from('gcal_links').select('*').eq('google_event_id', eventId).maybeSingle();
+  return (data as LinkRow) ?? null;
+}
+
+async function logSkippedRecurrence(eventId: string): Promise<void> {
+  await admin().from('sync_conflicts').insert({
+    task_id: null,
+    field: 'recurrence',
+    local_value: null,
+    remote_value: eventId,
+    resolution: 'skipped: recurring events are not supported in v1',
+  });
+}
+
+/** A moved/renamed linked event: resolve per-field conflicts and update the
+ * task. Returns true if anything changed. */
+async function applyLinkedEventUpdate(link: LinkRow, event: calendar_v3.Schema$Event): Promise<boolean> {
+  const task = await getTask(link.task_id);
+  if (!task) return false;
+
+  const remoteStart = event.start?.dateTime ?? event.start?.date ?? null;
+  if (!remoteStart) return false;
+  const remoteEnd = event.end?.dateTime ?? event.end?.date ?? null;
+  const remoteDurationMin = remoteEnd ? minutesBetween(remoteStart, remoteEnd) : task.duration_min ?? 30;
+  // event text is untrusted input: treated strictly as a plain title, never
+  // as instructions (spec "Security").
+  const remoteTitle = stripDoneMark(event.summary ?? task.title).slice(0, 300);
+
+  const lastSynced = link.last_synced_at ? new Date(link.last_synced_at).getTime() : 0;
+  const localChangedSince = new Date(task.updated_at).getTime() > lastSynced;
+  const remoteChangedSince = event.updated ? new Date(event.updated).getTime() > lastSynced : false;
+
+  const patch: Record<string, unknown> = {};
+
+  // Time fields: later change wins (dragging in Calendar is the usual reschedule).
+  if (remoteStart !== task.due_at || remoteDurationMin !== (task.duration_min ?? 30)) {
+    if (localChangedSince && remoteChangedSince) {
+      const remoteWins = !event.updated || new Date(event.updated).getTime() >= new Date(task.updated_at).getTime();
+      await admin().from('sync_conflicts').insert({
+        task_id: task.id,
+        field: 'due_at',
+        local_value: task.due_at,
+        remote_value: remoteStart,
+        resolution: remoteWins ? 'remote wins (later change)' : 'local wins (later change)',
+      });
+      if (remoteWins) {
+        patch.due_at = remoteStart;
+        patch.duration_min = remoteDurationMin;
+      }
+    } else {
+      patch.due_at = remoteStart;
+      patch.duration_min = remoteDurationMin;
+    }
+  }
+
+  // Title: the app wins on conflict.
+  if (remoteTitle !== task.title) {
+    if (localChangedSince && remoteChangedSince) {
+      await admin().from('sync_conflicts').insert({
+        task_id: task.id,
+        field: 'title',
+        local_value: task.title,
+        remote_value: remoteTitle,
+        resolution: 'local wins (app wins on title/status)',
+      });
+    } else if (!localChangedSince) {
+      patch.title = remoteTitle;
+    }
+  }
+
+  let changed = false;
+  if (Object.keys(patch).length > 0) {
+    await updateTask(task.id, patch);
+    await suppressEcho(task.id);
+    changed = true;
+  }
+
+  await admin()
+    .from('gcal_links')
+    .update({
+      etag: event.etag ?? null,
+      google_updated_at: event.updated ?? null,
+      last_synced_at: new Date().toISOString(),
+    })
+    .eq('task_id', task.id);
+
+  return changed;
+}
+
+/** A deleted linked event: clear due_at, keep the task, notify. */
+async function applyLinkedEventDeletion(link: LinkRow): Promise<boolean> {
+  const task = await getTask(link.task_id);
+  await deleteLink(link.task_id);
+  if (!task) return false;
+  await updateTask(task.id, { due_at: null });
+  await suppressEcho(task.id);
+  await notify({
+    title: 'Calendar event removed',
+    body: `"${task.title}" was removed from Google Calendar. The task is unscheduled but still open.`,
+    tag: `gcal-deleted-${task.id}`,
+    url: `/tasks/${task.id}`,
+  });
+  return true;
+}
+
+/** A hand-made event on the LifeOS calendar with no link becomes an
+ * unsorted task (spec section 9, default answer to open question 2). */
+async function createTaskFromEvent(calendarId: string, event: calendar_v3.Schema$Event): Promise<boolean> {
+  if (!event.id) return false;
+  const start = event.start?.dateTime ?? event.start?.date;
+  if (!start) return false;
+  const end = event.end?.dateTime ?? event.end?.date ?? null;
+  const durationMin = end ? minutesBetween(start, end) : 30;
+
+  // Event text is untrusted input: store as a plain title/notes value only,
+  // never passed to the LLM as instructions.
+  const title = (event.summary ?? '(untitled calendar event)').slice(0, 300);
+  const notes = event.description ? `Imported from Google Calendar:\n\n${String(event.description).slice(0, 4000)}` : '';
+
+  const task = await createTask({
+    title,
+    due_at: start,
+    duration_min: durationMin > 0 ? durationMin : 30,
+    notes_md: notes,
+  });
+  await suppressEcho(task.id); // the INSERT trigger just enqueued an upsert for this task
+
+  const { error } = await admin().from('gcal_links').insert({
+    task_id: task.id,
+    google_calendar_id: calendarId,
+    google_event_id: event.id,
+    etag: event.etag ?? null,
+    google_updated_at: event.updated ?? null,
+    local_updated_at: new Date().toISOString(),
+    last_synced_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(`gcal_links: ${error.message}`);
+
+  await notify({
+    title: 'New task from Google Calendar',
+    body: `"${title}" was added as an unsorted task from a calendar event.`,
+    tag: `gcal-new-${task.id}`,
+    url: `/tasks/${task.id}`,
+  });
+  return true;
+}
+
+async function applyRemoteEvent(calendarId: string, event: calendar_v3.Schema$Event): Promise<boolean> {
+  if (!event.id) return false;
+
+  if (event.recurrence && event.recurrence.length > 0) {
+    await logSkippedRecurrence(event.id);
+    return false;
+  }
+
+  const link = await findLinkByEventId(event.id);
+
+  // Echo suppression: an unchanged etag means this is our own write coming
+  // back from the poll, not a real remote change.
+  if (link && link.etag && event.etag && link.etag === event.etag) return false;
+
+  if (event.status === 'cancelled') {
+    if (!link) return false; // an event we never tracked; ignore
+    return applyLinkedEventDeletion(link);
+  }
+
+  if (link) return applyLinkedEventUpdate(link, event);
+
+  const lifeosTaskId = event.extendedProperties?.private?.lifeos_task_id;
+  if (lifeosTaskId) {
+    // Our own event whose link row is missing (e.g. lost in a previous
+    // partial run): relink instead of creating a duplicate task.
+    const task = await getTask(lifeosTaskId);
+    if (task) {
+      await admin().from('gcal_links').insert({
+        task_id: task.id,
+        google_calendar_id: calendarId,
+        google_event_id: event.id,
+        etag: event.etag ?? null,
+        google_updated_at: event.updated ?? null,
+        local_updated_at: new Date().toISOString(),
+        last_synced_at: new Date().toISOString(),
+      });
+      return false;
+    }
+  }
+
+  return createTaskFromEvent(calendarId, event);
+}
+
+async function pollLifeosCalendar(): Promise<number> {
+  const calendarId = await ensureLifeosCalendar();
+  const { events, nextSyncToken } = await listEventsResilient(calendarId);
+
+  let changed = 0;
+  for (const event of events) {
+    if (await applyRemoteEvent(calendarId, event)) changed += 1;
+  }
+
+  await setSyncToken(calendarId, nextSyncToken);
+  return changed;
+}
+
+/** Read-only cache of the primary calendar for the agenda/morning plan;
+ * these events never become tasks. */
+async function pollPrimaryCalendar(): Promise<number> {
+  await ensurePrimaryCached();
+  const { events, nextSyncToken } = await listEventsResilient(PRIMARY_CALENDAR_ID);
+
+  let changed = 0;
+  for (const event of events) {
+    if (!event.id) continue;
+    if (event.status === 'cancelled') {
+      await admin().from('calendar_events').delete().eq('google_event_id', event.id);
+      changed += 1;
+      continue;
+    }
+    const startsAt = event.start?.dateTime ?? event.start?.date ?? null;
+    const endsAt = event.end?.dateTime ?? event.end?.date ?? null;
+    if (!startsAt) continue;
+    const allDay = !event.start?.dateTime;
+    const { error } = await admin()
+      .from('calendar_events')
+      .upsert(
+        {
+          google_event_id: event.id,
+          summary: event.summary ?? null,
+          starts_at: startsAt,
+          ends_at: endsAt,
+          all_day: allDay,
+          updated_at: event.updated ?? null,
+        },
+        { onConflict: 'google_event_id' },
+      );
+    if (!error) changed += 1;
+  }
+
+  await setSyncToken(PRIMARY_CALENDAR_ID, nextSyncToken);
+  return changed;
+}
+
+/** Google -> app. Polled every 10 minutes by the cron tick. */
+export async function pollCalendar(): Promise<{ changed: number }> {
+  if (!(await connected())) return { changed: 0 };
+  try {
+    const lifeos = await pollLifeosCalendar();
+    const primary = await pollPrimaryCalendar();
+    return { changed: lifeos + primary };
+  } catch (err) {
+    // The cron tick must never break because Google had a bad moment.
+    console.error('pollCalendar failed', err instanceof Error ? err.message : err);
+    return { changed: 0 };
+  }
+}
