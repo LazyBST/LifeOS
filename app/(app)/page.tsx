@@ -5,6 +5,7 @@ import { WalletCard } from '@/components/dashboard/WalletCard';
 import { HabitsCard } from '@/components/dashboard/HabitsCard';
 import { AgendaCard } from '@/components/dashboard/AgendaCard';
 import { JournalCard } from '@/components/dashboard/JournalCard';
+import { LifeCalendar } from '@/components/dashboard/LifeCalendar';
 import { TaskViews } from '@/components/tasks/TaskViews';
 
 export default function DashboardPage() {
@@ -15,6 +16,8 @@ export default function DashboardPage() {
       <Suspense fallback={<div className="h-28 w-full animate-pulse rounded-xl bg-muted" />}>
         <GoalsStrip />
       </Suspense>
+
+      <LifeCalendar />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-3 lg:col-span-2">

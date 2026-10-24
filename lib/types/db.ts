@@ -30,6 +30,8 @@ export type AppConfig = {
   night_time: string;
   push_enabled: boolean;
   default_estimate_min: number;
+  birth_date?: DateStr | null;
+  lifespan_years?: number;
 };
 
 export type Area = {
