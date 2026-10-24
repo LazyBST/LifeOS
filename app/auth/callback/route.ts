@@ -23,7 +23,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const r = await checkUser();
+  let r: Awaited<ReturnType<typeof checkUser>>;
+  try {
+    r = await checkUser();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[auth/callback] owner check failed:', msg);
+    return fail('server_error', msg);
+  }
   if (!r.ok) {
     console.error('[auth/callback] rejected:', r.reason);
     if (r.reason === 'owner_mismatch') {

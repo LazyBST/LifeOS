@@ -9,6 +9,8 @@ const MESSAGES: Record<string, string> = {
   exchange_failed:
     'Sign-in could not be completed (code exchange failed). Check the Supabase redirect URLs and try again.',
   signin_failed: 'Could not start Google sign-in. Check the Supabase Google provider settings.',
+  server_error:
+    'Signed in with Google, but the server could not check the owner record. Check SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL and that the migrations were run.',
   no_session: 'No session was created after sign-in. Try again.',
 };
 
