@@ -151,10 +151,10 @@ export async function runTick(now: Date = new Date()): Promise<TickResult> {
     });
   }
 
-  // Calendar poll: every 10 minutes. drainOutbox/pollCalendar already return
+  // Calendar poll: every 5 minutes. drainOutbox/pollCalendar already return
   // zero-values without throwing when Google is unconfigured or not
   // connected, so the tick keeps working either way.
-  if (Number(time.slice(3)) % 10 === 0) {
+  if (Number(time.slice(3)) % 5 === 0) {
     await runJob('calendar-poll', result, async () => {
       const [{ changed }, { pushed }] = await Promise.all([pollCalendar(), drainOutbox()]);
       return changed > 0 || pushed > 0;

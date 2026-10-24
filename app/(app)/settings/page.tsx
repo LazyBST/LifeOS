@@ -4,7 +4,7 @@ import { PushSetup } from '@/components/settings/PushSetup';
 import { GoogleConnect } from '@/components/settings/GoogleConnect';
 import { getConfig } from '@/lib/domain/config';
 import { admin } from '@/lib/supabase/admin';
-import { hasTasksScope } from '@/lib/google/auth';
+import { hasTasksScope, hasCalendarWriteScope } from '@/lib/google/auth';
 import type { Account, Category } from '@/lib/types/db';
 
 async function loadAccounts(): Promise<Account[]> {
@@ -62,10 +62,10 @@ function envStatus(name: string): boolean {
 
 async function loadTasksSync() {
   try {
-    const [{ data }, scope] = await Promise.all([admin().from('gtasks_sync_state').select('*').maybeSingle(), hasTasksScope().catch(() => false)]);
-    return { scope, polled: (data?.last_polled_at as string | null) ?? null, error: (data?.last_error as string | null) ?? null, pulled: Number(data?.last_pulled ?? 0) };
+    const [{ data }, scope, calWrite] = await Promise.all([admin().from('gtasks_sync_state').select('*').maybeSingle(), hasTasksScope().catch(() => false), hasCalendarWriteScope().catch(() => false)]);
+    return { scope, calWrite, polled: (data?.last_polled_at as string | null) ?? null, error: (data?.last_error as string | null) ?? null, pulled: Number(data?.last_pulled ?? 0) };
   } catch {
-    return { scope: false, polled: null, error: null, pulled: 0 };
+    return { scope: false, calWrite: false, polled: null, error: null, pulled: 0 };
   }
 }
 
@@ -110,6 +110,16 @@ export default async function SettingsPage() {
           connectedEmail={google.connectedEmail}
           lastSyncError={lastSyncError}
         />
+        {google.connected && (
+          <div className="mt-3 rounded-lg border px-3 py-2 text-sm">
+            <div className="font-medium">Calendar editing</div>
+            {tasksSync.calWrite ? (
+              <p className="text-xs text-muted-foreground">Two-way: events you add or change in LifeOS go to Google Calendar, and changes made on your phone come back within 5 minutes (or press Sync now on the dashboard).</p>
+            ) : (
+              <p className="text-xs text-amber-600 dark:text-amber-400">Read-only for now: disconnect and connect Google again to allow LifeOS to edit your calendar.</p>
+            )}
+          </div>
+        )}
         {google.connected && (
           <div className="mt-3 rounded-lg border px-3 py-2 text-sm">
             <div className="font-medium">Google Tasks ↔ habits</div>

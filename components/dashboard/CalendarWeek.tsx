@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
+import { syncCalendarNowAction } from '@/app/actions/calevents';
+import { EventDialog, type DialogTarget } from './EventDialog';
 import type { WeekData } from '@/lib/domain/calweek';
 import { addDays, daysBetween, istDate, istParts } from '@/lib/time';
 import { weekStart as mondayOf } from '@/lib/domain/lifecal-math';
@@ -18,6 +20,7 @@ export function CalendarWeek() {
   const [ws, setWs] = useState(mondayOf(today));
   const [data, setData] = useState<WeekData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dialog, setDialog] = useState<DialogTarget>(null);
 
   const load = useCallback(async (w: string) => {
     setLoading(true);
@@ -27,6 +30,12 @@ export function CalendarWeek() {
     setData(r.data);
   }, []);
   useEffect(() => { void load(ws); }, [ws, load]);
+  async function syncNow() {
+    setLoading(true);
+    const r = await syncCalendarNowAction();
+    if (!r.ok) toast.error(r.error); else toast.success(r.data.changed ? `Pulled ${r.data.changed} change${r.data.changed === 1 ? '' : 's'} from Google Calendar.` : 'Already up to date.');
+    await load(ws);
+  }
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(ws, i)), [ws]);
   const hours = Array.from({ length: END_H - START_H }, (_, i) => START_H + i);
@@ -39,7 +48,12 @@ export function CalendarWeek() {
         <button onClick={() => setWs(addDays(ws, 7))} className="rounded-md border px-2 py-1" aria-label="Next week">›</button>
         <span className="ml-1 font-medium">{days[0].slice(5)} → {days[6].slice(5)}</span>
         {loading && <span className="text-xs text-muted-foreground">loading…</span>}
+        <span className="ml-auto flex gap-2">
+          <button onClick={syncNow} className="rounded-md border px-2 py-1 text-xs" title="Pull the latest from Google Calendar now">Sync now</button>
+          <button onClick={() => setDialog({ mode: 'create', date: today, hour: Math.min(22, Math.max(START_H, istParts().hour + 1)) })} className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground">+ Event</button>
+        </span>
       </div>
+      <EventDialog target={dialog} onClose={() => setDialog(null)} onChanged={() => void load(ws)} />
 
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border">
         <div className="grid min-w-[640px] grid-cols-[48px_repeat(7,1fr)] text-xs">
@@ -71,24 +85,27 @@ export function CalendarWeek() {
             {hours.map((h) => <div key={h} className="absolute right-1 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h - START_H) * ROW }}>{h > 12 ? h - 12 : h}{h >= 12 ? 'p' : 'a'}</div>)}
           </div>
           {days.map((d) => (
-            <div key={d} className="relative border-l border-border" style={{ height: hours.length * ROW }}>
+            <div key={d} className="relative cursor-cell border-l border-border" style={{ height: hours.length * ROW }}
+              onClick={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); setDialog({ mode: 'create', date: d, hour: Math.min(END_H - 1, START_H + Math.floor((ev.clientY - r.top) / ROW)) }); }}>
               {hours.map((h) => <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: (h - START_H) * ROW }} />)}
               {data?.allDay.filter((a) => a.date === d).map((a) => (
-                <div key={a.id} className="absolute inset-x-1 top-0 truncate rounded bg-muted px-1 text-[12px]">{a.title}</div>
+                <button key={a.id} onClick={(ev) => { ev.stopPropagation(); if (a.event) setDialog({ mode: 'edit', event: a.event }); }} className="absolute inset-x-1 top-0 truncate rounded bg-muted px-1 text-left text-[12px]">{a.title}</button>
               ))}
               {data?.blocks.filter((b) => istParts(new Date(b.start)).date === d).map((b) => {
                 const s = Math.max(START_H * 60, minutesOf(b.start));
                 const e = Math.min(END_H * 60, Math.max(s + 20, minutesOf(b.end) || s + 30));
                 const style = { top: ((s - START_H * 60) / 60) * ROW, height: ((e - s) / 60) * ROW - 2 };
                 const cls = `absolute inset-x-1 overflow-hidden rounded-md px-1.5 py-0.5 text-[12px] leading-tight ${b.kind === 'task' ? (b.done ? 'bg-muted text-muted-foreground line-through' : 'bg-indigo-100 text-indigo-900 dark:bg-indigo-500/25 dark:text-indigo-100') : 'bg-emerald-100 text-emerald-900 dark:bg-emerald-500/25 dark:text-emerald-100'}`;
-                return b.href ? <Link key={b.id} href={b.href} className={cls} style={style} title={b.title}>{b.title}</Link> : <div key={b.id} className={cls} style={style} title={b.title}>{b.title}</div>;
+                return b.href
+                  ? <Link key={b.id} href={b.href} onClick={(ev) => ev.stopPropagation()} className={cls} style={style} title={b.title}>{b.title}</Link>
+                  : <button key={b.id} onClick={(ev) => { ev.stopPropagation(); if (b.event) setDialog({ mode: 'edit', event: b.event }); }} className={`${cls} text-left`} style={style} title={b.title}>{b.event?.recurring ? '↻ ' : ''}{b.title}</button>;
               })}
               {d === today && (() => { const m = minutesOf(new Date().toISOString()); return m >= START_H * 60 && m < END_H * 60 ? <div className="absolute inset-x-0 z-10 h-0.5 bg-red-500" style={{ top: ((m - START_H * 60) / 60) * ROW }} /> : null; })()}
             </div>
           ))}
         </div>
       </div>
-      <p className="text-[12px] text-muted-foreground">Green: calendar events · Blue: your timed tasks · Bars: goals and projects. Reads your synced calendar, so it works with a private calendar.</p>
+      <p className="text-[12px] text-muted-foreground">Green: calendar events · Blue: your timed tasks · Bars: goals and projects. Click an empty slot to add an event, or an event to edit it — changes go to your Google Calendar. Works with a private calendar.</p>
     </div>
   );
 }

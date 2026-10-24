@@ -37,7 +37,8 @@ Then, only if you want test data to click around in:
 
 9. `0009_habit_task_link.sql` — habits can hang off a task
 10. `0010_gtasks_sync.sql` — Google Tasks ↔ habits sync state
-11. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
+11. `0011_calendar_edit.sql` — edit events on your main calendar from the app, with an undo log
+12. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
    two goals, three projects, about a dozen tasks, three habits, five
    transactions and two journal entries.
 
@@ -112,9 +113,7 @@ It prints a public key and a private key. Set:
    status Google expires refresh tokens after 7 days and calendar sync breaks
    silently. For a personal single-user app the "unverified app" warning on
    first sign-in is fine — click through it.
-5. Scopes: `https://www.googleapis.com/auth/calendar.app.created` and
-   `https://www.googleapis.com/auth/calendar.readonly`. If Google rejects
-   `calendar.app.created`, fall back to `https://www.googleapis.com/auth/calendar`.
+5. Scopes: `https://www.googleapis.com/auth/calendar` (full access, so LifeOS can edit your main calendar as well as its own LifeOS calendar) and, for habit sync, `https://www.googleapis.com/auth/tasks`.
 6. **Credentials** → **Create credentials** → **OAuth client ID** → type
    **Web application**. Authorized redirect URIs:
    - `https://<your-app-domain>/api/google/callback`

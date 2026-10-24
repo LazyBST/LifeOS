@@ -5,18 +5,24 @@ import { env } from '@/lib/env';
 import { admin } from '@/lib/supabase/admin';
 
 /**
- * Least privilege: manage only the app's own "LifeOS" calendar, plus
- * read-only access to the primary calendar for the agenda (spec section 9).
- * Confirm these exact scope names against the current Google docs; fall
- * back to the full `https://www.googleapis.com/auth/calendar` scope if
- * Google rejects `calendar.app.created`.
+ * The full calendar scope: needed to edit events on the primary calendar
+ * from the app (a deliberate widening of spec section 9, which started
+ * read-only). Every app-made change is logged with its before-state.
  */
 export const SCOPES = [
-  'https://www.googleapis.com/auth/calendar.app.created',
-  'https://www.googleapis.com/auth/calendar.readonly',
+  // full calendar access: LifeOS creates and edits events on your primary calendar as well as its own
+  'https://www.googleapis.com/auth/calendar',
   // Google Tasks <-> habits sync (read and complete tasks)
   'https://www.googleapis.com/auth/tasks',
 ];
+
+export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
+
+/** True when the stored consent allows editing your main calendar (older connections must reconnect). */
+export async function hasCalendarWriteScope(): Promise<boolean> {
+  const row = await getTokenRow();
+  return !!row?.refresh_token && (row.scope ?? '').split(/\s+/).includes(CALENDAR_SCOPE);
+}
 
 export const TASKS_SCOPE = 'https://www.googleapis.com/auth/tasks';
 

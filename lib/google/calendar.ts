@@ -13,6 +13,11 @@ type CalendarRow = {
   sync_token: string | null;
 };
 
+/** Authorised Calendar API client (used by the primary-calendar edit path). */
+export async function calendarApi(): Promise<calendar_v3.Calendar> {
+  return client();
+}
+
 async function client(): Promise<calendar_v3.Calendar> {
   const auth = await authedClient();
   return google.calendar({ version: 'v3', auth });

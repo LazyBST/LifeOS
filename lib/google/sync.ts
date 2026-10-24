@@ -15,6 +15,7 @@ import {
   listEvents,
   httpStatus,
 } from './calendar';
+import { eventToCacheRow, type CacheRow } from './events-math';
 
 const MAX_ATTEMPTS = 6;
 const DONE_COLOR_ID = '8'; // grey, for a completed task's event (spec section 9)
@@ -453,7 +454,16 @@ async function pollLifeosCalendar(): Promise<number> {
   return changed;
 }
 
-/** Read-only cache of the primary calendar for the agenda/morning plan;
+/** Upserts a primary-calendar event into the cache. Falls back to the original columns if migration 0011 has not run. */
+export async function upsertCacheRow(row: CacheRow): Promise<boolean> {
+  const { error } = await admin().from('calendar_events').upsert(row, { onConflict: 'google_event_id' });
+  if (!error) return true;
+  const { google_event_id, summary, starts_at, ends_at, all_day, updated_at } = row;
+  const { error: e2 } = await admin().from('calendar_events').upsert({ google_event_id, summary, starts_at, ends_at, all_day, updated_at }, { onConflict: 'google_event_id' });
+  return !e2;
+}
+
+/** Cache of the primary calendar for the agenda/morning plan;
  * these events never become tasks. */
 async function pollPrimaryCalendar(): Promise<number> {
   await ensurePrimaryCached();
@@ -467,24 +477,9 @@ async function pollPrimaryCalendar(): Promise<number> {
       changed += 1;
       continue;
     }
-    const startsAt = event.start?.dateTime ?? event.start?.date ?? null;
-    const endsAt = event.end?.dateTime ?? event.end?.date ?? null;
-    if (!startsAt) continue;
-    const allDay = !event.start?.dateTime;
-    const { error } = await admin()
-      .from('calendar_events')
-      .upsert(
-        {
-          google_event_id: event.id,
-          summary: event.summary ?? null,
-          starts_at: startsAt,
-          ends_at: endsAt,
-          all_day: allDay,
-          updated_at: event.updated ?? null,
-        },
-        { onConflict: 'google_event_id' },
-      );
-    if (!error) changed += 1;
+    const row = eventToCacheRow(event);
+    if (!row) continue;
+    if (await upsertCacheRow(row)) changed += 1;
   }
 
   await setSyncToken(PRIMARY_CALENDAR_ID, nextSyncToken);
