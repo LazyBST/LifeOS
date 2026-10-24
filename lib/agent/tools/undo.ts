@@ -12,6 +12,8 @@ import { deleteTask, restoreTask, updateTask, type TaskPatch } from '@/lib/domai
 import { setNotes } from '@/lib/domain/notes';
 import { archiveHabit, updateHabit, type HabitPatch } from '@/lib/domain/habits';
 import { writeJournal } from '@/lib/domain/journal';
+import { setPriority } from '@/lib/domain/priorities';
+import { setImprovement } from '@/lib/domain/improvement';
 import { cancelReminder } from '@/lib/domain/reminders';
 import { deleteTransaction } from '@/lib/domain/money';
 import { admin } from '@/lib/supabase/admin';
@@ -132,6 +134,21 @@ async function reverseOne(action: AgentAction): Promise<string> {
       }
       await writeJournal({ date: before.date, body_md: before.before, mood: before.mood, mode: 'replace' });
       return 'Reverted a journal entry';
+    }
+    case 'top3_set':
+    case 'top3_toggle': {
+      const before = action.before as { date: string; items: ({ position: number; text: string; task_id: string | null; done: boolean } | null)[] };
+      for (let i = 0; i < 3; i++) {
+        const it = before.items[i];
+        await setPriority(before.date, (i + 1) as 1 | 2 | 3, it?.text ?? '', it?.task_id);
+        if (it?.done) await admin().from('daily_priorities').update({ done_at: new Date().toISOString() }).eq('plan_date', before.date).eq('position', i + 1);
+      }
+      return 'Restored the top 3';
+    }
+    case 'improvement_set': {
+      const before = action.before as { date: string; improvement: string | null };
+      await setImprovement(before.date, before.improvement ?? '');
+      return 'Reverted the improvement';
     }
     case 'reminder_create': {
       const after = action.after as Reminder;

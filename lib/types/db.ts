@@ -127,6 +127,7 @@ export type Habit = {
   reminder_time: string | null;
   area_id: UUID | null;
   goal_id: UUID | null;
+  task_id?: UUID | null;
   archived_at: Instant | null;
   created_at: Instant;
 };

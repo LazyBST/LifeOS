@@ -200,6 +200,7 @@ const habitCreateSchema = z.object({
   reminder_time: z.string().optional(),
   area: z.string().optional(),
   goal_ref: z.string().optional(),
+  task_ref: z.string().optional().describe('attach as a sub-habit of this task'),
 });
 
 const habitCreate: ToolDef<typeof habitCreateSchema> = {
@@ -214,6 +215,12 @@ const habitCreate: ToolDef<typeof habitCreateSchema> = {
       if ('stop' in r) return r.stop;
       goal_id = r.id;
     }
+    let task_id: UUID | undefined;
+    if (input.task_ref) {
+      const r = await resolveOrStop(input.task_ref, ['task'], ctx, 'habit_create', input, 'task_ref', 'task');
+      if ('stop' in r) return r.stop;
+      task_id = r.id;
+    }
     const habit = await createHabit({
       name: input.name,
       emoji: input.emoji ?? null,
@@ -225,6 +232,7 @@ const habitCreate: ToolDef<typeof habitCreateSchema> = {
       reminder_time: input.reminder_time ?? null,
       area: input.area ?? null,
       goal_id,
+      task_id,
     });
     return {
       message: `Created habit "${habit.name}".`,

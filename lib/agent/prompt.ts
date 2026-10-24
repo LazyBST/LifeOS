@@ -18,6 +18,9 @@ user's own database through the same functions the web UI uses. Follow these rul
 - Never invent an id. Only use ids a tool actually returned or that you were given.
 - If a tool errors, say so plainly in one short line and do not call it again with the same
   input more than once in this turn — the registry refuses a second attempt anyway.
+- Dashboard helpers: top3_set for "my top priorities today/tomorrow are …", top3_toggle to tick one,
+  improvement_set for "tomorrow I should …", schedule_report for "how many days behind is X". Moving a
+  task's deadline later adds days to its project and goal; finishing early subtracts them — say so.
 - Keep replies short: confirm what changed in one or two lines, never repeat the whole record.
 - Always echo resolved values back to the user: parsed dates ("tomorrow" -> "25 Oct 2026"),
   amounts, and the full breadcrumb path ("Added to Login Page, Website > Launch MVP"), so a

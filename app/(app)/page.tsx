@@ -14,6 +14,17 @@ import { CalendarEmbed } from '@/components/dashboard/CalendarEmbed';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
 import { TaskViews } from '@/components/tasks/TaskViews';
 import { getConfig } from '@/lib/domain/config';
+import { safe } from '@/components/dashboard/safe';
+
+const Areas = safe('Life areas report', () => LifeAreasWidget());
+const Goals = safe('Goals', () => GoalsWidget());
+const Habits = safe('Habits', () => HabitsCard());
+const Top3 = safe('Today’s top 3', () => PrioritiesWidget());
+const Improve = safe('Last night’s improvement', () => ImprovementWidget());
+const Money = safe('Money', () => MoneyWidget());
+const Projects = safe('Projects', () => ProjectsWidget());
+const Journal = safe('Journal', () => JournalCard());
+const Slip = safe('Schedule', async () => (await SlipBanner()) ?? null);
 
 const Loading = () => <div className="h-full w-full animate-pulse rounded-2xl bg-muted" />;
 const S = ({ children }: { children: ReactNode }) => <Suspense fallback={<Loading />}>{children}</Suspense>;
@@ -21,22 +32,22 @@ const S = ({ children }: { children: ReactNode }) => <Suspense fallback={<Loadin
 export default async function DashboardPage() {
   const cfg = await getConfig().catch(() => null);
   const widgets: GridWidget[] = [
-    { id: 'areas', node: <S><LifeAreasWidget /></S> },
-    { id: 'goals', node: <S><GoalsWidget /></S> },
-    { id: 'habits', node: <S><HabitsCard /></S> },
-    { id: 'top3', node: <S><PrioritiesWidget /></S> },
-    { id: 'improve', node: <S><ImprovementWidget /></S> },
-    { id: 'money', node: <S><MoneyWidget /></S> },
-    { id: 'projects', node: <S><ProjectsWidget /></S> },
+    { id: 'areas', node: <S><Areas /></S> },
+    { id: 'goals', node: <S><Goals /></S> },
+    { id: 'habits', node: <S><Habits /></S> },
+    { id: 'top3', node: <S><Top3 /></S> },
+    { id: 'improve', node: <S><Improve /></S> },
+    { id: 'money', node: <S><Money /></S> },
+    { id: 'projects', node: <S><Projects /></S> },
     { id: 'tasks', node: <WidgetCard title="Tasks" sub="Board · List — the same view on every page"><TaskViews base={{}} scope="dashboard" /></WidgetCard> },
     { id: 'life', node: <WidgetCard title="Life calendar" sub="One dot per day · green 70%+, yellow 50–70%, red under 50%"><LifeCalendar /></WidgetCard> },
     { id: 'calendar', node: <WidgetCard title="Google Calendar" sub="Embedded view of your calendar" bodyClassName="flex flex-col"><CalendarEmbed url={cfg?.calendar_embed_url ?? null} /></WidgetCard> },
-    { id: 'journal', node: <S><JournalCard /></S> },
+    { id: 'journal', node: <S><Journal /></S> },
   ];
   return (
     <div className="flex flex-col gap-4 p-4 sm:p-6">
       <DashboardHeader />
-      <S><SlipBanner /></S>
+      <S><Slip /></S>
       <DashboardGrid widgets={widgets} />
     </div>
   );

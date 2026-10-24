@@ -20,6 +20,7 @@ import { undoTools } from './tools/undo';
 import { dailyTools } from './tools/daily';
 import { moneyTools } from './tools/money';
 import { reportTools } from './tools/report';
+import { dashboardTools } from './tools/dashboard';
 
 function toRegistry(defs: ToolDef[]): ToolRegistry {
   const out: ToolRegistry = {};
@@ -42,6 +43,7 @@ export const registry: ToolRegistry = registerTools(
   // PART 2/3 PLUG-IN POINT:
   dailyTools,
   moneyTools, reportTools,
+  dashboardTools,
 );
 
 /** Tools that never write and never count against the "more than 3 entities"
@@ -51,7 +53,7 @@ export const registry: ToolRegistry = registerTools(
 const READONLY_TOOLS = new Set([
   'search', 'get', 'task_list', 'notes_read', 'get_today', 'undo_last',
   'habit_status', 'journal_get', 'reminder_list',
-  'wallet', 'finance_summary', 'report',
+  'wallet', 'finance_summary', 'report', 'schedule_report',
 ]);
 
 const MAX_FREE_MUTATIONS = 3;

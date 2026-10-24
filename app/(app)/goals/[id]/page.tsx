@@ -6,6 +6,7 @@ import { listProjects } from '@/lib/domain/projects';
 import { listTasks } from '@/lib/domain/tasks';
 import { goalForecast } from '@/lib/domain/analytics';
 import { ledgerForGoal, slipCount } from '@/lib/domain/ledger';
+import { LinkedHabits } from '@/components/habits/LinkedHabits';
 import { LedgerSection } from '@/components/ledger/LedgerSection';
 import { readNotes } from '@/lib/domain/notes';
 import { Breadcrumbs } from '@/components/shell/Breadcrumbs';
@@ -119,6 +120,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       </PropertiesHeader>
 
       <LedgerSection name={goal.title} agreed={goal.original_target_date ?? goal.target_date} current={goal.target_date} completedOn={goal.completed_on ?? null} ledger={ledger} slips={slips} />
+
+      <LinkedHabits goalId={goal.id} areaId={goal.area_id} title="Habits linked to this goal" />
 
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-muted-foreground">Projects</h2>

@@ -14,6 +14,7 @@ import { NotesEditor } from '@/components/notes/NotesEditor';
 import { updateTaskAction } from '@/app/actions/tasks';
 import { ledgerForTask, slipCount } from '@/lib/domain/ledger';
 import { istDay } from '@/lib/domain/ledger-math';
+import { LinkedHabits } from '@/components/habits/LinkedHabits';
 import { LedgerSection } from '@/components/ledger/LedgerSection';
 import { PRIORITIES } from '@/lib/types/db';
 import { listStatuses } from '@/lib/domain/statuses';
@@ -155,6 +156,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       />
 
       <LedgerSection name={task.title} agreed={task.original_due_date ?? task.due_date} current={task.due_date} completedOn={task.completed_at ? istDay(task.completed_at) : null} ledger={ledger} slips={slips} />
+
+      <LinkedHabits taskId={task.id} areaId={task.area_id} title="Sub-habits for this task" />
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-muted-foreground">Subtasks</h2>

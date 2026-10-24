@@ -18,6 +18,8 @@ export type HabitInput = {
   area?: string | null;
   area_id?: UUID | null;
   goal_id?: UUID | null;
+  /** a sub-habit of this task */
+  task_id?: UUID | null;
 };
 
 export type HabitPatch = Partial<HabitInput> & { archived_at?: string | null };
@@ -58,6 +60,7 @@ export async function createHabit(input: HabitInput): Promise<Habit> {
     reminder_time: input.reminder_time ?? null,
     area_id,
     goal_id: input.goal_id ?? null,
+    ...(input.task_id ? { task_id: input.task_id } : {}),
   };
   const { data, error } = await admin().from('habits').insert(row).select('*').single();
   if (error) throw new Error(`habit_create: ${error.message}`);
