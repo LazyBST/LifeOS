@@ -3,8 +3,7 @@
 // proactive messages into the same conversation with `channel: 'system'`.
 import 'server-only';
 import { generateText, stepCountIs } from 'ai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { env, MODELS } from '@/lib/env';
+import { chatModel } from './model';
 import { admin } from '@/lib/supabase/admin';
 import { newAccumulator, toAiTools } from './registry';
 import { buildSystemPrompt } from './prompt';
@@ -53,11 +52,6 @@ export async function recentlyTouched(limit = 20): Promise<{ type: string; id: s
   return out;
 }
 
-function anthropicModel() {
-  const anthropic = createAnthropic({ apiKey: env.anthropicApiKey });
-  return anthropic(MODELS.chat);
-}
-
 export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
   const now = new Date();
   const recent = await recentlyTouched();
@@ -67,7 +61,7 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
   const system = await buildSystemPrompt({ page: input.page, now });
 
   const result = await generateText({
-    model: anthropicModel(),
+    model: chatModel(),
     system,
     prompt: input.text,
     tools,

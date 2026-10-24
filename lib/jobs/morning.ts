@@ -4,8 +4,7 @@
 // to a deterministic plan when the model is unavailable or errors.
 import 'server-only';
 import { generateText } from 'ai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { env, MODELS } from '@/lib/env';
+import { cheapModel } from '@/lib/agent/model';
 import { admin } from '@/lib/supabase/admin';
 import { notify } from '@/lib/notify';
 import { addDays, daysBetween, istInstant, istParts } from '@/lib/time';
@@ -118,7 +117,6 @@ async function draftWithModel(opts: {
   habits: HabitStatus[];
   goals: GoalForecast[];
 }): Promise<string> {
-  const anthropic = createAnthropic({ apiKey: env.anthropicApiKey });
   // Task titles, event summaries, etc. are user data, not instructions —
   // the model is only asked to summarise them into a short plan.
   const prompt = [
@@ -134,7 +132,7 @@ async function draftWithModel(opts: {
     '',
     'Keep it under 150 words. Lead with the three must-do tasks.',
   ].join('\n');
-  const result = await generateText({ model: anthropic(MODELS.cheap), prompt });
+  const result = await generateText({ model: cheapModel(), prompt });
   const text = result.text.trim();
   if (!text) throw new Error('empty model response');
   return text;

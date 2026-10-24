@@ -4,6 +4,7 @@ import { PushSetup } from '@/components/settings/PushSetup';
 import { GoogleConnect } from '@/components/settings/GoogleConnect';
 import { getConfig } from '@/lib/domain/config';
 import { admin } from '@/lib/supabase/admin';
+import { keyEnvName } from '@/lib/agent/model';
 import { hasTasksScope, hasCalendarWriteScope } from '@/lib/google/auth';
 import type { Account, Category } from '@/lib/types/db';
 
@@ -80,7 +81,7 @@ export default async function SettingsPage() {
   ]);
 
   const diagnostics: { label: string; env: string }[] = [
-    { label: 'Anthropic key', env: 'ANTHROPIC_API_KEY' },
+    { label: 'AI model key', env: keyEnvName() },
     { label: 'VAPID public key', env: 'VAPID_PUBLIC_KEY' },
     { label: 'VAPID private key', env: 'VAPID_PRIVATE_KEY' },
     { label: 'Google client ID', env: 'GOOGLE_CLIENT_ID' },

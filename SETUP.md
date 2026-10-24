@@ -81,12 +81,14 @@ files depend on the earlier ones.
 - Use the same port everywhere: `npm run dev` serves on 3000, and the Supabase
   redirect URL must match the port you open.
 
-## 4. Create the Anthropic API key
+## 4. Create the Gemini API key
 
-1. Go to <https://console.anthropic.com/settings/keys>, create a key named
-   `lifeos`.
-2. Copy it into `ANTHROPIC_API_KEY` (step 8). It is read only on the server.
-3. Optional: set a monthly spend limit on the console while you are there.
+1. Go to <https://aistudio.google.com/apikey> and create an API key.
+2. Copy it into `GOOGLE_GENERATIVE_AI_API_KEY` (step 8). It is read only on the server.
+3. The chat uses `gemini-2.5-flash` and the morning plan `gemini-2.5-flash-lite` by default. Set
+   `CHAT_MODEL` / `CHEAP_MODEL` in Vercel to use another Gemini model (for example a Pro model).
+4. To use Claude instead, set `LLM_PROVIDER=anthropic`, add `ANTHROPIC_API_KEY`, and set `CHAT_MODEL`.
+5. Optional: set a spend limit on the key's Google Cloud project.
 
 ## 5. Generate the Web Push (VAPID) keys
 
@@ -147,7 +149,8 @@ It prints a public key and a private key. Set:
    | `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public key |
    | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → service_role key (**server only**) |
    | `OWNER_EMAIL` | your Gmail address |
-   | `ANTHROPIC_API_KEY` | step 4 |
+   | `LLM_PROVIDER`, `GOOGLE_GENERATIVE_AI_API_KEY` | step 4 (`google` is the default) |
+   | `CHAT_MODEL`, `CHEAP_MODEL`, `ANTHROPIC_API_KEY` | optional overrides / Claude |
    | `CRON_SECRET` | `openssl rand -hex 32` |
    | `VAPID_PUBLIC_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | step 5 |
    | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | step 6 |

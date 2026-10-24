@@ -19,9 +19,6 @@ export const env = {
   get supabaseServiceRoleKey() {
     return need('SUPABASE_SERVICE_ROLE_KEY');
   },
-  get anthropicApiKey() {
-    return need('ANTHROPIC_API_KEY');
-  },
   get cronSecret() {
     return need('CRON_SECRET');
   },
@@ -36,8 +33,3 @@ export const env = {
   },
 };
 
-/** Models are swappable; defaults are Anthropic (spec section 3). */
-export const MODELS = {
-  chat: process.env.CHAT_MODEL ?? 'claude-sonnet-5',
-  cheap: process.env.CHEAP_MODEL ?? 'claude-haiku-4-5-20251001',
-};
