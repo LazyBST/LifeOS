@@ -20,4 +20,9 @@ describe('server components', () => {
     const offenders = server.filter((f) => /\son(Click|Change|Mouse\w+|Key\w+|Submit|Focus|Blur)=\{/.test(readFileSync(f, 'utf8')));
     expect(offenders.map((f) => path.relative(root, f))).toEqual([]);
   });
+  it('pass no function props (arrow functions) to other components', () => {
+    // `render=`/`children=` aside, any `name={(…) => …}` attribute in a server file cannot be serialised
+    const offenders = server.filter((f) => /\s(?!key=)\w+=\{\s*(async\s*)?\([^)]*\)\s*=>/.test(readFileSync(f, 'utf8')));
+    expect(offenders.map((f) => path.relative(root, f))).toEqual([]);
+  });
 });

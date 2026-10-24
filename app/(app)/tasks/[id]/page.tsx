@@ -11,7 +11,6 @@ import { InlineSelect } from '@/components/entity/InlineSelect';
 import { DueDateTime } from '@/components/entity/DueDateTime';
 import { SubtaskList } from '@/components/entity/SubtaskList';
 import { NotesEditor } from '@/components/notes/NotesEditor';
-import { updateTaskAction } from '@/app/actions/tasks';
 import { ledgerForTask, slipCount } from '@/lib/domain/ledger';
 import { istDay } from '@/lib/domain/ledger-math';
 import { LinkedHabits } from '@/components/habits/LinkedHabits';
@@ -20,7 +19,6 @@ import { PRIORITIES } from '@/lib/types/db';
 import { listStatuses } from '@/lib/domain/statuses';
 import { statusesFor } from '@/lib/types/statuses';
 import { formatDate } from '@/lib/time';
-import type { Priority, TaskStatus } from '@/lib/types/db';
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const statusOptions = statusesFor(await listStatuses(), 'task').map((s) => ({ value: s.key, label: s.label }));
@@ -83,7 +81,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <InlineText
             value={task.title}
             placeholder="Untitled task"
-            onSave={(v) => updateTaskAction(task.id, { title: v })}
+            save={{ entity: 'task', id: task.id, field: 'title' }}
             textClassName="text-xl font-semibold"
           />
         }
@@ -92,18 +90,18 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             <InlineSelect
               value={task.status}
               options={statusOptions}
-              onSave={(v) => updateTaskAction(task.id, { status: v as TaskStatus })}
+              save={{ entity: 'task', id: task.id, field: 'status' }}
             />
             <InlineSelect
               value={task.priority}
               options={PRIORITIES.map((p) => ({ value: p, label: p }))}
-              onSave={(v) => updateTaskAction(task.id, { priority: v as Priority })}
+              save={{ entity: 'task', id: task.id, field: 'priority' }}
             />
             <InlineSelect
               value={task.area_id}
               clearable
               options={areas.map((a) => ({ value: a.id, label: a.name }))}
-              onSave={(v) => updateTaskAction(task.id, { area_id: v || null })}
+              save={{ entity: 'task', id: task.id, field: 'area_id', mode: 'nullable' }}
             />
             <span className="flex items-center gap-1 text-sm text-muted-foreground">
               Due
@@ -114,11 +112,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               <InlineText
                 value={task.duration_min != null ? String(task.duration_min) : ''}
                 placeholder="—"
-                onSave={(v) =>
-                  updateTaskAction(task.id, {
-                    duration_min: v.trim() === '' ? null : Math.max(0, parseInt(v, 10) || 0),
-                  })
-                }
+                save={{ entity: 'task', id: task.id, field: 'duration_min', mode: 'int' }}
                 className="w-16"
               />
             </span>
@@ -127,11 +121,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               <InlineText
                 value={task.estimate_min != null ? String(task.estimate_min) : ''}
                 placeholder="30"
-                onSave={(v) =>
-                  updateTaskAction(task.id, {
-                    estimate_min: v.trim() === '' ? null : Math.max(0, parseInt(v, 10) || 0),
-                  })
-                }
+                save={{ entity: 'task', id: task.id, field: 'estimate_min', mode: 'int' }}
                 className="w-16"
               />
             </span>
@@ -140,14 +130,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               <InlineText
                 value={task.tags.join(', ')}
                 placeholder="tag1, tag2"
-                onSave={(v) =>
-                  updateTaskAction(task.id, {
-                    tags: v
-                      .split(',')
-                      .map((t) => t.trim())
-                      .filter(Boolean),
-                  })
-                }
+                save={{ entity: 'task', id: task.id, field: 'tags', mode: 'tags' }}
                 className="w-40"
               />
             </span>

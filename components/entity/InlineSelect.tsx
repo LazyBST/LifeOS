@@ -5,13 +5,15 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ActionResult } from '@/app/actions/_result';
+import { saveField, type FieldSave } from './save';
 
 type Option = { value: string; label: string };
 
 type InlineSelectProps = {
   value: string | null;
   options: Option[];
-  onSave: (next: string) => Promise<ActionResult<unknown>>;
+  onSave?: (next: string) => Promise<ActionResult<unknown>>;
+  save?: FieldSave;
   placeholder?: string;
   className?: string;
   /** Allow clearing back to no value (renders a "None" option). */
@@ -25,11 +27,13 @@ type InlineSelectProps = {
 export function InlineSelect({
   value,
   options,
-  onSave,
+  onSave: onSaveProp,
+  save,
   placeholder = 'Select…',
   className,
   clearable = false,
 }: InlineSelectProps) {
+  const onSave = onSaveProp ?? ((next: string) => saveField(save!, next));
   const [current, setCurrent] = useState<string | null>(value);
   const [saving, setSaving] = useState(false);
 

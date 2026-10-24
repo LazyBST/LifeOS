@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ActionResult } from '@/app/actions/_result';
+import { saveField, type FieldSave } from './save';
 
 type InlineTextProps = {
   value: string;
-  onSave: (next: string) => Promise<ActionResult<unknown>>;
+  onSave?: (next: string) => Promise<ActionResult<unknown>>;
+  /** serialisable alternative to onSave, usable from server components */
+  save?: FieldSave;
   placeholder?: string;
   className?: string;
   multiline?: boolean;
@@ -22,12 +25,14 @@ type InlineTextProps = {
  */
 export function InlineText({
   value,
-  onSave,
+  onSave: onSaveProp,
+  save,
   placeholder = 'Untitled',
   className,
   multiline = false,
   textClassName,
 }: InlineTextProps) {
+  const onSave = onSaveProp ?? ((next: string) => saveField(save!, next));
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
   const savedRef = useRef(value);

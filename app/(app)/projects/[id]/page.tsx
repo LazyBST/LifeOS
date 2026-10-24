@@ -14,14 +14,12 @@ import { InlineSelect } from '@/components/entity/InlineSelect';
 import { InlineDate } from '@/components/entity/InlineDate';
 import { NotesEditor } from '@/components/notes/NotesEditor';
 import { TaskViews } from '@/components/tasks/TaskViews';
-import { updateProjectAction } from '@/app/actions/projects';
 import { ledgerForProject, slipCount } from '@/lib/domain/ledger';
 import { LedgerSection } from '@/components/ledger/LedgerSection';
 import { PRIORITIES } from '@/lib/types/db';
 import { listStatuses } from '@/lib/domain/statuses';
 import { statusesFor } from '@/lib/types/statuses';
 import { formatDate } from '@/lib/time';
-import type { EntityStatus, Priority } from '@/lib/types/db';
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const statusOptions = statusesFor(await listStatuses(), 'project').map((s) => ({ value: s.key, label: s.label }));
@@ -64,7 +62,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <InlineText
             value={project.emoji ?? ''}
             placeholder="📁"
-            onSave={(v) => updateProjectAction(project.id, { emoji: v || null })}
+            save={{ entity: 'project', id: project.id, field: 'emoji', mode: 'nullable' }}
             className="w-10 text-center text-2xl"
           />
         }
@@ -72,7 +70,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <InlineText
             value={project.title}
             placeholder="Untitled project"
-            onSave={(v) => updateProjectAction(project.id, { title: v })}
+            save={{ entity: 'project', id: project.id, field: 'title' }}
             textClassName="text-xl font-semibold"
           />
         }
@@ -81,26 +79,26 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             <InlineSelect
               value={project.status}
               options={statusOptions}
-              onSave={(v) => updateProjectAction(project.id, { status: v as EntityStatus })}
+              save={{ entity: 'project', id: project.id, field: 'status' }}
             />
             <InlineSelect
               value={project.priority}
               options={PRIORITIES.map((p) => ({ value: p, label: p }))}
-              onSave={(v) => updateProjectAction(project.id, { priority: v as Priority })}
+              save={{ entity: 'project', id: project.id, field: 'priority' }}
             />
             <InlineSelect
               value={project.area_id}
               clearable
               options={areas.map((a) => ({ value: a.id, label: a.name }))}
-              onSave={(v) => updateProjectAction(project.id, { area_id: v || null })}
+              save={{ entity: 'project', id: project.id, field: 'area_id', mode: 'nullable' }}
             />
             <span className="flex items-center gap-1 text-sm text-muted-foreground">
               Start
-              <InlineDate value={project.start_date} onSave={(v) => updateProjectAction(project.id, { start_date: v })} />
+              <InlineDate value={project.start_date} save={{ entity: 'project', id: project.id, field: 'start_date', mode: 'nullable' }} />
             </span>
             <span className="flex items-center gap-1 text-sm text-muted-foreground">
               Target
-              <InlineDate value={project.target_date} onSave={(v) => updateProjectAction(project.id, { target_date: v })} />
+              <InlineDate value={project.target_date} save={{ entity: 'project', id: project.id, field: 'target_date', mode: 'nullable' }} />
             </span>
           </>
         }

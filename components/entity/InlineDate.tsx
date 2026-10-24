@@ -5,11 +5,13 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import type { ActionResult } from '@/app/actions/_result';
+import { saveField, type FieldSave } from './save';
 
 type InlineDateProps = {
   /** 'YYYY-MM-DD' for type="date"; 'HH:MM' for type="time"; or null/empty. */
   value: string | null;
-  onSave: (next: string | null) => Promise<ActionResult<unknown>>;
+  onSave?: (next: string | null) => Promise<ActionResult<unknown>>;
+  save?: FieldSave;
   type?: 'date' | 'time';
   className?: string;
   placeholder?: string;
@@ -19,7 +21,8 @@ type InlineDateProps = {
  * Small controlled date or time field that saves on blur/change through a
  * server action. Shows an optimistic value and reverts with a toast on error.
  */
-export function InlineDate({ value, onSave, type = 'date', className, placeholder }: InlineDateProps) {
+export function InlineDate({ value, onSave: onSaveProp, save, type = 'date', className, placeholder }: InlineDateProps) {
+  const onSave = onSaveProp ?? ((next: string | null) => saveField(save!, next));
   const [draft, setDraft] = useState(value ?? '');
   const [saving, setSaving] = useState(false);
   const savedRef = useRef(value ?? '');

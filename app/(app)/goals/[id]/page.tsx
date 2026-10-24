@@ -20,13 +20,12 @@ import { InlineDate } from '@/components/entity/InlineDate';
 import { AddProject } from '@/components/entity/AddProject';
 import { NotesEditor } from '@/components/notes/NotesEditor';
 import { TaskViews } from '@/components/tasks/TaskViews';
-import { updateGoalAction } from '@/app/actions/goals';
 import { PRIORITIES } from '@/lib/types/db';
 import { StatusLabel } from '@/components/status/StatusLabel';
 import { listStatuses } from '@/lib/domain/statuses';
 import { statusesFor } from '@/lib/types/statuses';
 import { formatDate, dueLabel } from '@/lib/time';
-import type { EntityStatus, Priority, Task } from '@/lib/types/db';
+import type { Task } from '@/lib/types/db';
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const statusOptions = statusesFor(await listStatuses(), 'goal').map((s) => ({ value: s.key, label: s.label }));
@@ -62,7 +61,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <InlineText
             value={goal.emoji ?? ''}
             placeholder="🎯"
-            onSave={(v) => updateGoalAction(goal.id, { emoji: v || null })}
+            save={{ entity: 'goal', id: goal.id, field: 'emoji', mode: 'nullable' }}
             className="w-10 text-center text-2xl"
           />
         }
@@ -70,7 +69,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <InlineText
             value={goal.title}
             placeholder="Untitled goal"
-            onSave={(v) => updateGoalAction(goal.id, { title: v })}
+            save={{ entity: 'goal', id: goal.id, field: 'title' }}
             textClassName="text-xl font-semibold"
           />
         }
@@ -79,26 +78,26 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             <InlineSelect
               value={goal.status}
               options={statusOptions}
-              onSave={(v) => updateGoalAction(goal.id, { status: v as EntityStatus })}
+              save={{ entity: 'goal', id: goal.id, field: 'status' }}
             />
             <InlineSelect
               value={goal.priority}
               options={PRIORITIES.map((p) => ({ value: p, label: p }))}
-              onSave={(v) => updateGoalAction(goal.id, { priority: v as Priority })}
+              save={{ entity: 'goal', id: goal.id, field: 'priority' }}
             />
             <InlineSelect
               value={goal.area_id}
               clearable
               options={areas.map((a) => ({ value: a.id, label: a.name }))}
-              onSave={(v) => updateGoalAction(goal.id, { area_id: v || null })}
+              save={{ entity: 'goal', id: goal.id, field: 'area_id', mode: 'nullable' }}
             />
             <span className="flex items-center gap-1 text-sm text-muted-foreground">
               Start
-              <InlineDate value={goal.start_date} onSave={(v) => updateGoalAction(goal.id, { start_date: v })} />
+              <InlineDate value={goal.start_date} save={{ entity: 'goal', id: goal.id, field: 'start_date', mode: 'nullable' }} />
             </span>
             <span className="flex items-center gap-1 text-sm text-muted-foreground">
               Target
-              <InlineDate value={goal.target_date} onSave={(v) => updateGoalAction(goal.id, { target_date: v })} />
+              <InlineDate value={goal.target_date} save={{ entity: 'goal', id: goal.id, field: 'target_date', mode: 'nullable' }} />
             </span>
           </>
         }
