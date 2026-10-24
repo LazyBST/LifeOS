@@ -17,6 +17,7 @@ export function toRow(s: HabitStatus, met: Map<string, number>, today: string): 
   return {
     id: s.id, name: s.name, emoji: s.emoji, kind: s.kind, target, unit: s.unit, value: Math.max(0, s.value), done: s.done,
     streak: s.current_streak, longest: s.longest_streak, schedule: scheduleLabel(s.days_of_week), today,
+    start: s.start_time?.slice(0, 5) ?? null, end: s.end_time?.slice(0, 5) ?? null,
     week: Array.from({ length: 7 }, (_, i) => {
       const date = addDays(today, i - 6);
       const v = met.get(`${s.id}|${date}`);

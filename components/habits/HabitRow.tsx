@@ -8,7 +8,7 @@ import { checkinHabitAction, setHabitDayAction } from '@/app/actions/habits';
 export type WeekDay = { date: string; due: boolean; done: boolean; /** marked missed by hand */ missed: boolean };
 export type HabitRowData = {
   id: string; name: string; emoji: string | null; kind: 'boolean' | 'count'; target: number; unit: string | null;
-  value: number; done: boolean; streak: number; longest: number; schedule: string; week: WeekDay[]; today: string;
+  value: number; done: boolean; streak: number; longest: number; schedule: string; week: WeekDay[]; today: string; start?: string | null; end?: string | null;
 };
 
 const SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -70,6 +70,7 @@ export function HabitRow({ h, onUnlink, onEdit, onArchive }: { h: HabitRowData; 
           className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[12px] font-bold transition-colors ${todayMissed ? 'border-red-500 bg-red-500 text-white' : 'border-input text-transparent hover:border-red-500 hover:text-red-500'}`}
         >✕</button>
         <button type="button" onClick={() => setOpen((o) => !o)} className="min-w-0 flex-1 truncate text-left text-sm font-medium" title="Details">
+          {h.start && <span className="mr-1.5 text-xs font-normal tabular-nums text-muted-foreground">{h.start}{h.end ? `–${h.end}` : ''}</span>}
           {h.emoji ? `${h.emoji} ` : ''}{h.name}
           {h.kind === 'count' && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{value}/{h.target}{h.unit ? ` ${h.unit}` : ''}</span>}
         </button>

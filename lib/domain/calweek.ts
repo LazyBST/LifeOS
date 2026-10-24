@@ -74,7 +74,7 @@ export async function weekData(weekStart: string): Promise<WeekData> {
         const missed = v !== undefined && v < 0;
         const sMin = minutesOfTime(h.start_time);
         if (sMin === null) { untimed.push({ kind: 'habit', id: h.id, title: h.name, date, done, missed, emoji: h.emoji }); continue; }
-        const eMin = minutesOfTime(h.end_time) ?? sMin + 30;
+        const eMin = minutesOfTime(h.end_time) ?? sMin + 5;
         const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
         blocks.push({ id: `habit-${h.id}-${date}`, title: h.name, start: istInstant(date, hhmm(sMin)).toISOString(), end: istInstant(date, hhmm(Math.min(eMin, 24 * 60 - 1))).toISOString(), kind: 'habit', done, habit: { id: h.id, date, emoji: h.emoji, missed } });
       }
