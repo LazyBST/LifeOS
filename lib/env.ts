@@ -1,7 +1,7 @@
 import 'server-only';
 
 function need(name: string): string {
-  const v = process.env[name];
+  const v = process.env[name]?.trim();
   if (!v) throw new Error(`Missing environment variable ${name}. See .env.example.`);
   return v;
 }
@@ -9,10 +9,12 @@ function need(name: string): string {
 /** Server-only secrets. Never import this from a client component. */
 export const env = {
   get supabaseUrl() {
-    return need('SUPABASE_URL');
+    return (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? need('SUPABASE_URL')).trim();
   },
   get supabaseAnonKey() {
-    return need('SUPABASE_ANON_KEY');
+    return (
+      process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? need('SUPABASE_ANON_KEY')
+    ).trim();
   },
   get supabaseServiceRoleKey() {
     return need('SUPABASE_SERVICE_ROLE_KEY');
