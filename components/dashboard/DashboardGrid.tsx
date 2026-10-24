@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { resetUiStateAction, saveUiStateAction } from '@/app/actions/uistate';
+import { saveUiStateAction } from '@/app/actions/uistate';
 import { Responsive, useContainerWidth, type Layout, type ResponsiveLayouts } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -61,17 +61,8 @@ export function DashboardGrid({ widgets, initial }: { widgets: GridWidget[]; /**
     saveTimer.current = setTimeout(() => { void saveUiStateAction('dashboard-layout', all); }, 800);
   }, []);
 
-  function reset() {
-    try { localStorage.removeItem(KEY); } catch {}
-    void resetUiStateAction('dashboard-layout');
-    setLayouts({ lg: DEFAULT_LG, md: DEFAULT_LG, sm: STACK(DEFAULT_LG), xs: STACK(DEFAULT_LG), xxs: STACK(DEFAULT_LG) });
-  }
-
   return (
     <div ref={containerRef}>
-      <div className="mb-2 flex justify-end">
-        <button type="button" onClick={reset} className="text-xs text-muted-foreground hover:underline">Reset layout</button>
-      </div>
       {mounted && (
         <Responsive
           width={width}
