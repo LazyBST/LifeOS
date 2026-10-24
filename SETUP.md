@@ -85,8 +85,9 @@ files depend on the earlier ones.
 
 1. Go to <https://aistudio.google.com/apikey> and create an API key.
 2. Copy it into `GOOGLE_GENERATIVE_AI_API_KEY` (step 8). It is read only on the server.
-3. The chat uses `gemini-2.5-flash` and the morning plan `gemini-2.5-flash-lite` by default. Set
-   `CHAT_MODEL` / `CHEAP_MODEL` in Vercel to use another Gemini model (for example a Pro model).
+3. The chat and the morning plan use `gemini-3.8-flash` by default. Google retires model names often:
+   if the chat reports a model is "no longer available", set `CHAT_MODEL` / `CHEAP_MODEL` in Vercel to the
+   name it recommends (or a Pro model for stronger tool use).
 4. To use Claude instead, set `LLM_PROVIDER=anthropic`, add `ANTHROPIC_API_KEY`, and set `CHAT_MODEL`.
 5. Optional: set a spend limit on the key's Google Cloud project.
 

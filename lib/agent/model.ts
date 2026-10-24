@@ -11,7 +11,8 @@ export function llmProvider(): Provider {
 }
 
 const DEFAULTS: Record<Provider, { chat: string; cheap: string }> = {
-  google: { chat: 'gemini-2.5-flash', cheap: 'gemini-2.5-flash-lite' },
+  // Google retires models quickly: if a call says a model is "no longer available", set CHAT_MODEL / CHEAP_MODEL.
+  google: { chat: 'gemini-3.8-flash', cheap: 'gemini-3.8-flash' },
   anthropic: { chat: 'claude-sonnet-5', cheap: 'claude-haiku-4-5-20251001' },
 };
 
