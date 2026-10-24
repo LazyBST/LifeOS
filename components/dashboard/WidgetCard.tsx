@@ -12,7 +12,7 @@ export function WidgetCard({ title, sub, right, children, bodyClassName = '' }: 
           <h2 className="truncate text-sm font-semibold leading-tight">{title}</h2>
           {sub && <p className="truncate text-[11px] text-muted-foreground">{sub}</p>}
         </div>
-        {right && <div className="shrink-0" onMouseDown={(e) => e.stopPropagation()}>{right}</div>}
+        {right && <div className="no-drag shrink-0">{right}</div>}
       </header>
       <div className={`min-h-0 flex-1 overflow-auto px-4 pb-4 ${bodyClassName}`}>{children}</div>
     </section>

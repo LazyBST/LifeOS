@@ -59,7 +59,7 @@ export function DashboardGrid({ widgets }: { widgets: GridWidget[] }) {
           cols={{ lg: 12, md: 12, sm: 1, xs: 1, xxs: 1 }}
           rowHeight={30}
           margin={[16, 16]}
-          dragConfig={{ enabled: true, handle: '.drag-handle' }}
+          dragConfig={{ enabled: true, handle: '.drag-handle', cancel: '.no-drag' }}
           onLayoutChange={onChange}
         >
           {widgets.map((w) => (

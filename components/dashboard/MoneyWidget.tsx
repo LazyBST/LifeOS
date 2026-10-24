@@ -18,7 +18,7 @@ export async function MoneyWidget() {
             <div><div className="text-muted-foreground">Owed to me</div><div className={`text-sm font-semibold ${pos}`}>{formatINR(w?.owed_to_me ?? 0)}</div></div>
             <div><div className="text-muted-foreground">I owe</div><div className={`text-sm font-semibold ${neg}`}>{formatINR(w?.i_owe ?? 0)}</div></div>
           </div>
-          <TrendChart weeks={t.weeks} ahead={t.ahead} series={t.series} height={170} format={(n) => `${Math.round(n / 1000)}k`} />
+          <TrendChart weeks={t.weeks} ahead={t.ahead} series={t.series} height={170} unit="thousands" />
         </>
       )}
     </WidgetCard>

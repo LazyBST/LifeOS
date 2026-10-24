@@ -5,8 +5,8 @@ export type TrendProps = {
   weeks: string[];
   ahead: number;
   series: { id: string; name: string; color: string; actual: number[]; forecast: number[] }[];
-  /** format a y value, e.g. rupees */
-  format?: (n: number) => string;
+  /** how y values read: plain numbers or thousands (functions cannot cross the server/client boundary) */
+  unit?: 'count' | 'thousands';
   height?: number;
 };
 
@@ -15,7 +15,8 @@ const label = (d: string) => `${Number(d.slice(8))} ${SHORT[Number(d.slice(5, 7)
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 /** Weekly line chart: solid actuals, dashed forecast in a shaded zone. */
-export function TrendChart({ weeks, ahead, series, format = (n) => String(n), height = 220 }: TrendProps) {
+export function TrendChart({ weeks, ahead, series, unit = 'count', height = 220 }: TrendProps) {
+  const format = (n: number) => (unit === 'thousands' ? `${Math.round(n / 1000)}k` : String(n));
   const n = weeks.length;
   const allWeeks = [...weeks, ...Array.from({ length: ahead }, (_, i) => addDays(weeks[n - 1], 7 * (i + 1)))];
   const data = allWeeks.map((w, i) => {
