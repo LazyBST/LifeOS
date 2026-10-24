@@ -84,3 +84,34 @@ export async function lifeCalendarSettings(): Promise<{ birth_date: string | nul
   const cfg = await getConfig(true);
   return { birth_date: cfg.birth_date ?? null, lifespan_years: cfg.lifespan_years ?? 80 };
 }
+
+export type DetailItem = { kind: 'task' | 'habit'; id: string; title: string; done: boolean; area_id: string | null; date: string; href: string | null };
+
+/** The individual tasks and habits behind a day, week or month dot, for the analytics panel. */
+export async function detailItems(from: string, to: string): Promise<DetailItem[]> {
+  const today = istDate();
+  const out: DetailItem[] = [];
+  const [tasks, parents] = await Promise.all([
+    paged<{ id: string; title: string; due_date: string; status: string; area_id: string | null }>((a, b) =>
+      admin().from('tasks').select('id,title,due_date,status,area_id').is('deleted_at', null).gte('due_date', from).lte('due_date', to).order('due_date').range(a, b)),
+    paged<{ parent_task_id: string }>((a, b) =>
+      admin().from('tasks').select('parent_task_id').is('deleted_at', null).not('parent_task_id', 'is', null).order('id').range(a, b)),
+  ]);
+  const hasChildren = new Set(parents.map((p) => p.parent_task_id));
+  for (const t of tasks) if (!hasChildren.has(t.id)) out.push({ kind: 'task', id: t.id, title: t.title, done: t.status === 'done', area_id: t.area_id, date: t.due_date, href: `/tasks/${t.id}` });
+
+  const habits = await listHabits(true);
+  const last = to < today ? to : today;
+  if (habits.length && from <= last) {
+    const checkins = await paged<{ habit_id: string; checkin_date: string; value: number }>((a, b) =>
+      admin().from('habit_checkins').select('habit_id,checkin_date,value').gte('checkin_date', from).lte('checkin_date', last).order('checkin_date').range(a, b));
+    const met = new Map(checkins.map((c) => [`${c.habit_id}|${c.checkin_date}`, Number(c.value)]));
+    for (let d = from; d <= last; d = addDays(d, 1)) {
+      for (const h of habits) {
+        if (h.created_at.slice(0, 10) > d || (h.archived_at && h.archived_at.slice(0, 10) <= d) || !habitDueOn(h, d)) continue;
+        out.push({ kind: 'habit', id: h.id, title: h.name, done: (met.get(`${h.id}|${d}`) ?? 0) >= Number(h.target_value), area_id: h.area_id, date: d, href: null });
+      }
+    }
+  }
+  return out;
+}

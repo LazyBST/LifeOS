@@ -1,5 +1,6 @@
 'use client';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { resetUiStateAction, saveUiStateAction } from '@/app/actions/uistate';
 import { Responsive, useContainerWidth, type Layout, type ResponsiveLayouts } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -27,23 +28,42 @@ const STACK = (items: Item[]): Item[] => items.map((it, n) => ({ ...it, x: 0, w:
 const KEY = 'lifeos:dash:layout:v2';
 
 /** Drag the header, resize from the corner. The arrangement is remembered in this browser. */
-export function DashboardGrid({ widgets }: { widgets: GridWidget[] }) {
+export function DashboardGrid({ widgets, initial }: { widgets: GridWidget[]; /** layout saved in the database, if any */ initial?: ResponsiveLayouts | null }) {
   const { width, containerRef, mounted } = useContainerWidth();
   const [layouts, setLayouts] = useState<ResponsiveLayouts>({ lg: DEFAULT_LG, md: DEFAULT_LG, sm: STACK(DEFAULT_LG), xs: STACK(DEFAULT_LG), xxs: STACK(DEFAULT_LG) });
 
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loaded = useRef(false);
+
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) setLayouts((cur) => ({ ...cur, ...(JSON.parse(raw) as ResponsiveLayouts) }));
-    } catch {}
+    // the database copy is the source of truth, so every device shows the same layout;
+    // a layout only in this browser (from before syncing) is uploaded once
+    if (initial) {
+      setLayouts((cur) => ({ ...cur, ...initial }));
+    } else {
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (raw) {
+          const local = JSON.parse(raw) as ResponsiveLayouts;
+          setLayouts((cur) => ({ ...cur, ...local }));
+          void saveUiStateAction('dashboard-layout', local);
+        }
+      } catch {}
+    }
+    loaded.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onChange = useCallback((_cur: Layout, all: ResponsiveLayouts) => {
+    if (!loaded.current) return;
     try { localStorage.setItem(KEY, JSON.stringify(all)); } catch {}
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { void saveUiStateAction('dashboard-layout', all); }, 800);
   }, []);
 
   function reset() {
     try { localStorage.removeItem(KEY); } catch {}
+    void resetUiStateAction('dashboard-layout');
     setLayouts({ lg: DEFAULT_LG, md: DEFAULT_LG, sm: STACK(DEFAULT_LG), xs: STACK(DEFAULT_LG), xxs: STACK(DEFAULT_LG) });
   }
 

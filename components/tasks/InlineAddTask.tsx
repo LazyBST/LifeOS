@@ -28,7 +28,7 @@ export function InlineAddTask({ placeholder = 'Add task', onCreate, variant = 'r
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex min-h-9 w-full items-center gap-1.5 rounded-[4px] px-2 text-sm text-[#5e6c84] transition-colors hover:bg-[#ebecf0] dark:text-muted-foreground dark:hover:bg-muted"
+          className="flex min-h-9 w-full items-center gap-1.5 rounded-[4px] px-2 text-sm text-[var(--st-fg,#5e6c84)] transition-colors hover:bg-black/5 dark:text-muted-foreground dark:hover:bg-white/10"
         >
           <Plus className="size-4" /> Create
         </button>

@@ -14,6 +14,8 @@ import { LifeCalendar } from '@/components/dashboard/LifeCalendar';
 import { CalendarWeek } from '@/components/dashboard/CalendarWeek';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
 import { TaskViews } from '@/components/tasks/TaskViews';
+import { getUiState } from '@/lib/domain/uistate';
+import type { ResponsiveLayouts } from 'react-grid-layout';
 import { safe } from '@/components/dashboard/safe';
 
 const Areas = safe('Life areas report', () => LifeAreasWidget());
@@ -31,6 +33,7 @@ const Loading = () => <div className="h-full w-full animate-pulse rounded-2xl bg
 const S = ({ children }: { children: ReactNode }) => <Suspense fallback={<Loading />}>{children}</Suspense>;
 
 export default async function DashboardPage() {
+  const savedLayout = await getUiState<ResponsiveLayouts>('dashboard-layout').catch(() => null);
   const widgets: GridWidget[] = [
     { id: 'areas', node: <S><Areas /></S> },
     { id: 'goals', node: <S><Goals /></S> },
@@ -49,7 +52,7 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-4 p-4 sm:p-6">
       <DashboardHeader />
       <S><Slip /></S>
-      <DashboardGrid widgets={widgets} />
+      <DashboardGrid widgets={widgets} initial={savedLayout} />
     </div>
   );
 }

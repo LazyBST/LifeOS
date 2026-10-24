@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth';
 import { updateConfig } from '@/lib/domain/config';
-import { areaTotals, dayItems, lifeCalendarSettings, summarise } from '@/lib/domain/lifecal';
+import { areaTotals, dayItems, detailItems, lifeCalendarSettings, summarise, type DetailItem } from '@/lib/domain/lifecal';
 import type { DayStat } from '@/lib/domain/lifecal-math';
 import { istDate } from '@/lib/time';
 import { type ActionResult, run } from './_result';
@@ -38,5 +38,14 @@ export async function setBirthDateAction(birth: string, lifespanYears = 80): Pro
     }
     revalidatePath('/');
     return { birth_date: birth };
+  });
+}
+
+/** What is behind one dot: the tasks and habits scheduled in that day, week or month. */
+export async function getDayDetailAction(from: string, to: string): Promise<ActionResult<DetailItem[]>> {
+  return run(async () => {
+    await requireUser();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) throw new Error('Bad range');
+    return detailItems(from, to);
   });
 }

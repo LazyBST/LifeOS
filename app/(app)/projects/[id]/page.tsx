@@ -5,7 +5,8 @@ import { getGoal } from '@/lib/domain/goals';
 import { listAreas, areaSlug } from '@/lib/domain/areas';
 import { projectForecasts } from '@/lib/domain/analytics';
 import { readNotes } from '@/lib/domain/notes';
-import { Breadcrumbs } from '@/components/shell/Breadcrumbs';
+import { Trail } from '@/components/entity/Trail';
+import { areaColor } from '@/lib/domain/areas-colors';
 import { SetPageContext } from '@/components/chat/page-context';
 import { PropertiesHeader } from '@/components/entity/PropertiesHeader';
 import { ProgressBar } from '@/components/entity/ProgressBar';
@@ -15,6 +16,7 @@ import { InlineDate } from '@/components/entity/InlineDate';
 import { NotesEditor } from '@/components/notes/NotesEditor';
 import { TaskViews } from '@/components/tasks/TaskViews';
 import { ledgerForProject, slipCount } from '@/lib/domain/ledger';
+import { LinkedHabits } from '@/components/habits/LinkedHabits';
 import { LinkedBooks } from '@/components/books/LinkedBooks';
 import { LedgerSection } from '@/components/ledger/LedgerSection';
 import { PRIORITIES } from '@/lib/types/db';
@@ -43,15 +45,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <SetPageContext
         ctx={{ route: `/projects/${project.id}`, entity_type: 'project', entity_id: project.id, area_id: project.area_id }}
       />
-      <Breadcrumbs
-        items={[
-          ...(area ? [{ href: `/area/${areaSlug(area.name)}`, label: area.name }] : []),
-          ...(goal ? [{ href: `/goals/${goal.id}`, label: goal.title }] : []),
-          { label: project.title },
-        ]}
-      />
-
       <PropertiesHeader
+        trail={<Trail items={[...(area ? [{ kind: 'area' as const, label: area.name, href: `/area/${areaSlug(area.name)}`, color: areaColor(area) }] : []), ...(goal ? [{ kind: 'goal' as const, label: goal.title, href: `/goals/${goal.id}` }] : [])]} />}
         eyebrow={
           goal && (
             <>
@@ -120,11 +115,14 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <LedgerSection name={project.title} agreed={project.original_target_date ?? project.target_date} current={project.target_date} completedOn={project.completed_on ?? null} ledger={ledger} slips={slips} />
 
       <TaskViews
+              defaultPreset="all"
         base={{ project_id: project.id }}
         scope={`project:${project.id}`}
         defaultView="board"
         defaultGroup="priority"
       />
+
+      <LinkedHabits entityType="project" entityId={project.id} areaId={project.area_id} title="Habits for this project" />
 
       <LinkedBooks entityType="project" entityId={project.id} title="Books for this project" />
 

@@ -1,15 +1,16 @@
 import { notFound } from 'next/navigation';
-import { getTask, breadcrumbFor, listSubtasks } from '@/lib/domain/tasks';
-import { listAreas } from '@/lib/domain/areas';
+import { getTask, breadcrumbFor } from '@/lib/domain/tasks';
+import { areaSlug, listAreas } from '@/lib/domain/areas';
 import { readNotes } from '@/lib/domain/notes';
 import { admin } from '@/lib/supabase/admin';
-import { Breadcrumbs, type BreadcrumbItem } from '@/components/shell/Breadcrumbs';
+import { Trail, type TrailItem } from '@/components/entity/Trail';
+import { areaColor } from '@/lib/domain/areas-colors';
 import { SetPageContext } from '@/components/chat/page-context';
 import { PropertiesHeader } from '@/components/entity/PropertiesHeader';
 import { InlineText } from '@/components/entity/InlineText';
 import { InlineSelect } from '@/components/entity/InlineSelect';
 import { DueDateTime } from '@/components/entity/DueDateTime';
-import { SubtaskList } from '@/components/entity/SubtaskList';
+import { TaskViews } from '@/components/tasks/TaskViews';
 import { NotesEditor } from '@/components/notes/NotesEditor';
 import { ledgerForTask, slipCount } from '@/lib/domain/ledger';
 import { istDay } from '@/lib/domain/ledger-math';
@@ -27,9 +28,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const [task, areas] = await Promise.all([getTask(id), listAreas()]);
   if (!task) notFound();
 
-  const [breadcrumb, subtasks, notes, ledger, slips] = await Promise.all([
+  const [breadcrumb, notes, ledger, slips] = await Promise.all([
     breadcrumbFor(task),
-    listSubtasks(task.id),
     readNotes('task', task.id),
     ledgerForTask(task),
     slipCount('task', task.id),
@@ -63,11 +63,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     gcalEventId = null;
   }
 
-  const breadcrumbItems: BreadcrumbItem[] = [
-    ...(breadcrumb.goal ? [{ href: `/goals/${breadcrumb.goal.id}`, label: breadcrumb.goal.title }] : []),
-    ...(breadcrumb.project ? [{ href: `/projects/${breadcrumb.project.id}`, label: breadcrumb.project.title }] : []),
-    ...breadcrumb.parents.map((p) => ({ href: `/tasks/${p.id}`, label: p.title })),
-    { label: task.title },
+  const area = areas.find((a) => a.id === task.area_id) ?? null;
+  const trailItems: TrailItem[] = [
+    ...(area ? [{ kind: 'area' as const, label: area.name, href: `/area/${areaSlug(area.name)}`, color: areaColor(area) }] : []),
+    ...(breadcrumb.goal ? [{ kind: 'goal' as const, href: `/goals/${breadcrumb.goal.id}`, label: breadcrumb.goal.title }] : []),
+    ...(breadcrumb.project ? [{ kind: 'project' as const, href: `/projects/${breadcrumb.project.id}`, label: breadcrumb.project.title }] : []),
+    ...breadcrumb.parents.map((p) => ({ kind: 'task' as const, href: `/tasks/${p.id}`, label: p.title })),
   ];
 
   return (
@@ -75,9 +76,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <SetPageContext
         ctx={{ route: `/tasks/${task.id}`, entity_type: 'task', entity_id: task.id, area_id: task.area_id }}
       />
-      <Breadcrumbs items={breadcrumbItems} />
-
       <PropertiesHeader
+        trail={<Trail items={trailItems} />}
         title={
           <InlineText
             value={task.title}
@@ -141,19 +141,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
       <LedgerSection name={task.title} agreed={task.original_due_date ?? task.due_date} current={task.due_date} completedOn={task.completed_at ? istDay(task.completed_at) : null} ledger={ledger} slips={slips} />
 
-      <LinkedHabits taskId={task.id} areaId={task.area_id} title="Sub-habits for this task" />
+      <LinkedHabits entityType="task" entityId={task.id} areaId={task.area_id} title="Habits for this task" />
 
       <LinkedBooks entityType="task" entityId={task.id} title="Books for this task" />
 
       <section className="space-y-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Subtasks</h2>
-        <SubtaskList
-          parentTaskId={task.id}
-          initial={subtasks}
-          areaId={task.area_id}
-          goalId={task.goal_id}
-          projectId={task.project_id}
-        />
+        <h2 className="text-sm font-semibold">Subtasks</h2>
+        <TaskViews base={{ parent_task_id: task.id }} scope={`subtasks:${task.id}`} createDefaults={{ parent_task_id: task.id }} defaultView="board" defaultPreset="all" hidePresets />
       </section>
 
       <section className="space-y-2">

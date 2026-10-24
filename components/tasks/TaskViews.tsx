@@ -1,5 +1,6 @@
 'use client';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GroupByKey, TaskFilters, TaskViewState } from '@/lib/types/filters';
@@ -19,6 +20,8 @@ export type TaskViewsProps = {
   hidePresets?: boolean;
   defaultView?: 'board' | 'list';
   defaultGroup?: GroupByKey;
+  /** which preset tab to start on (default: all open tasks); 'all' also shows done tasks */
+  defaultPreset?: TaskViewState['preset'];
   /** optional heading rendered above the toolbar */
   title?: React.ReactNode;
 };
@@ -30,7 +33,7 @@ const PRESET_TABS: { key: TaskViewState['preset']; label: string }[] = [
   { key: 'open', label: 'All open' },
 ];
 
-export function TaskViews({ base, scope, createDefaults, hidePresets, defaultView, defaultGroup, title }: TaskViewsProps) {
+export function TaskViews({ base, scope, createDefaults, hidePresets, defaultView, defaultGroup, defaultPreset, title }: TaskViewsProps) {
   const {
     state,
     setPreset,
@@ -46,12 +49,20 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
     completeTask,
     reopenTask,
     moveTask,
-  } = useTaskViewState({ base, scope, defaultView, defaultGroup });
+  } = useTaskViewState({ base, scope, defaultView, defaultGroup, defaultPreset });
 
   const effectiveCreateDefaults: TaskCreateInput = useMemo(
     () => ({ title: '', ...createDefaults }),
     [createDefaults],
   );
+
+  // the filter bar stays tucked away until asked for, and remembers that choice per view
+  const [showFilters, setShowFilters] = useState(false);
+  useEffect(() => {
+    try { setShowFilters(localStorage.getItem(`lifeos:filters-open:${scope}`) === '1'); } catch {}
+  }, [scope]);
+  const toggleFilters = () => setShowFilters((v) => { const n = !v; try { localStorage.setItem(`lifeos:filters-open:${scope}`, n ? '1' : '0'); } catch {} return n; });
+  const activeFilters = Object.entries(state.filters).filter(([k, v]) => !(k in base) && v != null && !(Array.isArray(v) && v.length === 0) && v !== '' && k !== 'include_done' && k !== 'limit').length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -79,9 +90,17 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
             List
           </Button>
         </div>
-        {state.view === 'list' && <GroupBySelect value={state.group} onChange={setGroup} />}
+        <div className="flex items-center gap-2">
+          {state.view === 'list' && <GroupBySelect value={state.group} onChange={setGroup} />}
+          <Button size="sm" variant={showFilters || activeFilters ? 'secondary' : 'outline'} onClick={toggleFilters} aria-expanded={showFilters} aria-controls="task-filters">
+            <Filter className="size-3.5" />
+            Filters
+            {activeFilters > 0 && <span className="ml-0.5 rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">{activeFilters}</span>}
+          </Button>
+          {activeFilters > 0 && !showFilters && <button type="button" onClick={clearFilters} className="text-xs text-muted-foreground hover:underline">Clear</button>}
+        </div>
       </div>
-      <FilterBar filters={state.filters} base={base} onChange={setFilters} onClear={clearFilters} />
+      {showFilters && <div id="task-filters"><FilterBar filters={state.filters} base={base} onChange={setFilters} onClear={clearFilters} /></div>}
       {error && <p className="text-sm text-destructive">{error}</p>}
       {loading ? (
         <ViewSkeleton view={state.view} />

@@ -10,7 +10,8 @@ import { LinkedHabits } from '@/components/habits/LinkedHabits';
 import { LinkedBooks } from '@/components/books/LinkedBooks';
 import { LedgerSection } from '@/components/ledger/LedgerSection';
 import { readNotes } from '@/lib/domain/notes';
-import { Breadcrumbs } from '@/components/shell/Breadcrumbs';
+import { Trail } from '@/components/entity/Trail';
+import { areaColor } from '@/lib/domain/areas-colors';
 import { SetPageContext } from '@/components/chat/page-context';
 import { PropertiesHeader } from '@/components/entity/PropertiesHeader';
 import { ProgressBar } from '@/components/entity/ProgressBar';
@@ -50,14 +51,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <SetPageContext
         ctx={{ route: `/goals/${goal.id}`, entity_type: 'goal', entity_id: goal.id, area_id: goal.area_id }}
       />
-      <Breadcrumbs
-        items={[
-          ...(area ? [{ href: `/area/${areaSlug(area.name)}`, label: area.name }] : []),
-          { label: goal.title },
-        ]}
-      />
-
       <PropertiesHeader
+        trail={<Trail items={[...(area ? [{ kind: 'area' as const, label: area.name, href: `/area/${areaSlug(area.name)}`, color: areaColor(area) }] : [])]} />}
         icon={
           <InlineText
             value={goal.emoji ?? ''}
@@ -121,7 +116,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
       <LedgerSection name={goal.title} agreed={goal.original_target_date ?? goal.target_date} current={goal.target_date} completedOn={goal.completed_on ?? null} ledger={ledger} slips={slips} />
 
-      <LinkedHabits goalId={goal.id} areaId={goal.area_id} title="Habits linked to this goal" />
+      <LinkedHabits entityType="goal" entityId={goal.id} areaId={goal.area_id} title="Habits for this goal" />
 
       <LinkedBooks entityType="goal" entityId={goal.id} title="Books for this goal" />
 
@@ -135,6 +130,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         {projects.map((p) => (
           <EntityGroup key={p.id} href={`/projects/${p.id}`} title={`${p.emoji ? `${p.emoji} ` : ''}${p.title}`} meta={<StatusLabel status={p.status} compact />}>
             <TaskViews
+              defaultPreset="all"
               base={{ project_id: p.id }}
               scope={`goal:${goal.id}:project:${p.id}`}
               hidePresets

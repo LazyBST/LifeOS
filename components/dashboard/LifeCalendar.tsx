@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { listAreasAction } from '@/app/actions/lookup';
 import type { Area } from '@/lib/types/db';
-import { getLifeCalendarAction, setBirthDateAction, type LifeCalendarData } from '@/app/actions/lifecal';
+import { getDayDetailAction, getLifeCalendarAction, setBirthDateAction, type LifeCalendarData } from '@/app/actions/lifecal';
+import type { DetailItem } from '@/lib/domain/lifecal';
+import Link from 'next/link';
 import {
   cellStat, classify, monthName, rowsFor, spanOf, weeksLived,
   type Cell, type DotColor, type Gran, type View,
@@ -47,6 +49,8 @@ export function LifeCalendar() {
   const [loading, setLoading] = useState(false);
   const [areas, setAreas] = useState<Area[]>([]);
   const [areaId, setAreaId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Cell | null>(null);
+  const [detail, setDetail] = useState<DetailItem[] | null>(null);
 
   useEffect(() => {
     try {
@@ -82,6 +86,16 @@ export function LifeCalendar() {
     () => (data && cursor ? rowsFor(view, gran, cursor, data.birth_date, data.lifespan_years) : []),
     [data, view, gran, cursor],
   );
+
+  useEffect(() => {
+    if (!selected) { setDetail(null); return; }
+    let alive = true;
+    setDetail(null);
+    void getDayDetailAction(selected.from, selected.to).then((r) => { if (alive) { if (r.ok) setDetail(r.data); else toast.error(r.error); } });
+    return () => { alive = false; };
+  }, [selected]);
+  // changing view or period clears the selection, so the panel never describes something off screen
+  useEffect(() => { setSelected(null); }, [view, gran, cursor]);
 
   async function saveBirth() {
     const res = await setBirthDateAction(birthInput);
@@ -158,7 +172,7 @@ export function LifeCalendar() {
                 <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground">{row.label}</span>
               ) : view === 'life' ? <span className="w-6 shrink-0" /> : null}
               <div className={`flex flex-wrap ${view === 'life' ? 'gap-[3px]' : 'gap-1.5'}`}>
-                {row.cells.map((c) => <Dot key={c.key} cell={c} data={data} className={dot} />)}
+                {row.cells.map((c) => <Dot key={c.key} cell={c} data={data} className={dot} selected={selected?.key === c.key} onSelect={() => setSelected((cur) => (cur?.key === c.key ? null : c))} />)}
               </div>
             </div>
           ))}
@@ -185,6 +199,10 @@ export function LifeCalendar() {
         </div>
       )}
 
+      {selected && (
+        <DayPanel cell={selected} items={detail} areas={areas} onClose={() => setSelected(null)} />
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-3 text-[12px] text-muted-foreground">
         {([['green', '70%+ done'], ['yellow', '50–70%'], ['red', 'under 50%'], ['empty', 'no data']] as [DotColor, string][]).map(([k, l]) => (
           <span key={k} className="flex items-center gap-1"><span className={`inline-block size-2.5 rounded-full border ${COLORS[k]}`} />{l}</span>
@@ -195,12 +213,63 @@ export function LifeCalendar() {
   );
 }
 
-function Dot({ cell, data, className }: { cell: Cell; data: LifeCalendarData | null; className: string }) {
+function Dot({ cell, data, className, selected, onSelect }: { cell: Cell; data: LifeCalendarData | null; className: string; selected: boolean; onSelect: () => void }) {
   const stat = data ? cellStat(cell, data.days, data.today) : undefined;
   const color = classify(stat);
   const isNow = !!data && cell.from <= data.today && cell.to >= data.today;
   const label = stat ? `${cell.label}: ${stat.done}/${stat.total} done (${Math.round((stat.done / stat.total) * 100)}%)` : `${cell.label}: no data`;
-  return <span title={label} aria-label={label} className={`${className} shrink-0 rounded-full border ${COLORS[color]} ${isNow ? 'ring-2 ring-primary ring-offset-1 ring-offset-card' : ''}`} />;
+  return <button type="button" onClick={onSelect} aria-pressed={selected} title={label} aria-label={label} className={`${className} shrink-0 rounded-full border ${COLORS[color]} ${isNow ? 'ring-2 ring-primary ring-offset-1 ring-offset-card' : ''} ${selected ? 'outline outline-2 outline-offset-2 outline-foreground' : 'hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-foreground/40'}`} />;
+}
+
+function DayPanel({ cell, items, areas, onClose }: { cell: Cell; items: DetailItem[] | null; areas: Area[]; onClose: () => void }) {
+  const am = new Map(areas.map((a) => [a.id, a]));
+  const done = items?.filter((i) => i.done).length ?? 0;
+  const total = items?.length ?? 0;
+  const pctVal = total ? Math.round((done / total) * 100) : null;
+  const byArea = new Map<string, { name: string; color: string; done: number; total: number }>();
+  for (const it of items ?? []) {
+    const a = it.area_id ? am.get(it.area_id) : null;
+    const k = it.area_id ?? 'none';
+    const e = byArea.get(k) ?? { name: a?.name ?? 'No area', color: a ? areaColor(a) : '#94a3b8', done: 0, total: 0 };
+    e.total += 1; if (it.done) e.done += 1; byArea.set(k, e);
+  }
+  const multi = cell.from !== cell.to;
+  return (
+    <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 text-sm">
+      <div className="flex items-center gap-2">
+        <div className="font-semibold">{cell.label}{multi ? ` · ${cell.from} → ${cell.to}` : ` · ${cell.from}`}</div>
+        {items && <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${pctVal === null ? 'bg-muted text-muted-foreground' : pctVal >= 70 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : pctVal >= 50 ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'}`}>{pctVal === null ? 'nothing scheduled' : `${pctVal}% · ${done}/${total}`}</span>}
+        <button type="button" onClick={onClose} className="ml-auto rounded px-2 text-muted-foreground hover:bg-muted" aria-label="Close">×</button>
+      </div>
+      {items === null ? <p className="mt-2 text-xs text-muted-foreground">Loading…</p> : total === 0 ? <p className="mt-2 text-xs text-muted-foreground">No tasks or habits were scheduled then.</p> : (
+        <>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[...byArea.values()].map((a) => (
+              <span key={a.name} className="flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-0.5 text-xs"><span className="size-2 rounded-full" style={{ backgroundColor: a.color }} />{a.name} <b>{Math.round((a.done / a.total) * 100)}%</b><span className="text-muted-foreground">{a.done}/{a.total}</span></span>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {([['Not done', false], ['Done', true]] as const).map(([label, flag]) => (
+              <div key={label}>
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label} · {items.filter((i) => i.done === flag).length}</div>
+                <ul className="space-y-1">
+                  {items.filter((i) => i.done === flag).slice(0, 40).map((i) => (
+                    <li key={`${i.kind}-${i.id}-${i.date}`} className="flex items-center gap-1.5">
+                      <span className={flag ? 'text-emerald-600' : 'text-red-500'}>{flag ? '✓' : '✕'}</span>
+                      <span className="rounded bg-muted px-1 text-[10px] font-semibold uppercase text-muted-foreground">{i.kind}</span>
+                      {i.href ? <Link href={i.href} className="truncate hover:underline">{i.title}</Link> : <span className="truncate">{i.title}</span>}
+                      {multi && <span className="ml-auto shrink-0 text-xs text-muted-foreground">{i.date.slice(5)}</span>}
+                    </li>
+                  ))}
+                  {items.filter((i) => i.done === flag).length === 0 && <li className="text-xs text-muted-foreground">None</li>}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default LifeCalendar;

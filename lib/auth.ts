@@ -40,7 +40,8 @@ export async function checkUser(): Promise<AuthCheck> {
     await sb.auth.signOut();
     return { ok: false, reason: 'wrong_account' };
   }
-  const cfg = await getConfig(true);
+  let cfg = await getConfig(); // cached for 30s: one fewer database round trip on every page
+  if (!cfg.owner_user_id) cfg = await getConfig(true);
   if (!cfg.owner_user_id) await claimOwner(user.id);
   else if (cfg.owner_user_id !== user.id) return { ok: false, reason: 'owner_mismatch' };
   return { ok: true, session: { userId: user.id, email: user.email } };

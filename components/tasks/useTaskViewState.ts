@@ -67,8 +67,9 @@ export function useTaskViewState(opts: {
   scope: string;
   defaultView?: 'board' | 'list';
   defaultGroup?: GroupByKey;
+  defaultPreset?: TaskViewState['preset'];
 }) {
-  const { base, scope, defaultView, defaultGroup } = opts;
+  const { base, scope, defaultView, defaultGroup, defaultPreset } = opts;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -78,6 +79,7 @@ export function useTaskViewState(opts: {
       filters: base,
       ...(defaultView ? { view: defaultView } : {}),
       ...(defaultGroup ? { group: defaultGroup } : {}),
+      ...(defaultPreset ? { preset: defaultPreset } : {}),
     };
     return paramsToViewState(searchParams, baseState);
   });

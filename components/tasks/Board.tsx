@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { StatusIcon } from '@/components/status/StatusBadge';
+import { StatusIcon, statusVars } from '@/components/status/StatusBadge';
 import { useStatuses } from '@/components/status/StatusProvider';
 import { boardColumns, isDone, type StatusDef } from '@/lib/types/statuses';
 import type { TaskStatus } from '@/lib/types/db';
@@ -122,16 +122,17 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-40 w-[300px] shrink-0 flex-col gap-2 rounded-md bg-[#f4f5f7] p-2 pt-3 transition-shadow dark:bg-muted/40 ${
-        isOver ? 'ring-2 ring-[#4c9aff]' : ''
-      }`}
+      style={statusVars(def)}
+      className={`flex min-h-40 w-[300px] shrink-0 flex-col gap-2 rounded-md p-2 pt-3 transition-shadow
+        bg-[color-mix(in_srgb,var(--st-bg)_70%,white)] dark:bg-[color-mix(in_srgb,var(--st)_11%,var(--card))]
+        ${isOver ? 'ring-2 ring-[#4c9aff]' : ''}`}
     >
       <div className="flex items-center gap-1.5 px-1.5">
         <StatusIcon status={def} className="size-3.5" />
-        <span className="text-xs font-semibold uppercase tracking-wide text-[#5e6c84] dark:text-muted-foreground">
+        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--st-fg)] dark:text-[var(--st)]">
           {def.label}
         </span>
-        <span className="text-xs text-[#5e6c84] dark:text-muted-foreground">{tasks.length}</span>
+        <span className="rounded-full bg-white/60 px-1.5 text-xs font-semibold text-[var(--st-fg)] dark:bg-white/10 dark:text-[var(--st)]">{tasks.length}</span>
       </div>
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col gap-2">

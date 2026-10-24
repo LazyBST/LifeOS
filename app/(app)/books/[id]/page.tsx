@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { SetPageContext } from '@/components/chat/page-context';
-import { Breadcrumbs } from '@/components/shell/Breadcrumbs';
+import { Trail } from '@/components/entity/Trail';
+import { areaColor } from '@/lib/domain/areas-colors';
 import { PropertiesHeader } from '@/components/entity/PropertiesHeader';
 import { InlineText } from '@/components/entity/InlineText';
 import { InlineSelect } from '@/components/entity/InlineSelect';
@@ -35,8 +36,8 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       <SetPageContext ctx={{ route: `/books/${id}`, entity_type: 'book', entity_id: id, area_id: book.area_id }} />
-      <Breadcrumbs items={[{ href: '/books', label: 'Books' }, { label: book.title }]} />
       <PropertiesHeader
+        trail={<Trail items={[{ kind: 'books', label: 'Books', href: '/books' }, ...(book.area_id && areas.find((a) => a.id === book.area_id) ? [{ kind: 'area' as const, label: areas.find((a) => a.id === book.area_id)!.name, color: areaColor(areas.find((a) => a.id === book.area_id)) }] : [])]} />}
         title={<InlineText value={book.title} save={save('title')} textClassName="text-xl font-semibold" />}
         meta={
           <>

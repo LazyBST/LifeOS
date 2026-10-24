@@ -64,7 +64,10 @@ export async function createHabit(input: HabitInput): Promise<Habit> {
   };
   const { data, error } = await admin().from('habits').insert(row).select('*').single();
   if (error) throw new Error(`habit_create: ${error.message}`);
-  return data as Habit;
+  const created = data as Habit;
+  if (input.goal_id) await linkHabit(created.id, 'goal', input.goal_id).catch(() => undefined);
+  if (input.task_id) await linkHabit(created.id, 'task', input.task_id).catch(() => undefined);
+  return created;
 }
 
 export async function updateHabit(id: UUID, patch: HabitPatch): Promise<Habit> {
@@ -115,7 +118,7 @@ export async function checkinHabit(
     .single();
   if (error) throw new Error(`habit_checkin: ${error.message}`);
   const { current, longest } = await streakFor(habit, date);
-  if (opts.source !== 'gtasks' && value >= Number(habit.target_value)) {
+  if (opts.source !== 'gtasks' && date === istDate() && value >= Number(habit.target_value)) {
     // keep Google Tasks in step; a failure here must never fail the check-in
     const { pushHabitCheckin } = await import('@/lib/google/habit-sync');
     await pushHabitCheckin(habit, date).catch(() => false);
@@ -176,4 +179,41 @@ export async function habitsNeedingNudge(now = new Date()): Promise<Habit[]> {
   const habits = await listHabits();
   const byId = new Map(habits.map((h) => [h.id, h]));
   return nudge.map((h) => byId.get(h.id)).filter((h): h is Habit => Boolean(h));
+}
+
+// ---- links to goals, projects and tasks -------------------------------------
+
+export type HabitLinkType = 'goal' | 'project' | 'task';
+
+export async function linkHabit(habitId: UUID, type: HabitLinkType, entityId: UUID): Promise<void> {
+  const { error } = await admin().from('habit_links').upsert({ habit_id: habitId, entity_type: type, entity_id: entityId }, { onConflict: 'habit_id,entity_type,entity_id' });
+  if (error) throw new Error(`habit_link: ${error.message.includes('habit_links') ? 'run migration 0014 first' : error.message}`);
+}
+
+export async function unlinkHabit(habitId: UUID, type: HabitLinkType, entityId: UUID): Promise<void> {
+  await admin().from('habit_links').delete().eq('habit_id', habitId).eq('entity_type', type).eq('entity_id', entityId);
+}
+
+/** Ids of the habits attached to a goal, project or task (also the older goal_id / task_id columns). */
+export async function habitIdsFor(type: HabitLinkType, entityId: UUID): Promise<Set<UUID>> {
+  const ids = new Set<UUID>();
+  const { data } = await admin().from('habit_links').select('habit_id').eq('entity_type', type).eq('entity_id', entityId);
+  for (const r of (data ?? []) as { habit_id: string }[]) ids.add(r.habit_id);
+  const legacy = type === 'goal' ? 'goal_id' : type === 'task' ? 'task_id' : null;
+  if (legacy) {
+    const { data: old } = await admin().from('habits').select('id').eq(legacy, entityId);
+    for (const r of (old ?? []) as { id: string }[]) ids.add(r.id);
+  }
+  return ids;
+}
+
+/** Toggle one day's check-in: a met day goes to 0, any other day becomes met. Used to correct the past. */
+export async function toggleHabitDay(habitId: UUID, date: string): Promise<{ done: boolean }> {
+  const habit = await getHabit(habitId);
+  if (!habit) throw new Error(`No habit ${habitId}`);
+  if (date > istDate()) throw new Error('You cannot check in a future day.');
+  const { data } = await admin().from('habit_checkins').select('value').eq('habit_id', habitId).eq('checkin_date', date).maybeSingle();
+  const met = Number(data?.value ?? 0) >= Number(habit.target_value);
+  await checkinHabit(habitId, { date, value: met ? 0 : Number(habit.target_value), note: met ? undefined : date === istDate() ? undefined : 'edited later' });
+  return { done: !met };
 }

@@ -40,7 +40,8 @@ Then, only if you want test data to click around in:
 11. `0011_calendar_edit.sql` — edit events on your main calendar from the app, with an undo log
 12. `0012_books.sql` — books, reading log and links to goals, projects, tasks and habits
 13. `0013_external_ids.sql` — remembers where imported rows came from (used by the AppFlowy import)
-14. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
+14. `0014_ui_state_habit_links_indexes.sql` — dashboard layout synced across devices, habits linked to any goal/project/task, and indexes for speed
+15. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
    two goals, three projects, about a dozen tasks, three habits, five
    transactions and two journal entries.
 

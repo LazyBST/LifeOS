@@ -5,7 +5,7 @@ export function WidgetCard({ title, sub, right, children, bodyClassName = '' }: 
   title: ReactNode; sub?: ReactNode; right?: ReactNode; children: ReactNode; bodyClassName?: string;
 }) {
   return (
-    <section className="flex h-full flex-col overflow-hidden rounded-[20px] border border-border/70 bg-card shadow-[0_2px_8px_rgba(27,31,42,0.04)]">
+    <section className="flex h-full flex-col overflow-hidden rounded-[20px] border border-border bg-card shadow-[0_1px_3px_rgba(27,31,42,0.08),0_4px_12px_rgba(27,31,42,0.04)]">
       <header className="drag-handle flex cursor-grab items-center gap-2 px-5 pt-4 pb-3 active:cursor-grabbing">
         <span aria-hidden className="select-none text-xs leading-none tracking-tighter text-muted-foreground/60">⋮⋮</span>
         <div className="min-w-0 flex-1">

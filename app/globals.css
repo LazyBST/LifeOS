@@ -65,7 +65,7 @@
 
 :root {
   --radius: 0.75rem;
-  --background: #f3f4f7;
+  --background: #e9ecf2;
   --foreground: #1b1f2a;
   --card: #ffffff;
   --card-foreground: #1b1f2a;
@@ -75,13 +75,13 @@
   --primary-foreground: #ffffff;
   --secondary: #eef0f4;
   --secondary-foreground: #1b1f2a;
-  --muted: #eef0f4;
+  --muted: #eceff5;
   --muted-foreground: #6b7280;
   --accent: #eceefc;
   --accent-foreground: #3a41a0;
   --destructive: #dc2626;
-  --border: #e6e8ee;
-  --input: #d5d9e2;
+  --border: #d3d8e2;
+  --input: #c9cfdb;
   --ring: #5e6ad2;
   --chart-1: #5e6ad2;
   --chart-2: #10b981;
@@ -94,7 +94,7 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #eceefc;
   --sidebar-accent-foreground: #3a41a0;
-  --sidebar-border: #e6e8ee;
+  --sidebar-border: #d3d8e2;
   --sidebar-ring: #5e6ad2;
 }
 
@@ -165,4 +165,10 @@
 .touch-target {
   min-height: 44px;
   min-width: 44px;
+}
+
+/* Cards sit clearly above the page: a soft shadow on every bordered card surface (light mode). */
+:root:not(.dark) [class~="bg-card"][class~="border"],
+:root:not(.dark) [class~="bg-card"][class*="border-border"] {
+  box-shadow: 0 1px 3px rgba(27, 31, 42, 0.08), 0 1px 1px rgba(27, 31, 42, 0.04);
 }

@@ -5,7 +5,6 @@ import { listGoals } from '@/lib/domain/goals';
 import { listProjects } from '@/lib/domain/projects';
 import { listTasks } from '@/lib/domain/tasks';
 import { goalForecasts } from '@/lib/domain/analytics';
-import { Breadcrumbs } from '@/components/shell/Breadcrumbs';
 import { SetPageContext } from '@/components/chat/page-context';
 import { PropertiesHeader } from '@/components/entity/PropertiesHeader';
 import { ProgressBar } from '@/components/entity/ProgressBar';
@@ -47,7 +46,6 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       <SetPageContext ctx={{ route: `/area/${slug}`, entity_type: 'area', entity_id: area.id, area_id: area.id }} />
-      <Breadcrumbs items={[{ label: area.name }]} />
 
       <PropertiesHeader
         icon={<span className="inline-block size-3 rounded-full" style={{ background: color }} />}

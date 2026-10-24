@@ -8,6 +8,8 @@ type PropertiesHeaderProps = {
   icon?: ReactNode;
   /** Usually an <InlineText> bound to the title. */
   title: ReactNode;
+  /** Small context line shown right under the title (Area, Goal › Project …). */
+  trail?: ReactNode;
   /** Row of inline-editable property chips (status, priority, area, dates…). */
   meta?: ReactNode;
   /** Right-aligned actions, e.g. a delete button. */
@@ -23,6 +25,7 @@ type PropertiesHeaderProps = {
  */
 export function PropertiesHeader({
   eyebrow,
+  trail,
   icon,
   title,
   meta,
@@ -40,6 +43,7 @@ export function PropertiesHeader({
         </div>
         {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
       </div>
+      {trail}
       {meta && <div className="flex flex-wrap items-center gap-2.5">{meta}</div>}
       {children}
     </header>

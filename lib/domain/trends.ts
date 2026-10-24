@@ -8,25 +8,18 @@ import { bucketIndex, lastWeeks, linearForecast } from './trend-math';
 export type TrendSeries = { id: string; name: string; color: string; actual: number[]; forecast: number[]; total: number };
 export type Trend = { weeks: string[]; ahead: number; series: TrendSeries[] };
 
-async function pagedTasks<T>(cols: string): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await admin().from('tasks').select(cols).is('deleted_at', null).order('id').range(from, from + 999);
-    if (error) throw new Error(error.message);
-    out.push(...((data ?? []) as T[]));
-    if (!data || data.length < 1000) break;
-  }
-  return out;
-}
-
 /** Units completed per week for each Area. Unit = a subtask, or a task without subtasks. */
 export async function weeklyUnitsByArea(weeksBack = 10, ahead = 3, today = istDate()): Promise<Trend> {
   const weeks = lastWeeks(today, weeksBack);
-  const [areas, tasks] = await Promise.all([
+  const since = new Date(Date.parse(`${weeks[0]}T00:00:00Z`) - 86_400_000).toISOString();
+  // only what the chart needs: tasks completed inside the window, plus the ids that have subtasks
+  const [areas, doneRows, parentRows] = await Promise.all([
     listAreas(),
-    pagedTasks<{ id: string; area_id: string | null; status: string; completed_at: string | null; parent_task_id: string | null }>('id,area_id,status,completed_at,parent_task_id'),
+    admin().from('tasks').select('id,area_id,completed_at').is('deleted_at', null).eq('status', 'done').gte('completed_at', since).limit(5000),
+    admin().from('tasks').select('parent_task_id').is('deleted_at', null).not('parent_task_id', 'is', null).limit(5000),
   ]);
-  const parents = new Set(tasks.map((t) => t.parent_task_id).filter(Boolean) as string[]);
+  const tasks = ((doneRows.data ?? []) as { id: string; area_id: string | null; completed_at: string | null }[]).map((t) => ({ ...t, status: 'done', parent_task_id: null as string | null }));
+  const parents = new Set(((parentRows.data ?? []) as { parent_task_id: string }[]).map((p) => p.parent_task_id));
   const counts = new Map<string, number[]>(areas.map((a) => [a.id, Array(weeksBack).fill(0)]));
   for (const t of tasks) {
     if (t.status !== 'done' || !t.completed_at || parents.has(t.id) || !t.area_id) continue;
