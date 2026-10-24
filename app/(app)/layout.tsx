@@ -7,6 +7,9 @@ import { StatusProvider } from '@/components/status/StatusProvider';
 import { listStatuses } from '@/lib/domain/statuses';
 import { AppShell } from '@/components/shell/AppShell';
 
+// syncing Google can take a while on the first run; allow it the full minute
+export const maxDuration = 60;
+
 export default async function Layout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
   if (!user) redirect('/login');

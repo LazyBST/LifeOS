@@ -22,7 +22,7 @@ const DONE_COLOR_ID = '8'; // grey, for a completed task's event (spec section 9
 const OUTBOX_BATCH = 20;
 const PRIMARY_CALENDAR_ID = 'primary';
 const FULL_RESYNC_PAST_DAYS = 30;
-const FULL_RESYNC_FUTURE_DAYS = 180;
+const FULL_RESYNC_FUTURE_DAYS = 31; // a month back and a month ahead is all the app shows
 
 type OutboxRow = {
   id: number;
@@ -462,6 +462,16 @@ async function pollLifeosCalendar(): Promise<number> {
   return changed;
 }
 
+/** Upserts many events at once; falls back to the original columns if migration 0011 has not run. */
+export async function upsertCacheRows(rows: CacheRow[]): Promise<boolean> {
+  if (rows.length === 0) return true;
+  const { error } = await admin().from('calendar_events').upsert(rows, { onConflict: 'google_event_id' });
+  if (!error) return true;
+  const slim = rows.map(({ google_event_id, summary, starts_at, ends_at, all_day, updated_at }) => ({ google_event_id, summary, starts_at, ends_at, all_day, updated_at }));
+  const { error: e2 } = await admin().from('calendar_events').upsert(slim, { onConflict: 'google_event_id' });
+  return !e2;
+}
+
 /** Upserts a primary-calendar event into the cache. Falls back to the original columns if migration 0011 has not run. */
 export async function upsertCacheRow(row: CacheRow): Promise<boolean> {
   const { error } = await admin().from('calendar_events').upsert(row, { onConflict: 'google_event_id' });
@@ -477,19 +487,25 @@ async function pollPrimaryCalendar(): Promise<number> {
   await ensurePrimaryCached();
   const { events, nextSyncToken } = await listEventsResilient(PRIMARY_CALENDAR_ID);
 
-  let changed = 0;
-  let failed = 0;
+  // one round trip for the deletions and one per 200 events, instead of one per event
+  const cancelled: string[] = [];
+  const rows: CacheRow[] = [];
   for (const event of events) {
     if (!event.id) continue;
-    if (event.status === 'cancelled') {
-      await admin().from('calendar_events').delete().eq('google_event_id', event.id);
-      changed += 1;
-      continue;
-    }
+    if (event.status === 'cancelled') { cancelled.push(event.id); continue; }
     const row = eventToCacheRow(event);
-    if (!row) continue;
-    if (await upsertCacheRow(row)) changed += 1;
-    else failed += 1;
+    if (row) rows.push(row);
+  }
+  let changed = 0;
+  let failed = 0;
+  for (let k = 0; k < cancelled.length; k += 200) {
+    await admin().from('calendar_events').delete().in('google_event_id', cancelled.slice(k, k + 200));
+    changed += Math.min(200, cancelled.length - k);
+  }
+  for (let k = 0; k < rows.length; k += 200) {
+    const chunk = rows.slice(k, k + 200);
+    if (await upsertCacheRows(chunk)) changed += chunk.length;
+    else failed += chunk.length;
   }
 
   // keep the old token if anything could not be saved, so the next poll sends those events again

@@ -57,7 +57,12 @@ export async function pullHabitCheckins(now = new Date()): Promise<PullReport> {
     const habits = await activeHabits();
     if (habits.length === 0) { await record({ last_error: null, last_pulled: 0 }); return empty; }
     const since = new Date(now.getTime() - 3 * 86_400_000).toISOString();
-    const all = await listGoogleTasks({ completedMin: since });
+    // what changed in the last 3 days (finds recent completions), plus what is due within two weeks (for the link report)
+    const [recent, planned] = await Promise.all([
+      listGoogleTasks({ updatedMin: since, completedMin: since }),
+      listGoogleTasks({ dueMin: new Date(now.getTime() - 14 * 86_400_000).toISOString(), dueMax: new Date(now.getTime() + 14 * 86_400_000).toISOString(), showCompleted: false }),
+    ]);
+    const all = [...recent, ...planned];
     const done = all.filter((t) => t.status === 'completed' && t.completed);
     const report: PullReport = { ...empty, found: done.length };
     const { checkinHabit } = await import('@/lib/domain/habits'); // lazy: habits.ts imports this module
@@ -90,7 +95,8 @@ export async function pushHabitCheckin(habit: HabitRow, date = istDate()): Promi
   const r = await ready();
   if (!r.ok) return false;
   try {
-    const open = (await listGoogleTasks()).filter((t) => t.status === 'needsAction' && matchHabit(t.title, [habit]));
+    const day = new Date(`${date}T00:00:00Z`).getTime();
+    const open = (await listGoogleTasks({ showCompleted: false, dueMin: new Date(day - 14 * 86_400_000).toISOString(), dueMax: new Date(day + 2 * 86_400_000).toISOString() })).filter((t) => t.status === 'needsAction' && matchHabit(t.title, [habit]));
     const eligible = open
       .filter((t) => !t.due || t.due.slice(0, 10) <= date)
       .sort((a, b) => (b.due ?? '').localeCompare(a.due ?? ''));

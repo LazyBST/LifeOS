@@ -13,19 +13,39 @@ async function allLists(api: tasks_v1.Tasks): Promise<{ id: string; title: strin
   return (res.data.items ?? []).filter((l) => l.id).map((l) => ({ id: l.id!, title: l.title ?? '' }));
 }
 
-/** Tasks across every list. Google Tasks stores a due DATE only; its time of day is not exposed by the API. */
-export async function listGoogleTasks(opts: { completedMin?: string } = {}): Promise<GTask[]> {
+export type ListOpts = {
+  /** only tasks completed after this instant */
+  completedMin?: string;
+  /** only tasks changed after this instant: completing a task changes it, so this finds recent completions cheaply */
+  updatedMin?: string;
+  /** only tasks due in this window (RFC 3339) */
+  dueMin?: string;
+  dueMax?: string;
+  showCompleted?: boolean;
+  /** stop after this many pages of 100 per list (default 3) */
+  maxPages?: number;
+};
+
+/**
+ * Tasks across every list, narrowed by the options so a large Google Tasks history is never walked in full.
+ * Google Tasks stores a due DATE only; its time of day is not exposed by the API.
+ */
+export async function listGoogleTasks(opts: ListOpts = {}): Promise<GTask[]> {
   const api = await client();
   const out: GTask[] = [];
+  const maxPages = opts.maxPages ?? 3;
   for (const list of await allLists(api)) {
     let pageToken: string | undefined;
-    do {
+    for (let page = 0; page < maxPages; page++) {
       const res = await api.tasks.list({
         tasklist: list.id,
-        showCompleted: true,
-        showHidden: true,
+        showCompleted: opts.showCompleted ?? true,
+        showHidden: opts.showCompleted ?? true,
         maxResults: 100,
         completedMin: opts.completedMin,
+        updatedMin: opts.updatedMin,
+        dueMin: opts.dueMin,
+        dueMax: opts.dueMax,
         pageToken,
       });
       for (const t of res.data.items ?? []) {
@@ -33,7 +53,8 @@ export async function listGoogleTasks(opts: { completedMin?: string } = {}): Pro
         out.push({ id: t.id, listId: list.id, title: t.title, status: t.status === 'completed' ? 'completed' : 'needsAction', due: t.due ?? null, completed: t.completed ?? null });
       }
       pageToken = res.data.nextPageToken ?? undefined;
-    } while (pageToken);
+      if (!pageToken) break;
+    }
   }
   return out;
 }

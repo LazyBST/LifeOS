@@ -86,7 +86,7 @@ export function CalendarWeek() {
         <span className="ml-1 font-medium">{title}</span>
         {loading && <span className="text-xs text-muted-foreground">loading…</span>}
         <span className="ml-auto flex gap-2">
-          <button onClick={syncNow} className="rounded-md border px-2 py-1 text-xs" title="Re-read your whole Google Calendar now">Sync Google</button>
+          <button onClick={syncNow} className="rounded-md border px-2 py-1 text-xs" title="Fetch what changed in Google Calendar since the last sync">Sync Google</button>
           <button onClick={() => setDialog({ mode: 'create', date: focus, hour: Math.min(22, Math.max(startH, istParts().hour + 1)) })} className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground">+ Event</button>
         </span>
       </div>

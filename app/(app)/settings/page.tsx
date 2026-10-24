@@ -10,6 +10,9 @@ import { hasTasksScope, hasCalendarWriteScope, googleRedirectUri, isConfigured }
 import { requestOrigin } from '@/lib/origin';
 import type { Account, Category } from '@/lib/types/db';
 
+// syncing Google can take a while on the first run; allow it the full minute
+export const maxDuration = 60;
+
 async function loadAccounts(): Promise<Account[]> {
   try {
     const { data, error } = await admin().from('accounts').select('*').is('archived_at', null).order('name');

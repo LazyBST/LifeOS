@@ -9,10 +9,10 @@ export function GoogleSyncNow({ lastError, lastOk, cached }: { lastError: string
   const [report, setReport] = useState<GoogleSyncReport | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  function sync() {
+  function sync(full = false) {
     setFailure(null);
     start(async () => {
-      const r = await syncGoogleNowAction();
+      const r = await syncGoogleNowAction({ full });
       if (!r.ok) setFailure(r.error); else setReport(r.data);
       router.refresh();
     });
@@ -25,8 +25,11 @@ export function GoogleSyncNow({ lastError, lastOk, cached }: { lastError: string
         <span className="text-xs text-muted-foreground">
           {lastOk ? `Calendar last synced ${new Date(lastOk).toLocaleString()} · ${cached} events stored` : 'Calendar has not synced successfully yet'}
         </span>
-        <button type="button" onClick={sync} disabled={pending} className="ml-auto rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
+        <button type="button" onClick={() => sync(false)} disabled={pending} className="ml-auto rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
           {pending ? 'Syncing…' : 'Sync Google now'}
+        </button>
+        <button type="button" onClick={() => sync(true)} disabled={pending} className="rounded-lg border px-2.5 py-1.5 text-xs disabled:opacity-50" title="Throw away the saved position and re-read the last and next month">
+          Re-read everything
         </button>
       </div>
       {lastError && !report && <p className="text-xs text-destructive">Last calendar sync problem: {lastError}</p>}
