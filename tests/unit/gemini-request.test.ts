@@ -51,10 +51,20 @@ describe('Gemini chat provider', () => {
     expect(pickModel(undefined, 'x', 'google')).toBe('x');
   });
 
+  it('defaults to Claude when LLM_PROVIDER is unset', async () => {
+    const { llmProvider } = await import('@/lib/agent/model');
+    const was = process.env.LLM_PROVIDER;
+    delete process.env.LLM_PROVIDER;
+    expect(llmProvider()).toBe('anthropic');
+    process.env.LLM_PROVIDER = 'google';
+    expect(llmProvider()).toBe('google');
+    if (was) process.env.LLM_PROVIDER = was;
+  });
+
   it('chooses models by provider and lets env override them', async () => {
     const { modelNames, keyEnvName } = await import('@/lib/agent/model');
     expect(modelNames('google').chat).toMatch(/^gemini/);
-    expect(modelNames('anthropic').chat).toMatch(/^claude/);
+    expect(modelNames('anthropic').chat).toBe('claude-sonnet-5-5');
     expect(keyEnvName('google')).toBe('GOOGLE_GENERATIVE_AI_API_KEY');
     process.env.CHAT_MODEL = 'gemini-custom';
     expect(modelNames('google').chat).toBe('gemini-custom');

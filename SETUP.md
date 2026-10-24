@@ -81,15 +81,16 @@ files depend on the earlier ones.
 - Use the same port everywhere: `npm run dev` serves on 3000, and the Supabase
   redirect URL must match the port you open.
 
-## 4. Create the Gemini API key
+## 4. Create the Anthropic (Claude) API key
 
-1. Go to <https://aistudio.google.com/apikey> and create an API key.
-2. Copy it into `GOOGLE_GENERATIVE_AI_API_KEY` (step 8). It is read only on the server.
-3. The chat and the morning plan use `gemini-3.8-flash` by default. Google retires model names often:
-   if the chat reports a model is "no longer available", set `CHAT_MODEL` / `CHEAP_MODEL` in Vercel to the
-   name it recommends (or a Pro model for stronger tool use).
-4. To use Claude instead, set `LLM_PROVIDER=anthropic`, add `ANTHROPIC_API_KEY`, and set `CHAT_MODEL`.
-5. Optional: set a spend limit on the key's Google Cloud project.
+1. Go to <https://console.anthropic.com/settings/keys> and create a key named `lifeos`. API usage is billed
+   separately from a Claude.ai subscription, so add credits under Billing.
+2. Copy it into `ANTHROPIC_API_KEY` (step 8). It is read only on the server.
+3. The chat uses `claude-sonnet-5-5` and the morning plan `claude-haiku-4-5-20251001` by default. Set
+   `CHAT_MODEL` / `CHEAP_MODEL` in Vercel to use other Claude models.
+4. To use Gemini instead, set `LLM_PROVIDER=google`, add `GOOGLE_GENERATIVE_AI_API_KEY`, and set `CHAT_MODEL`
+   to a current Gemini model. A model name from the wrong provider is ignored automatically.
+5. Optional: set a monthly spend limit in the Anthropic console.
 
 ## 5. Generate the Web Push (VAPID) keys
 
@@ -150,8 +151,8 @@ It prints a public key and a private key. Set:
    | `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public key |
    | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → service_role key (**server only**) |
    | `OWNER_EMAIL` | your Gmail address |
-   | `LLM_PROVIDER`, `GOOGLE_GENERATIVE_AI_API_KEY` | step 4 (`google` is the default) |
-   | `CHAT_MODEL`, `CHEAP_MODEL`, `ANTHROPIC_API_KEY` | optional overrides / Claude |
+   | `ANTHROPIC_API_KEY` | step 4 (`LLM_PROVIDER=anthropic` is the default) |
+   | `CHAT_MODEL`, `CHEAP_MODEL`, `GOOGLE_GENERATIVE_AI_API_KEY` | optional overrides / Gemini |
    | `CRON_SECRET` | `openssl rand -hex 32` |
    | `VAPID_PUBLIC_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | step 5 |
    | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | step 6 |

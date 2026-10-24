@@ -5,15 +5,15 @@ import type { LanguageModel } from 'ai';
 
 export type Provider = 'google' | 'anthropic';
 
-/** Gemini is the default; set LLM_PROVIDER=anthropic to switch back. Nothing else in the app knows the provider. */
+/** Claude is the default; set LLM_PROVIDER=google to use Gemini. Nothing else in the app knows the provider. */
 export function llmProvider(): Provider {
-  return (process.env.LLM_PROVIDER ?? 'google').trim().toLowerCase() === 'anthropic' ? 'anthropic' : 'google';
+  return (process.env.LLM_PROVIDER ?? 'anthropic').trim().toLowerCase() === 'google' ? 'google' : 'anthropic';
 }
 
 const DEFAULTS: Record<Provider, { chat: string; cheap: string }> = {
   // Google retires models quickly: if a call says a model is "no longer available", set CHAT_MODEL / CHEAP_MODEL.
   google: { chat: 'gemini-3.8-flash', cheap: 'gemini-3.8-flash' },
-  anthropic: { chat: 'claude-sonnet-5', cheap: 'claude-haiku-4-5-20251001' },
+  anthropic: { chat: 'claude-sonnet-5-5', cheap: 'claude-haiku-4-5-20251001' },
 };
 
 /** An override only applies if it belongs to the active provider: a leftover CHAT_MODEL=claude-… must not be sent to Gemini. */
