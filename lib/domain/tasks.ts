@@ -5,6 +5,7 @@ import { getProject } from './projects';
 import { getGoal } from './goals';
 import { addDays, istDate } from '@/lib/time';
 import { syncTaskReminders } from './reminders';
+import { drainOutbox } from '@/lib/google/sync';
 import type { TaskFilters } from '@/lib/types/filters';
 import type { DateStr, Priority, Task, TaskStatus, UUID } from '@/lib/types/db';
 
@@ -38,6 +39,22 @@ export type Breadcrumb = {
   /** 'Website > Launch MVP' style path used in chat echoes */
   path: string;
 };
+
+
+/**
+ * Push a scheduled task to Google right after the write, so the event appears
+ * in seconds rather than waiting for the next cron tick (spec section 9).
+ * `drainOutbox` already no-ops when Google is not configured; errors here are
+ * swallowed because a calendar hiccup must never fail a task write — the tick
+ * retries from the same outbox rows.
+ */
+async function pushToCalendar(): Promise<void> {
+  try {
+    await drainOutbox();
+  } catch {
+    // the cron tick will retry
+  }
+}
 
 export async function getTask(id: UUID): Promise<Task | null> {
   const { data } = await admin().from('tasks').select('*').eq('id', id).is('deleted_at', null).maybeSingle();
@@ -139,7 +156,10 @@ export async function createTask(input: TaskInput): Promise<Task> {
   const task = data as Task;
   // A task with a clock time gets its reminder pair now, so cancelling or
   // moving the task later updates them (spec section 8).
-  if (task.due_at) await syncTaskReminders(task);
+  if (task.due_at) {
+    await syncTaskReminders(task);
+    await pushToCalendar();
+  }
   return task;
 }
 
@@ -167,6 +187,7 @@ export async function updateTask(id: UUID, patch: TaskPatch): Promise<Task> {
   const task = data as Task;
   if (row.due_at !== undefined || row.status !== undefined || row.title !== undefined) {
     await syncTaskReminders(task);
+    if (task.due_at || row.due_at === null) await pushToCalendar();
   }
   return task;
 }
@@ -199,6 +220,7 @@ export async function deleteTask(id: UUID): Promise<Task> {
     .single();
   if (error) throw new Error(`task_delete: ${error.message}`);
   await syncTaskReminders(data as Task);
+  if ((data as Task).due_at) await pushToCalendar();
   await admin().from('task_events').insert({
     task_id: id,
     goal_id: (data as Task).goal_id,
