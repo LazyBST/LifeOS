@@ -26,9 +26,16 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   // Every job is wrapped in its own try/catch inside runTick, so one broken
-  // job never stops the others and this always returns 200.
-  const result = await runTick(new Date());
-  return NextResponse.json(result, { status: 200 });
+  // job never stops the others. The outer catch covers the setup runTick does
+  // before that — reading app_config — so a database outage still answers
+  // with a readable body instead of an empty 500.
+  try {
+    const result = await runTick(new Date());
+    return NextResponse.json(result, { status: 200 });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return NextResponse.json({ ran: [], skipped: [], errors: [{ job: 'tick', error: message }] }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
