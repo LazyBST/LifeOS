@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- typed mock signatures */
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
