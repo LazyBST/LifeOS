@@ -120,6 +120,7 @@ export function useChat(getPageContext: () => PageContext) {
           createdAt: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, reply]);
+        window.dispatchEvent(new Event('lifeos:changed'));
         if (!isOpenRef.current) setUnread((n) => n + 1);
       } catch {
         const errBubble: ChatBubble = {

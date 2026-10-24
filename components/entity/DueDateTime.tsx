@@ -56,7 +56,7 @@ export function DueDateTime({ taskId, dueDate, dueAt, durationMin }: DueDateTime
   }
 
   return (
-    <span className="flex items-center gap-1.5">
+    <span className="flex flex-wrap items-center gap-1.5">
       <Input
         type="date"
         value={date}

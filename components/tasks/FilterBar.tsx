@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -32,8 +32,6 @@ export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) 
   const [areas, setAreas] = useState<Area[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [search, setSearch] = useState(filters.q ?? '');
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     listAreasAction().then((r) => {
@@ -51,10 +49,6 @@ export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) 
     });
   }, [effectiveGoalId]);
 
-  useEffect(() => {
-    setSearch(filters.q ?? '');
-  }, [filters.q]);
-
   function patch(next: Partial<TaskFilters>) {
     onChange({ ...filters, ...next });
   }
@@ -71,12 +65,6 @@ export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) 
     patch({ status: next.length ? next : undefined });
   }
 
-  function onSearchChange(value: string) {
-    setSearch(value);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => patch({ q: value || undefined }), 350);
-  }
-
   const lockedArea = 'area_id' in base;
   const lockedGoal = 'goal_id' in base;
   const lockedProject = 'project_id' in base;
@@ -85,9 +73,6 @@ export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) 
   return (
     <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Search">
-          <Input placeholder="Title contains…" className="h-9" value={search} onChange={(e) => onSearchChange(e.target.value)} />
-        </Field>
         {!lockedArea && (
           <Field label="Area">
             <select className={sel} value={filters.area_id ?? ''} onChange={(e) => patch({ area_id: e.target.value || undefined })} aria-label="Area">

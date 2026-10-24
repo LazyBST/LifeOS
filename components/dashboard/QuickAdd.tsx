@@ -28,6 +28,7 @@ export function QuickAdd() {
       }
       const data = (await res.json()) as { reply?: string };
       toast.success(data.reply ?? 'Done.');
+      window.dispatchEvent(new Event('lifeos:changed'));
       setValue('');
     } catch {
       toast.error("Couldn't reach the assistant yet.");

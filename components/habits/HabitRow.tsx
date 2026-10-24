@@ -27,6 +27,11 @@ export function HabitRow({ h, onUnlink, onEdit, onArchive }: { h: HabitRowData; 
   const [, start] = useTransition();
   useEffect(() => { setWeek(h.week); setValue(h.value); setDraft(String(h.value)); }, [h.week, h.value]);
 
+  // arriving from the calendar (/habits#habit-<id>): open this habit's details and bring it into view
+  useEffect(() => {
+    if (window.location.hash === `#habit-${h.id}`) { setOpen(true); document.getElementById(`habit-${h.id}`)?.scrollIntoView({ block: 'center' }); }
+  }, [h.id]);
+
   const todayDone = week.find((d) => d.date === h.today)?.done ?? false;
   const todayMissed = week.find((d) => d.date === h.today)?.missed ?? false;
   const doneCount = week.filter((d) => d.due && d.done).length;
@@ -54,7 +59,7 @@ export function HabitRow({ h, onUnlink, onEdit, onArchive }: { h: HabitRowData; 
   }
 
   return (
-    <div className="rounded-xl border border-border/70 bg-card/60 px-2.5 py-1.5">
+    <div id={`habit-${h.id}`} className="scroll-mt-24 rounded-xl border border-border/70 bg-card/60 px-2.5 py-1.5">
       <div className="flex items-center gap-2">
         <button
           type="button"

@@ -42,6 +42,14 @@ export function CalendarWeek() {
     setData(r.data);
   }, []);
   useEffect(() => { void load(ws); }, [ws, load]);
+  // anything created or changed in the app (tasks, chat) shows up right away; also refresh on returning to the tab
+  useEffect(() => {
+    const again = () => { if (document.visibilityState === 'visible') void load(ws); };
+    window.addEventListener('lifeos:changed', again);
+    window.addEventListener('focus', again);
+    document.addEventListener('visibilitychange', again);
+    return () => { window.removeEventListener('lifeos:changed', again); window.removeEventListener('focus', again); document.removeEventListener('visibilitychange', again); };
+  }, [ws, load]);
 
   async function syncNow() {
     setLoading(true);
@@ -137,9 +145,10 @@ export function CalendarWeek() {
                   <button key={a.id} onClick={() => a.event && setDialog({ mode: 'edit', event: a.event })} className={`truncate rounded border px-1.5 py-0.5 text-left text-[12px] ${KIND.event}`}>{a.title}</button>
                 ))}
                 {any.map((u) => u.kind === 'habit' ? (
-                  <button key={`h-${u.id}`} onClick={() => void toggleHabit(u.id, d, u.done)} title={u.done ? 'Done (click to undo)' : 'Click to check in'} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-left text-[12px] ${KIND.habit} ${u.done ? 'line-through opacity-60' : ''}`}>
-                    <span>{u.done ? '✓' : u.missed ? '✕' : '○'}</span><span className="truncate">{u.emoji ? `${u.emoji} ` : ''}{u.title}</span>
-                  </button>
+                  <div key={`h-${u.id}`} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-left text-[12px] ${KIND.habit} ${u.done ? 'line-through opacity-60' : ''}`}>
+                    <button type="button" onClick={() => void toggleHabit(u.id, d, u.done)} title={u.done ? 'Done (click to undo)' : 'Click to check in'}>{u.done ? '✓' : u.missed ? '✕' : '○'}</button>
+                    <Link href={`/habits#habit-${u.id}`} className="min-w-0 flex-1 truncate">{u.emoji ? `${u.emoji} ` : ''}{u.title}</Link>
+                  </div>
                 ) : (
                   <Link key={`t-${u.id}`} href={u.href ?? '#'} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-[12px] ${KIND.task} ${u.done ? 'line-through opacity-60' : ''}`}>
                     <span>{u.done ? '✓' : '☐'}</span><span className="truncate">{u.title}</span>
@@ -170,7 +179,7 @@ export function CalendarWeek() {
       <EventDialog target={dialog} onClose={() => setDialog(null)} onChanged={() => void load(ws)} />
       <p className="text-[12px] text-muted-foreground">
         <span className="mr-3">■ <span className="text-emerald-600">Google events</span></span><span className="mr-3">■ <span className="text-indigo-600">Tasks (start → end)</span></span><span className="mr-3">■ <span className="text-amber-600">Habits (their time block)</span></span>
-        Click an empty slot to add an event, an event to edit it, a habit to check it in. Give habits a time in Habits → Edit.
+        Click an empty slot to add an event, an event to edit it; tasks, habits, goals and projects open their page (the circle checks a habit in). Give habits a time in Habits → Edit.
       </p>
     </div>
   );
@@ -183,11 +192,19 @@ function Block({ b, p, top, height, detailed, onEvent, onHabit }: { b: WeekBlock
   const cls = `absolute overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[12px] leading-tight ${KIND[b.kind]} ${b.done ? 'opacity-60 line-through' : ''}`;
   const label = (
     <>
-      <span className="font-semibold">{b.kind === 'habit' ? (b.done ? '✓ ' : b.habit?.missed ? '✕ ' : '○ ') : b.event?.recurring ? '↻ ' : ''}{b.habit?.emoji ? `${b.habit.emoji} ` : ''}{b.title}</span>
+      <span className="font-semibold">{b.event?.recurring ? '↻ ' : ''}{b.habit?.emoji ? `${b.habit.emoji} ` : ''}{b.title}</span>
       {(detailed || height >= 40) && <span className="block text-[11px] opacity-70">{range}{b.kind === 'task' ? ' · task' : b.kind === 'habit' ? ' · habit' : ''}</span>}
     </>
   );
   if (b.href) return <Link href={b.href} onClick={(e) => e.stopPropagation()} className={cls} style={style} title={`${b.title} · ${range}`}>{label}</Link>;
-  if (b.kind === 'habit' && b.habit) return <button type="button" onClick={(e) => { e.stopPropagation(); onHabit(b.habit!.id, b.habit!.date, !!b.done); }} className={cls} style={style} title={`${b.title} · ${range} (click to ${b.done ? 'undo' : 'check in'})`}>{label}</button>;
+  if (b.kind === 'habit' && b.habit) {
+    const h = b.habit;
+    return (
+      <div className={`${cls} flex items-start gap-1`} style={style} title={`${b.title} · ${range}`}>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onHabit(h.id, h.date, !!b.done); }} title={b.done ? 'Done (click to undo)' : 'Click to check in'} className="shrink-0 font-semibold">{b.done ? '✓' : h.missed ? '✕' : '○'}</button>
+        <Link href={`/habits#habit-${h.id}`} onClick={(e) => e.stopPropagation()} className="min-w-0 flex-1">{label}</Link>
+      </div>
+    );
+  }
   return <button type="button" onClick={(e) => { e.stopPropagation(); if (b.event) onEvent(b.event); }} className={cls} style={style} title={`${b.title} · ${range}`}>{label}</button>;
 }

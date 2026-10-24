@@ -190,6 +190,7 @@ export function useTaskViewState(opts: {
       };
       setTasks((prev) => [...prev, optimistic]);
       const res = await createTaskAction(input);
+      if (res.ok) window.dispatchEvent(new Event('lifeos:changed'));
       refetch();
       return res;
     },
@@ -200,6 +201,7 @@ export function useTaskViewState(opts: {
     async (id: string, patch: TaskPatchLite) => {
       patchLocal(id, patch as Partial<TaskListItem>);
       const res = await updateTaskAction(id, patch);
+      if (res.ok) window.dispatchEvent(new Event('lifeos:changed'));
       refetch();
       return res;
     },
@@ -210,6 +212,7 @@ export function useTaskViewState(opts: {
     async (id: string) => {
       patchLocal(id, { status: 'done', completed_at: new Date().toISOString() });
       const res = await completeTaskAction(id);
+      if (res.ok) window.dispatchEvent(new Event('lifeos:changed'));
       refetch();
       return res;
     },
@@ -231,6 +234,7 @@ export function useTaskViewState(opts: {
       const gone = tasksRef.current.find((t) => t.id === id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
       const res = await deleteTaskAction(id);
+      if (res.ok) window.dispatchEvent(new Event('lifeos:changed'));
       if (!res.ok) toast.error(res.error);
       else {
         toast.success(`Deleted “${gone?.title ?? 'task'}”`, {

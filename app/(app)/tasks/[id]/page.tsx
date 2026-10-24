@@ -106,7 +106,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               options={areas.map((a) => ({ value: a.id, label: a.name }))}
               save={{ entity: 'task', id: task.id, field: 'area_id', mode: 'nullable' }}
             />
-            <span className="field">
+            <span className="field col-span-full">
               Due
               <DueDateTime taskId={task.id} dueDate={task.due_date} dueAt={task.due_at} durationMin={task.duration_min} />
             </span>

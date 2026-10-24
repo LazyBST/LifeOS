@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GroupByKey, TaskFilters, TaskViewState } from '@/lib/types/filters';
 import { useTaskViewState, type TaskCreateInput } from './useTaskViewState';
@@ -65,8 +66,20 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
   const toggleFilters = () => setShowFilters((v) => { const n = !v; try { localStorage.setItem(`lifeos:filters-open:${scope}`, n ? '1' : '0'); } catch {} return n; });
   const activeFilters = Object.entries(state.filters).filter(([k, v]) => !(k in base) && v != null && !(Array.isArray(v) && v.length === 0) && v !== '' && k !== 'include_done' && k !== 'limit').length;
 
+  // search sits in the toolbar (always visible) and feeds the same `q` filter the list is queried with
+  const [search, setSearch] = useState(state.filters.q ?? '');
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => { setSearch(state.filters.q ?? ''); }, [state.filters.q]);
+  const onSearch = (v: string) => {
+    setSearch(v);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setFilters({ ...state.filters, q: v || undefined }), 350);
+  };
+
   return (
     <div className="flex flex-col gap-3">
+      {/* the controls stay put; only the cards below scroll */}
+      <div className="sticky top-0 z-10 -mx-1 flex flex-col gap-3 bg-[var(--sticky-bg,var(--background))] px-1 pb-2">
       {title && <div className="text-sm font-medium">{title}</div>}
       {!hidePresets && (
         <div className="flex flex-wrap gap-1">
@@ -92,6 +105,7 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
           </Button>
         </div>
         <div className="flex items-center gap-2">
+          <Input value={search} onChange={(e) => onSearch(e.target.value)} placeholder="Search tasks…" aria-label="Search tasks" className="h-8 w-36 sm:w-48" />
           {state.view === 'list' && <GroupBySelect value={state.group} onChange={setGroup} />}
           <Button size="sm" variant={showFilters || activeFilters ? 'secondary' : 'outline'} onClick={toggleFilters} aria-expanded={showFilters} aria-controls="task-filters">
             <Filter className="size-3.5" />
@@ -102,6 +116,7 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
         </div>
       </div>
       {showFilters && <div id="task-filters"><FilterBar filters={state.filters} base={base} onChange={setFilters} onClear={clearFilters} /></div>}
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       {loading ? (
         <ViewSkeleton view={state.view} />

@@ -14,7 +14,7 @@ export function WidgetCard({ title, sub, right, children, bodyClassName = '' }: 
         </div>
         {right && <div className="no-drag shrink-0">{right}</div>}
       </header>
-      <div className={`min-h-0 flex-1 overflow-auto px-5 pb-5 ${bodyClassName}`}>{children}</div>
+      <div className={`min-h-0 flex-1 overflow-auto px-5 pb-5 [--sticky-bg:var(--card)] ${bodyClassName}`}>{children}</div>
     </section>
   );
 }
