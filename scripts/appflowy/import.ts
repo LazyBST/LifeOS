@@ -96,6 +96,8 @@ async function resetContent(): Promise<void> {
 }
 
 async function main() {
+  // every row in a bulk insert must carry the same keys: PostgREST fills a missing key with NULL, not the column default
+  const now = new Date().toISOString();
   if (reset) await resetContent();
   const { data: areaRows, error: ae } = await sb.from('areas').select('id,name');
   if (ae) throw new Error(`areas: ${ae.message}`);
@@ -138,7 +140,7 @@ async function main() {
   const newGoals = plan.goals.filter((g) => !have.goals.has(g.external_id));
   await insert('goals', newGoals.map((g) => ({
     id: g.id, external_id: g.external_id, title: g.title, area_id: areaId(g.area), status: g.status, priority: g.priority,
-    start_date: g.start_date, target_date: g.target_date, notes_md: g.notes_md, ...(g.created_at ? { created_at: g.created_at } : {}),
+    start_date: g.start_date, target_date: g.target_date, notes_md: g.notes_md, created_at: g.created_at ?? now,
   })));
   const goalById = new Set(plan.goals.map((g) => g.id));
   const newProjects = plan.projects.filter((p) => !have.projects.has(p.external_id));
@@ -146,14 +148,14 @@ async function main() {
     if (!goalById.has(p.goal_id)) throw new Error(`project "${p.title}" points at a goal that was not imported`);
     return {
       id: p.id, external_id: p.external_id, goal_id: p.goal_id, title: p.title, area_id: areaId(p.area), status: p.status, priority: p.priority,
-      start_date: p.start_date, target_date: p.target_date, notes_md: p.notes_md, ...(p.created_at ? { created_at: p.created_at } : {}),
+      start_date: p.start_date, target_date: p.target_date, notes_md: p.notes_md, created_at: p.created_at ?? now,
     };
   }));
 
   const newTasks = plan.tasks.filter((t) => !have.tasks.has(t.external_id));
   await insert('tasks', newTasks.map((t, i) => ({
     id: t.id, external_id: t.external_id, title: t.title, project_id: t.project_id, area_id: areaId(t.area), status: t.status,
-    priority: t.priority, due_date: t.due_date, due_at: t.due_at, notes_md: t.notes_md, sort_order: i + 1, ...(t.created_at ? { created_at: t.created_at } : {}),
+    priority: t.priority, due_date: t.due_date, due_at: t.due_at, notes_md: t.notes_md, sort_order: i + 1, created_at: t.created_at ?? now,
   })));
   // the status trigger stamps "now" on tasks inserted as done: put back the real completion time and its event
   for (const t of newTasks.filter((x) => x.status === 'done' && x.completed_at)) {
@@ -164,7 +166,7 @@ async function main() {
   const newHabits = plan.habits.filter((h) => !have.habits.has(h.external_id));
   await insert('habits', newHabits.map((h) => ({
     external_id: h.external_id, name: h.name, time_of_day: h.time_of_day, kind: h.kind, target_value: h.target_value, unit: h.unit,
-    days_of_week: h.days_of_week, area_id: areaId(h.area), ...(h.created_at ? { created_at: h.created_at } : {}),
+    days_of_week: h.days_of_week, area_id: areaId(h.area), created_at: h.created_at ?? now,
   })));
 
   console.log(`\nImported: ${newGoals.length} goals, ${newProjects.length} projects, ${newTasks.length} tasks, ${newHabits.length} habits.`);
