@@ -15,10 +15,23 @@ const DEFAULTS: Record<Provider, { chat: string; cheap: string }> = {
   anthropic: { chat: 'claude-sonnet-5', cheap: 'claude-haiku-4-5-20251001' },
 };
 
+/** An override only applies if it belongs to the active provider: a leftover CHAT_MODEL=claude-… must not be sent to Gemini. */
+export function pickModel(override: string | undefined, fallback: string, provider: Provider): string {
+  const name = override?.trim();
+  if (!name) return fallback;
+  const isClaude = /^claude/i.test(name);
+  const isGemini = /^(gemini|gemma|models\/gemini)/i.test(name);
+  if ((provider === 'google' && isClaude) || (provider === 'anthropic' && isGemini)) {
+    console.warn(`[model] Ignoring "${name}": it is not a ${provider} model. Using ${fallback}.`);
+    return fallback;
+  }
+  return name;
+}
+
 export function modelNames(provider = llmProvider()): { chat: string; cheap: string } {
   return {
-    chat: process.env.CHAT_MODEL?.trim() || DEFAULTS[provider].chat,
-    cheap: process.env.CHEAP_MODEL?.trim() || DEFAULTS[provider].cheap,
+    chat: pickModel(process.env.CHAT_MODEL, DEFAULTS[provider].chat, provider),
+    cheap: pickModel(process.env.CHEAP_MODEL, DEFAULTS[provider].cheap, provider),
   };
 }
 

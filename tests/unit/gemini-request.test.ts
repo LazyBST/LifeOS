@@ -42,6 +42,15 @@ describe('Gemini chat provider', () => {
     expect(bad).toEqual([]);
   });
 
+  it('ignores a leftover model name from the other provider', async () => {
+    const { pickModel } = await import('@/lib/agent/model');
+    expect(pickModel('claude-sonnet-5', 'gemini-2.5-flash', 'google')).toBe('gemini-2.5-flash');
+    expect(pickModel('gemini-2.5-pro', 'claude-sonnet-5', 'anthropic')).toBe('claude-sonnet-5');
+    expect(pickModel('gemini-2.5-pro', 'gemini-2.5-flash', 'google')).toBe('gemini-2.5-pro');
+    expect(pickModel('  ', 'gemini-2.5-flash', 'google')).toBe('gemini-2.5-flash');
+    expect(pickModel(undefined, 'x', 'google')).toBe('x');
+  });
+
   it('chooses models by provider and lets env override them', async () => {
     const { modelNames, keyEnvName } = await import('@/lib/agent/model');
     expect(modelNames('google').chat).toMatch(/^gemini/);
