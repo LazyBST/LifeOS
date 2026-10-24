@@ -48,6 +48,13 @@ export function ChatPanel() {
     setIsOpen(open);
   }, [open, setIsOpen]);
 
+  // Tell the rest of the shell (the left sidebar folds away while chat is open).
+  useEffect(() => {
+    if (!mounted) return;
+    (window as unknown as { __lifeosChatOpen?: boolean }).__lifeosChatOpen = open;
+    window.dispatchEvent(new CustomEvent('lifeos:chat:state', { detail: { open } }));
+  }, [open, mounted]);
+
   useEffect(() => {
     if (!mounted) return;
     try {

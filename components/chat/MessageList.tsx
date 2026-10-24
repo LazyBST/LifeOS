@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { ChatBubble } from '@/components/chat/useChat';
 import { ToolResultCard } from '@/components/chat/ToolResultCard';
+import { CopyButton } from '@/components/chat/CopyButton';
 
 function formatTime(iso: string): string {
   try {
@@ -47,13 +48,16 @@ export function MessageList({
               <span className="px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                 LifeOS
               </span>
-              <div
-                className={cn(
-                  'max-w-[90%] rounded-lg border border-dashed bg-muted/50 px-3 py-2 text-sm text-foreground whitespace-pre-wrap',
-                  m.isError && 'border-destructive/40 text-destructive',
-                )}
-              >
-                {m.text}
+              <div className="group/msg flex max-w-[95%] items-start gap-1">
+                <div
+                  className={cn(
+                    'rounded-lg border border-dashed bg-muted/50 px-3 py-2 text-sm text-foreground whitespace-pre-wrap',
+                    m.isError && 'border-destructive/40 text-destructive',
+                  )}
+                >
+                  {m.text}
+                </div>
+                <CopyButton text={m.text} />
               </div>
             </div>
           );
@@ -68,17 +72,20 @@ export function MessageList({
               </span>
             ) : null}
             {m.text ? (
-              <div
-                className={cn(
-                  'max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words',
-                  isUser
-                    ? 'bg-primary text-primary-foreground'
-                    : m.isError
-                      ? 'border border-destructive/30 bg-destructive/10 text-destructive'
-                      : 'bg-muted text-foreground',
-                )}
-              >
-                {m.text}
+              <div className={cn('group/msg flex max-w-[92%] items-start gap-1', isUser && 'flex-row-reverse')}>
+                <div
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words',
+                    isUser
+                      ? 'bg-primary text-primary-foreground'
+                      : m.isError
+                        ? 'border border-destructive/30 bg-destructive/10 text-destructive'
+                        : 'bg-muted text-foreground',
+                  )}
+                >
+                  {m.text}
+                </div>
+                <CopyButton text={m.text} />
               </div>
             ) : null}
 
