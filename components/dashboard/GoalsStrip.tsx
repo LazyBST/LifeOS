@@ -46,7 +46,7 @@ export async function GoalsStrip() {
               <span>{f?.projectedDate ? `ETA ${formatDate(f.projectedDate)}` : 'No forecast'}</span>
               {f && f.onTrack !== null && (
                 <span
-                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                  className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
                     f.onTrack
                       ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                       : 'bg-red-500/15 text-red-600 dark:text-red-400'

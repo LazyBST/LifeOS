@@ -44,7 +44,7 @@ export function MessageList({
         if (m.channel === 'system' || m.role === 'system') {
           return (
             <div key={m.id} className="flex flex-col items-start gap-1">
-              <span className="px-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+              <span className="px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                 LifeOS
               </span>
               <div
@@ -63,7 +63,7 @@ export function MessageList({
         return (
           <div key={m.id} className={cn('flex flex-col gap-1.5', isUser ? 'items-end' : 'items-start')}>
             {!isUser ? (
-              <span className="px-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+              <span className="px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                 LifeOS
               </span>
             ) : null}
@@ -107,14 +107,14 @@ export function MessageList({
               </div>
             ) : null}
 
-            <span className="px-1 text-[10px] text-muted-foreground">{formatTime(m.createdAt)}</span>
+            <span className="px-1 text-[11px] text-muted-foreground">{formatTime(m.createdAt)}</span>
           </div>
         );
       })}
 
       {sending ? (
         <div className="flex flex-col items-start gap-1">
-          <span className="px-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+          <span className="px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             LifeOS
           </span>
           <div className="flex items-center gap-1 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">

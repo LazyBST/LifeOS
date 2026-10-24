@@ -41,7 +41,7 @@ export function GoalProgressChart({ forecasts, areas }: Props) {
               <span className="truncate text-sm font-medium">{f.title}</span>
               {f.onTrack !== null && (
                 <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                  className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${
                     f.onTrack
                       ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                       : 'bg-red-500/15 text-red-600 dark:text-red-400'

@@ -155,7 +155,7 @@ export function LifeCalendar() {
           {rows.map((row) => (
             <div key={row.label} className="flex items-center gap-2">
               {(view === 'life' ? Number(row.label) % 5 === 0 : rows.length > 1) ? (
-                <span className="w-6 shrink-0 text-right text-[10px] text-muted-foreground">{row.label}</span>
+                <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground">{row.label}</span>
               ) : view === 'life' ? <span className="w-6 shrink-0" /> : null}
               <div className={`flex flex-wrap ${view === 'life' ? 'gap-[3px]' : 'gap-1.5'}`}>
                 {row.cells.map((c) => <Dot key={c.key} cell={c} data={data} className={dot} />)}
@@ -177,7 +177,7 @@ export function LifeCalendar() {
                 <div className="mt-1 flex items-center gap-2">
                   <span className={`inline-block size-3 rounded-full border ${COLORS[c]}`} />
                   <span className="text-sm font-semibold">{p === null ? '—' : `${p}%`}</span>
-                  <span className="text-[11px] text-muted-foreground">{t ? `${t.done}/${t.total}` : 'no data'}</span>
+                  <span className="text-[12px] text-muted-foreground">{t ? `${t.done}/${t.total}` : 'no data'}</span>
                 </div>
               </button>
             );
@@ -185,7 +185,7 @@ export function LifeCalendar() {
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-[12px] text-muted-foreground">
         {([['green', '70%+ done'], ['yellow', '50–70%'], ['red', 'under 50%'], ['empty', 'no data']] as [DotColor, string][]).map(([k, l]) => (
           <span key={k} className="flex items-center gap-1"><span className={`inline-block size-2.5 rounded-full border ${COLORS[k]}`} />{l}</span>
         ))}

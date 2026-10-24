@@ -42,14 +42,14 @@ export function TaskCard({ task, dragging = false }: { task: TaskListItem; dragg
         <span className="flex flex-wrap gap-1">
           {label && (
             <span
-              className="max-w-full truncate rounded-[3px] px-1.5 py-px text-[11px] font-semibold"
+              className="max-w-full truncate rounded-[3px] px-1.5 py-px text-[12px] font-semibold"
               style={{ backgroundColor: `${task.area_color}29`, color: task.area_color }}
             >
               {label}
             </span>
           )}
           {task.tags.map((t) => (
-            <span key={t} className="rounded-[3px] bg-muted px-1.5 py-px text-[11px] font-medium text-muted-foreground">
+            <span key={t} className="rounded-[3px] bg-muted px-1.5 py-px text-[12px] font-medium text-muted-foreground">
               {t}
             </span>
           ))}
@@ -70,7 +70,7 @@ export function TaskCard({ task, dragging = false }: { task: TaskListItem; dragg
         <span className="ml-auto flex items-center gap-1.5">
           {due && (
             <span
-              className={`rounded-full px-1.5 py-px text-[11px] font-semibold ${
+              className={`rounded-full px-1.5 py-px text-[12px] font-semibold ${
                 overdue ? 'bg-[#ffebe6] text-[#bf2600] dark:bg-red-500/20 dark:text-red-400' : 'bg-[#dfe1e6] text-[#42526e] dark:bg-muted dark:text-muted-foreground'
               }`}
             >
@@ -78,7 +78,7 @@ export function TaskCard({ task, dragging = false }: { task: TaskListItem; dragg
             </span>
           )}
           {task.estimate_min != null && (
-            <span className="rounded-full bg-[#dfe1e6] px-1.5 py-px text-[11px] font-semibold text-[#42526e] dark:bg-muted dark:text-muted-foreground">
+            <span className="rounded-full bg-[#dfe1e6] px-1.5 py-px text-[12px] font-semibold text-[#42526e] dark:bg-muted dark:text-muted-foreground">
               {fmtEstimate(task.estimate_min)}
             </span>
           )}

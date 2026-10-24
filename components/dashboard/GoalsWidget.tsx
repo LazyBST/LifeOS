@@ -28,12 +28,12 @@ export async function GoalsWidget() {
               <Link key={g.id} href={`/goals/${g.id}`} className="group flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-medium group-hover:underline">{g.emoji ? `${g.emoji} ` : ''}{g.title}</span>
-                  <span className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${net > 0 ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300' : net < 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>
+                  <span className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold ${net > 0 ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300' : net < 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>
                     {net > 0 ? `+${net}d` : net < 0 ? `−${-net}d` : 'on time'}
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${Math.max(2, pct)}%`, backgroundColor: color }} /></div>
-                <div className="flex gap-2 text-[11px] text-muted-foreground">
+                <div className="flex gap-2 text-[12px] text-muted-foreground">
                   <span>{pct}% · {f ? `${f.remainingHours}h left` : '—'}</span>
                   {agreed && <span className="ml-auto">Agreed {formatDate(agreed).slice(0, -5)} → <b className={net > 0 ? 'text-red-600' : net < 0 ? 'text-emerald-600' : ''}>{proj ? formatDate(proj).slice(0, -5) : '—'}</b></span>}
                 </div>

@@ -21,7 +21,7 @@ export async function ProjectsWidget() {
                 <div className="flex items-center gap-2 text-sm">
                   <span className="truncate font-medium group-hover:underline">{p.emoji ? `${p.emoji} ` : ''}{p.title}</span>
                   <span className="ml-auto text-xs text-muted-foreground">{pct}%</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${net > 0 ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300' : net < 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>{net > 0 ? `+${net}d` : net < 0 ? `−${-net}d` : 'on time'}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${net > 0 ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300' : net < 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>{net > 0 ? `+${net}d` : net < 0 ? `−${-net}d` : 'on time'}</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max(2, pct)}%` }} /></div>
               </Link>

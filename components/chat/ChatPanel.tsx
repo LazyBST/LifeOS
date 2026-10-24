@@ -104,7 +104,7 @@ export function ChatPanel() {
       >
         <MessageCircle className="size-5" />
         {unread > 0 ? (
-          <span className="absolute -top-1 -right-1 flex size-4.5 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+          <span className="absolute -top-1 -right-1 flex size-4.5 items-center justify-center rounded-full bg-destructive text-[11px] font-medium text-destructive-foreground">
             {unread > 9 ? '9+' : unread}
           </span>
         ) : null}
@@ -124,7 +124,7 @@ export function ChatPanel() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">LifeOS chat</span>
             {unread > 0 && !open ? (
-              <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
+              <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[11px] font-medium text-destructive-foreground">
                 {unread}
               </span>
             ) : null}

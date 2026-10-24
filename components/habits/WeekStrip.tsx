@@ -12,7 +12,7 @@ export function Week({ s, met }: { s: HabitStatus; met: Map<string, number> }) {
         const d = addDays(today, i - 6);
         const due = habitDueOn(s, d);
         const done = (met.get(`${s.id}|${d}`) ?? 0) >= Number(s.target_value);
-        const base = 'flex size-6 items-center justify-center rounded-md text-[11px] font-bold';
+        const base = 'flex size-6 items-center justify-center rounded-md text-[12px] font-bold';
         if (!due) return <span key={d} title={`${d}: not due`} className={`${base} border border-dashed border-border text-muted-foreground/50`}>·</span>;
         if (done) return <span key={d} title={`${d}: done`} className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300`}>✓</span>;
         if (d === today) return <span key={d} title="Today" className={`${base} border border-input text-muted-foreground`}>•</span>;

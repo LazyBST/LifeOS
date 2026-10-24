@@ -24,15 +24,15 @@ export function LedgerSection({ name, agreed, current, completedOn, ledger, slip
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {stats.map((s) => (
           <div key={s.label} className={`rounded-xl border p-3 ${s.tone === 'bad' || s.tone === 'good' ? toneCls[s.tone] : 'border-border bg-card'}`}>
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{s.label}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{s.label}</div>
             <div className={`text-lg font-bold ${s.tone === 'warn' ? toneCls.warn : ''}`}>{s.value}</div>
-            <div className="text-[11px] text-muted-foreground">{s.sub}</div>
+            <div className="text-[12px] text-muted-foreground">{s.sub}</div>
           </div>
         ))}
       </div>
       <section className="rounded-2xl border border-border bg-card p-4">
         <h2 className="mb-0.5 text-sm font-semibold">Schedule ledger · every day gained or lost</h2>
-        <p className="mb-3 text-[11px] text-muted-foreground">Each item moves {name} — late adds days, early subtracts them.</p>
+        <p className="mb-3 text-[12px] text-muted-foreground">Each item moves {name} — late adds days, early subtracts them.</p>
         <ScheduleLedger ledger={ledger} parentName={name} />
       </section>
     </div>

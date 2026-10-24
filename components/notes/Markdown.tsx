@@ -13,7 +13,7 @@ function escapeHtml(src: string): string {
 
 function injectCopyButtons(html: string): string {
   const openBtn =
-    '<button type="button" data-copy-btn class="absolute right-2 top-2 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] font-sans text-muted-foreground hover:bg-muted">Copy</button>';
+    '<button type="button" data-copy-btn class="absolute right-2 top-2 rounded-md border border-border bg-background px-2 py-0.5 text-[12px] font-sans text-muted-foreground hover:bg-muted">Copy</button>';
   return html.replace(/<pre>/g, `<pre data-code-block>${openBtn}`);
 }
 

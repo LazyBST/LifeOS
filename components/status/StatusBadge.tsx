@@ -27,7 +27,7 @@ export function StatusBadge({ status, compact = false }: { status: StatusDef; co
       className={`inline-flex shrink-0 items-center gap-1 rounded-[3px] font-bold uppercase tracking-wide
         bg-[var(--st-bg)] text-[var(--st-fg)]
         dark:bg-[color-mix(in_srgb,var(--st)_22%,transparent)] dark:text-[var(--st)]
-        ${compact ? 'px-1 py-px text-[10px]' : 'px-1.5 py-0.5 text-[11px]'}`}
+        ${compact ? 'px-1 py-px text-[11px]' : 'px-1.5 py-0.5 text-[12px]'}`}
     >
       {status.label}
     </span>

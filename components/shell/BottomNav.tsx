@@ -33,7 +33,7 @@ export function BottomNav() {
       <Link
         href={ITEMS[0].href}
         className={cn(
-          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] touch-target',
+          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[12px] touch-target',
           isActive(pathname, ITEMS[0].href) ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
@@ -43,7 +43,7 @@ export function BottomNav() {
       <Link
         href={ITEMS[1].href}
         className={cn(
-          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] touch-target',
+          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[12px] touch-target',
           isActive(pathname, ITEMS[1].href) ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
@@ -53,7 +53,7 @@ export function BottomNav() {
       <button
         type="button"
         onClick={toggleChat}
-        className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] text-muted-foreground touch-target"
+        className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[12px] text-muted-foreground touch-target"
       >
         <MessageCircle className="size-5" />
         Chat
@@ -61,7 +61,7 @@ export function BottomNav() {
       <Link
         href={ITEMS[2].href}
         className={cn(
-          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] touch-target',
+          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[12px] touch-target',
           isActive(pathname, ITEMS[2].href) ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
@@ -71,7 +71,7 @@ export function BottomNav() {
       <Link
         href={ITEMS[3].href}
         className={cn(
-          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] touch-target',
+          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[12px] touch-target',
           isActive(pathname, ITEMS[3].href) ? 'text-foreground' : 'text-muted-foreground',
         )}
       >

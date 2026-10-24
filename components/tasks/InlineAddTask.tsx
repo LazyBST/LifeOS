@@ -54,7 +54,7 @@ export function InlineAddTask({ placeholder = 'Add task', onCreate, variant = 'r
             }
           }}
         />
-        <p className="pt-1 text-[11px] text-muted-foreground">Enter to create · Esc to cancel</p>
+        <p className="pt-1 text-[12px] text-muted-foreground">Enter to create · Esc to cancel</p>
       </div>
     );
   }

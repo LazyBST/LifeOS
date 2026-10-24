@@ -27,7 +27,7 @@ export function ImprovementPanel({ last, tonight }: { last: Improvement | null; 
         <p className="text-sm text-muted-foreground">No improvement yet. Write one tonight and it will greet you here tomorrow.</p>
       )}
       <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tonight: one thing to do better tomorrow</label>
+        <label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Tonight: one thing to do better tomorrow</label>
         <div className="flex gap-2">
           <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run(() => setImprovementAction(text))} placeholder="e.g. Block the first 90 minutes for the hardest task" className="min-w-0 flex-1 rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm outline-none focus:border-ring" />
           <button type="button" onClick={() => run(() => setImprovementAction(text))} className="rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground">Save</button>

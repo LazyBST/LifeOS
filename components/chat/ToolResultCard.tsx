@@ -51,7 +51,7 @@ export function ToolResultCard({ card }: { card: ToolResultCardType }) {
         {card.badges && card.badges.length > 0 ? (
           <div className="flex flex-wrap gap-1 pt-0.5">
             {card.badges.map((b, i) => (
-              <Badge key={`${b}-${i}`} variant="secondary" className="text-[10px]">
+              <Badge key={`${b}-${i}`} variant="secondary" className="text-[11px]">
                 {b}
               </Badge>
             ))}
