@@ -123,8 +123,23 @@ export function Sidebar({ areas }: { areas: NavArea[] }) {
         collapsed ? 'md:w-14' : 'md:w-60',
       )}
     >
-      <div className={cn('flex h-14 items-center text-lg font-semibold', collapsed ? 'justify-center' : 'px-4')}>
-        {collapsed ? <span aria-label="LifeOS" className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm text-primary-foreground">L</span> : 'LifeOS'}
+      <div className={cn('flex shrink-0 border-b', collapsed ? 'flex-col items-center gap-1 px-1 py-2' : 'h-14 items-center justify-between pr-2 pl-4')}>
+        <div className="text-lg font-semibold">
+          {collapsed ? <span aria-label="LifeOS" className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm text-primary-foreground">L</span> : 'LifeOS'}
+        </div>
+        <div className={cn('flex items-center', collapsed ? 'flex-col gap-1' : 'gap-0.5')}>
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+          >
+            {collapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+          </button>
+        </div>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
         {STATIC_LINKS.slice(0, 1).map((link) => (
@@ -157,22 +172,6 @@ export function Sidebar({ areas }: { areas: NavArea[] }) {
           active={isActive(pathname, '/settings')}
         />
       </nav>
-      <div className={cn('flex border-t py-2', collapsed ? 'flex-col items-center gap-1 px-1' : 'items-center justify-between px-3')}>
-        <div className="flex items-center gap-2">
-          {!collapsed && <span className="text-xs text-muted-foreground">Theme</span>}
-          <ThemeToggle />
-        </div>
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-expanded={!collapsed}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
-        >
-          {collapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
-        </button>
-      </div>
     </aside>
   );
 }
