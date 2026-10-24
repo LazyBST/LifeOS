@@ -70,6 +70,12 @@ export function CalendarWeek() {
   const gridH = hours.length * ROW;
   const topOf = (min: number) => ((Math.max(startH * 60, min) - startH * 60) / 60) * ROW;
 
+  // what is on now and what comes next today, so a habit after the current task is never a surprise
+  const nowMs = Date.now();
+  const todays = (data?.blocks ?? []).filter((b) => istParts(new Date(b.start)).date === today && !b.done && !b.habit?.missed).sort((a, b) => a.start.localeCompare(b.start));
+  const onNow = todays.filter((b) => Date.parse(b.start) <= nowMs && Date.parse(b.end) > nowMs);
+  const upNext = todays.find((b) => Date.parse(b.start) > nowMs);
+  const inMin = upNext ? Math.max(1, Math.round((Date.parse(upNext.start) - nowMs) / 60_000)) : 0;
   const bars = (data?.bars ?? []).filter((b) => b.to >= days[0] && b.from <= days[days.length - 1]);
 
   return (
@@ -99,6 +105,17 @@ export function CalendarWeek() {
       {data && data.sync && !data.sync.error && data.sync.cached === 0 && data.blocks.every((b) => b.kind !== 'event') && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           No Google events stored yet. Press <b>Sync Google</b> to load them.
+        </div>
+      )}
+
+      {(onNow.length > 0 || upNext) && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-muted/40 px-3 py-2 text-xs">
+          {onNow.length > 0 && <span><b>Now:</b> {onNow.map((b) => `${b.habit?.emoji ?? ''} ${b.title}`.trim()).join(', ')}</span>}
+          {upNext && (
+            <span className={KIND[upNext.kind].split(' ')[0] + ' rounded px-1.5 py-0.5'}>
+              <b>Up next:</b> {upNext.habit?.emoji ?? ''} {upNext.title} at {fmtTime(minutesOf(upNext.start))} ({inMin < 60 ? `in ${inMin} min` : `in ${Math.floor(inMin / 60)}h ${inMin % 60}m`})
+            </span>
+          )}
         </div>
       )}
 
