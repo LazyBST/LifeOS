@@ -10,8 +10,9 @@ export type Instant = string;
 export const AREA_NAMES = ['Business', 'Health & Fitness', 'Relationships', 'Finances'] as const;
 export type AreaName = (typeof AREA_NAMES)[number];
 
-export type EntityStatus = 'active' | 'paused' | 'done' | 'dropped';
-export type TaskStatus = 'todo' | 'doing' | 'done';
+// Status keys come from the `statuses` table (lib/types/statuses.ts), not a fixed union.
+export type EntityStatus = string;
+export type TaskStatus = string;
 export type Priority = 'P0' | 'P1' | 'P2' | 'P3';
 export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'any';
 export type TxKind = 'expense' | 'income' | 'settlement';
@@ -19,13 +20,6 @@ export type ChatChannel = 'web' | 'system';
 export type ChatRole = 'user' | 'assistant' | 'tool';
 export type EventSource = 'web' | 'chat' | 'gcal' | 'system';
 
-/** UI labels for task status (spec section 4). */
-export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
-  todo: 'Not started',
-  doing: 'In progress',
-  done: 'Done',
-};
-export const TASK_STATUSES: TaskStatus[] = ['todo', 'doing', 'done'];
 export const PRIORITIES: Priority[] = ['P0', 'P1', 'P2', 'P3'];
 
 export type AppConfig = {
@@ -80,6 +74,7 @@ export type Project = {
 
 export type Task = {
   id: UUID;
+  task_no: number;
   title: string;
   goal_id: UUID | null;
   project_id: UUID | null;

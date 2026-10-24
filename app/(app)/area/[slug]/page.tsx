@@ -11,7 +11,7 @@ import { PropertiesHeader } from '@/components/entity/PropertiesHeader';
 import { ProgressBar } from '@/components/entity/ProgressBar';
 import { EntityGroup } from '@/components/entity/EntityGroup';
 import { TaskViews } from '@/components/tasks/TaskViews';
-import { TASK_STATUS_LABEL } from '@/lib/types/db';
+import { StatusLabel } from '@/components/status/StatusLabel';
 import { dueLabel } from '@/lib/time';
 import type { Task } from '@/lib/types/db';
 
@@ -84,7 +84,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
                       {p.emoji ? `${p.emoji} ` : ''}
                       {p.title}
                     </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">{p.status}</span>
+                    <StatusLabel status={p.status} compact />
                   </Link>
                 ))}
                 {unsorted.map((t) => <TaskRow key={t.id} task={t} />)}
@@ -104,8 +104,8 @@ function TaskRow({ task }: { task: Task }) {
   return (
     <Link href={`/tasks/${task.id}`} className="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted">
       <span className="truncate">{task.title}</span>
-      <span className="shrink-0 text-xs text-muted-foreground">
-        {TASK_STATUS_LABEL[task.status]}
+      <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <StatusLabel status={task.status} compact />
         {due ? ` · ${due}` : ''}
       </span>
     </Link>

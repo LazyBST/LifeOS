@@ -156,6 +156,7 @@ export function useTaskViewState(opts: {
       const now = new Date().toISOString();
       const optimistic: TaskListItem = {
         id: tempId,
+        task_no: 0,
         title: input.title,
         goal_id: input.goal_id ?? null,
         project_id: input.project_id ?? null,

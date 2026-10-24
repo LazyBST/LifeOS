@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { PRIORITIES, TASK_STATUSES, TASK_STATUS_LABEL, type Area, type Goal, type Priority, type Project, type TaskStatus } from '@/lib/types/db';
+import { PRIORITIES, type Area, type Goal, type Priority, type Project, type TaskStatus } from '@/lib/types/db';
+import { statusesFor } from '@/lib/types/statuses';
+import { useStatuses } from '@/components/status/StatusProvider';
 import type { DuePreset, TaskFilters } from '@/lib/types/filters';
 import { listAreasAction, listGoalsAction, listProjectsAction } from '@/app/actions/lookup';
 
@@ -26,6 +28,7 @@ const DUE_OPTIONS: { value: DuePreset | ''; label: string }[] = [
 ];
 
 export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) {
+  const statusOptions = statusesFor(useStatuses(), 'task');
   const [areas, setAreas] = useState<Area[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -139,14 +142,14 @@ export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) 
         ))}
       </div>
       <div className="flex items-center gap-1">
-        {TASK_STATUSES.map((s) => (
+        {statusOptions.map((s) => (
           <Badge
-            key={s}
-            variant={filters.status?.includes(s) ? 'default' : 'outline'}
+            key={s.key}
+            variant={filters.status?.includes(s.key) ? 'default' : 'outline'}
             className="h-7 cursor-pointer select-none px-2"
-            onClick={() => toggleStatus(s)}
+            onClick={() => toggleStatus(s.key)}
           >
-            {TASK_STATUS_LABEL[s]}
+            {s.label}
           </Badge>
         ))}
       </div>

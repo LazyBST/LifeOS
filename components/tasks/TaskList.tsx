@@ -2,7 +2,9 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { dueLabel, isOverdue } from '@/lib/time';
-import { TASK_STATUS_LABEL } from '@/lib/types/db';
+import { statusFor, isDone, type StatusDef } from '@/lib/types/statuses';
+import { StatusLabel } from '@/components/status/StatusLabel';
+import { useStatuses } from '@/components/status/StatusProvider';
 import type { TaskListItem } from '@/app/actions/tasks';
 import type { GroupByKey, TaskSortKey } from '@/lib/types/filters';
 import { InlineAddTask } from './InlineAddTask';
@@ -43,7 +45,7 @@ function compare(a: TaskListItem, b: TaskListItem, sort: TaskSortKey): number {
   }
 }
 
-function groupKeyOf(task: TaskListItem, group: GroupByKey): { key: string; label: string } {
+function groupKeyOf(task: TaskListItem, group: GroupByKey, statuses: StatusDef[]): { key: string; label: string } {
   switch (group) {
     case 'area':
       return { key: task.area_id ?? 'none', label: task.area_name ?? 'No area' };
@@ -56,7 +58,7 @@ function groupKeyOf(task: TaskListItem, group: GroupByKey): { key: string; label
     case 'due':
       return { key: task.due_date ?? 'none', label: dueLabel(task.due_date) ?? 'No date' };
     case 'status':
-      return { key: task.status, label: TASK_STATUS_LABEL[task.status] };
+      return { key: task.status, label: statusFor(statuses, task.status).label };
     default:
       return { key: 'all', label: '' };
   }
@@ -72,6 +74,7 @@ export function TaskList({
   onCreate,
   createDefaults,
 }: TaskListProps) {
+  const statuses = useStatuses();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const sorted = useMemo(() => {
@@ -84,12 +87,12 @@ export function TaskList({
     if (group === 'none') return [{ key: 'all', label: '', items: sorted }];
     const map = new Map<string, { key: string; label: string; items: TaskListItem[] }>();
     for (const t of sorted) {
-      const { key, label } = groupKeyOf(t, group);
+      const { key, label } = groupKeyOf(t, group, statuses);
       if (!map.has(key)) map.set(key, { key, label, items: [] });
       map.get(key)!.items.push(t);
     }
     return Array.from(map.values());
-  }, [sorted, group]);
+  }, [sorted, group, statuses]);
 
   function handleHeaderClick(key: TaskSortKey) {
     if (sort === key) onSortChange(key, dir === 'asc' ? 'desc' : 'asc');
@@ -143,8 +146,11 @@ export function TaskList({
 }
 
 function Row({ task, onToggleComplete }: { task: TaskListItem; onToggleComplete: (task: TaskListItem) => void }) {
+  const statuses = useStatuses();
+  const st = statusFor(statuses, task.status);
+  const done = isDone(statuses, task.status);
   const due = dueLabel(task.due_date);
-  const overdue = isOverdue(task.due_date) && task.status !== 'done';
+  const overdue = isOverdue(task.due_date) && !done;
   const path = [task.goal_title, task.project_title].filter(Boolean).join(' > ');
   return (
     <div
@@ -154,16 +160,16 @@ function Row({ task, onToggleComplete }: { task: TaskListItem; onToggleComplete:
       <input
         type="checkbox"
         className="size-4 accent-primary"
-        checked={task.status === 'done'}
+        checked={done}
         onChange={() => onToggleComplete(task)}
-        aria-label={task.status === 'done' ? 'Reopen task' : 'Complete task'}
+        aria-label={done ? 'Reopen task' : 'Complete task'}
       />
       <Link href={`/tasks/${task.id}`} className="flex min-w-0 flex-col">
-        <span className={`truncate ${task.status === 'done' ? 'text-muted-foreground line-through' : ''}`}>{task.title}</span>
+        <span className={`truncate ${st.dim ? 'text-muted-foreground' : ''} ${st.strike_through ? 'line-through' : ''}`}>{task.title}</span>
         {path && <span className="truncate text-xs text-muted-foreground">{path}</span>}
       </Link>
       <span className="text-xs text-muted-foreground">{task.priority}</span>
-      <span className="text-xs text-muted-foreground">{TASK_STATUS_LABEL[task.status]}</span>
+      <span><StatusLabel status={task.status} compact /></span>
       <span className={`text-xs ${overdue ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
         {due ?? '—'}
       </span>

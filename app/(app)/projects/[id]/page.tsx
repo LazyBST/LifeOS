@@ -16,17 +16,13 @@ import { NotesEditor } from '@/components/notes/NotesEditor';
 import { TaskViews } from '@/components/tasks/TaskViews';
 import { updateProjectAction } from '@/app/actions/projects';
 import { PRIORITIES } from '@/lib/types/db';
+import { listStatuses } from '@/lib/domain/statuses';
+import { statusesFor } from '@/lib/types/statuses';
 import { formatDate } from '@/lib/time';
 import type { EntityStatus, Priority } from '@/lib/types/db';
 
-const STATUS_OPTIONS: { value: EntityStatus; label: string }[] = [
-  { value: 'active', label: 'Active' },
-  { value: 'paused', label: 'Paused' },
-  { value: 'done', label: 'Done' },
-  { value: 'dropped', label: 'Dropped' },
-];
-
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const statusOptions = statusesFor(await listStatuses(), 'project').map((s) => ({ value: s.key, label: s.label }));
   const { id } = await params;
   const [project, areas] = await Promise.all([getProject(id), listAreas()]);
   if (!project) notFound();
@@ -81,7 +77,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <>
             <InlineSelect
               value={project.status}
-              options={STATUS_OPTIONS}
+              options={statusOptions}
               onSave={(v) => updateProjectAction(project.id, { status: v as EntityStatus })}
             />
             <InlineSelect

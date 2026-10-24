@@ -18,18 +18,15 @@ import { AddProject } from '@/components/entity/AddProject';
 import { NotesEditor } from '@/components/notes/NotesEditor';
 import { TaskViews } from '@/components/tasks/TaskViews';
 import { updateGoalAction } from '@/app/actions/goals';
-import { PRIORITIES, TASK_STATUS_LABEL } from '@/lib/types/db';
+import { PRIORITIES } from '@/lib/types/db';
+import { StatusLabel } from '@/components/status/StatusLabel';
+import { listStatuses } from '@/lib/domain/statuses';
+import { statusesFor } from '@/lib/types/statuses';
 import { formatDate, dueLabel } from '@/lib/time';
 import type { EntityStatus, Priority, Task } from '@/lib/types/db';
 
-const STATUS_OPTIONS: { value: EntityStatus; label: string }[] = [
-  { value: 'active', label: 'Active' },
-  { value: 'paused', label: 'Paused' },
-  { value: 'done', label: 'Done' },
-  { value: 'dropped', label: 'Dropped' },
-];
-
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const statusOptions = statusesFor(await listStatuses(), 'goal').map((s) => ({ value: s.key, label: s.label }));
   const { id } = await params;
   const [goal, areas] = await Promise.all([getGoal(id), listAreas()]);
   if (!goal) notFound();
@@ -77,7 +74,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <>
             <InlineSelect
               value={goal.status}
-              options={STATUS_OPTIONS}
+              options={statusOptions}
               onSave={(v) => updateGoalAction(goal.id, { status: v as EntityStatus })}
             />
             <InlineSelect
@@ -126,7 +123,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <div className="space-y-3">
         {projects.length === 0 && <p className="text-sm text-muted-foreground">No projects yet.</p>}
         {projects.map((p) => (
-          <EntityGroup key={p.id} href={`/projects/${p.id}`} title={`${p.emoji ? `${p.emoji} ` : ''}${p.title}`} meta={p.status}>
+          <EntityGroup key={p.id} href={`/projects/${p.id}`} title={`${p.emoji ? `${p.emoji} ` : ''}${p.title}`} meta={<StatusLabel status={p.status} compact />}>
             <TaskViews
               base={{ project_id: p.id }}
               scope={`goal:${goal.id}:project:${p.id}`}
@@ -164,8 +161,8 @@ function TaskRow({ task }: { task: Task }) {
       className="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted"
     >
       <span className="truncate">{task.title}</span>
-      <span className="shrink-0 text-xs text-muted-foreground">
-        {TASK_STATUS_LABEL[task.status]}
+      <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <StatusLabel status={task.status} compact />
         {due ? ` · ${due}` : ''}
       </span>
     </Link>

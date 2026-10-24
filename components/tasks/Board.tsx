@@ -1,7 +1,8 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   useDroppable,
@@ -16,7 +17,10 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { TASK_STATUSES, TASK_STATUS_LABEL, type TaskStatus } from '@/lib/types/db';
+import { StatusIcon } from '@/components/status/StatusBadge';
+import { useStatuses } from '@/components/status/StatusProvider';
+import { boardColumns, isDone, type StatusDef } from '@/lib/types/statuses';
+import type { TaskStatus } from '@/lib/types/db';
 import type { TaskListItem } from '@/app/actions/tasks';
 import { TaskCard } from './TaskCard';
 import { InlineAddTask } from './InlineAddTask';
@@ -36,15 +40,21 @@ export function Board({ tasks, onMove, onComplete, onCreate, createDefaults }: B
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  const statuses = useStatuses();
+  const defs = useMemo(() => boardColumns(statuses, 'task'), [statuses]);
+  const keys = useMemo(() => defs.map((d) => d.key), [defs]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
   const columns = useMemo(() => {
-    const byStatus: Record<TaskStatus, TaskListItem[]> = { todo: [], doing: [], done: [] };
-    for (const t of tasks) byStatus[t.status].push(t);
-    for (const k of TASK_STATUSES) byStatus[k].sort((a, b) => a.sort_order - b.sort_order);
+    const byStatus: Record<string, TaskListItem[]> = Object.fromEntries(keys.map((k) => [k, []]));
+    for (const t of tasks) (byStatus[t.status] ??= []).push(t);
+    for (const k of keys) byStatus[k].sort((a, b) => a.sort_order - b.sort_order);
     return byStatus;
-  }, [tasks]);
+  }, [tasks, keys]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+    setActiveId(null);
     if (!over) return;
     const activeId = String(active.id);
     const task = tasks.find((t) => t.id === activeId);
@@ -52,10 +62,10 @@ export function Board({ tasks, onMove, onComplete, onCreate, createDefaults }: B
 
     const overData = over.data.current as { status?: TaskStatus } | undefined;
     const destStatus: TaskStatus =
-      overData?.status ?? (TASK_STATUSES.includes(over.id as TaskStatus) ? (over.id as TaskStatus) : task.status);
+      overData?.status ?? (keys.includes(String(over.id)) ? String(over.id) : task.status);
 
-    if (destStatus === 'done') {
-      if (task.status !== 'done') onComplete(activeId);
+    if (isDone(statuses, destStatus)) {
+      if (!isDone(statuses, task.status)) onComplete(activeId);
       return;
     }
 
@@ -73,47 +83,56 @@ export function Board({ tasks, onMove, onComplete, onCreate, createDefaults }: B
     onMove(activeId, destStatus, newOrder);
   }
 
+  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : undefined;
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {TASK_STATUSES.map((status) => (
+    <DndContext
+      sensors={sensors}
+      onDragStart={(e) => setActiveId(String(e.active.id))}
+      onDragCancel={() => setActiveId(null)}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {defs.map((def) => (
           <Column
-            key={status}
-            status={status}
-            tasks={columns[status]}
+            key={def.key}
+            def={def}
+            tasks={columns[def.key] ?? []}
             onCreate={onCreate}
             createDefaults={createDefaults}
           />
         ))}
       </div>
+      <DragOverlay>{activeTask ? <TaskCard task={activeTask} dragging /> : null}</DragOverlay>
     </DndContext>
   );
 }
 
 function Column({
-  status,
+  def,
   tasks,
   onCreate,
   createDefaults,
 }: {
-  status: TaskStatus;
+  def: StatusDef;
   tasks: TaskListItem[];
   onCreate: (input: TaskCreateInput) => void;
   createDefaults?: TaskCreateInput;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: status, data: { status } });
+  const { setNodeRef, isOver } = useDroppable({ id: def.key, data: { status: def.key } });
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-32 flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-2 transition-colors ${
-        isOver ? 'ring-2 ring-primary/40' : ''
+      className={`flex min-h-40 w-[300px] shrink-0 flex-col gap-2 rounded-md bg-[#f4f5f7] p-2 pt-3 transition-shadow dark:bg-muted/40 ${
+        isOver ? 'ring-2 ring-[#4c9aff]' : ''
       }`}
     >
-      <div className="flex items-center justify-between px-1 pt-1">
-        <span className="text-xs font-medium text-muted-foreground">{TASK_STATUS_LABEL[status]}</span>
-        <span className="text-xs text-muted-foreground">{tasks.length}</span>
+      <div className="flex items-center gap-1.5 px-1.5">
+        <StatusIcon status={def} className="size-3.5" />
+        <span className="text-xs font-semibold uppercase tracking-wide text-[#5e6c84] dark:text-muted-foreground">
+          {def.label}
+        </span>
+        <span className="text-xs text-[#5e6c84] dark:text-muted-foreground">{tasks.length}</span>
       </div>
-      <InlineAddTask placeholder="Add task" onCreate={(title) => onCreate({ ...createDefaults, title, status })} />
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col gap-2">
           {tasks.map((t) => (
@@ -121,6 +140,10 @@ function Column({
           ))}
         </div>
       </SortableContext>
+      <InlineAddTask
+        variant="jira"
+        onCreate={(title) => onCreate({ ...createDefaults, title, status: def.key })}
+      />
     </div>
   );
 }
@@ -133,7 +156,7 @@ function SortableCard({ task }: { task: TaskListItem }) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
   };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>

@@ -12,11 +12,14 @@ import { DueDateTime } from '@/components/entity/DueDateTime';
 import { SubtaskList } from '@/components/entity/SubtaskList';
 import { NotesEditor } from '@/components/notes/NotesEditor';
 import { updateTaskAction } from '@/app/actions/tasks';
-import { PRIORITIES, TASK_STATUSES, TASK_STATUS_LABEL } from '@/lib/types/db';
+import { PRIORITIES } from '@/lib/types/db';
+import { listStatuses } from '@/lib/domain/statuses';
+import { statusesFor } from '@/lib/types/statuses';
 import { formatDate } from '@/lib/time';
 import type { Priority, TaskStatus } from '@/lib/types/db';
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const statusOptions = statusesFor(await listStatuses(), 'task').map((s) => ({ value: s.key, label: s.label }));
   const { id } = await params;
   const [task, areas] = await Promise.all([getTask(id), listAreas()]);
   if (!task) notFound();
@@ -82,7 +85,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <>
             <InlineSelect
               value={task.status}
-              options={TASK_STATUSES.map((s) => ({ value: s, label: TASK_STATUS_LABEL[s] }))}
+              options={statusOptions}
               onSave={(v) => updateTaskAction(task.id, { status: v as TaskStatus })}
             />
             <InlineSelect
