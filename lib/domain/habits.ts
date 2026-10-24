@@ -20,6 +20,9 @@ export type HabitInput = {
   goal_id?: UUID | null;
   /** a sub-habit of this task */
   task_id?: UUID | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  gtask_title?: string | null;
 };
 
 export type HabitPatch = Partial<HabitInput> & { archived_at?: string | null };
@@ -63,6 +66,9 @@ export async function createHabit(input: HabitInput): Promise<Habit> {
     area_id,
     goal_id: input.goal_id ?? null,
     ...(input.task_id ? { task_id: input.task_id } : {}),
+    ...(input.start_time ? { start_time: input.start_time } : {}),
+    ...(input.end_time ? { end_time: input.end_time } : {}),
+    ...(input.gtask_title ? { gtask_title: input.gtask_title } : {}),
   };
   const { data, error } = await admin().from('habits').insert(row).select('*').single();
   if (error) throw new Error(`habit_create: ${error.message}`);
@@ -74,13 +80,14 @@ export async function createHabit(input: HabitInput): Promise<Habit> {
 
 export async function updateHabit(id: UUID, patch: HabitPatch): Promise<Habit> {
   const row: Record<string, unknown> = {};
-  for (const k of ['name', 'emoji', 'time_of_day', 'kind', 'target_value', 'unit', 'days_of_week', 'reminder_time', 'goal_id', 'archived_at'] as const) {
+  for (const k of ['name', 'emoji', 'time_of_day', 'kind', 'target_value', 'unit', 'days_of_week', 'reminder_time', 'goal_id', 'archived_at', 'start_time', 'end_time', 'gtask_title'] as const) {
     if (patch[k] !== undefined) row[k] = patch[k];
   }
   if (patch.area_id !== undefined) row.area_id = patch.area_id;
   else if (patch.area !== undefined) row.area_id = patch.area ? (await areaByName(patch.area))?.id ?? null : null;
+  if (patch.start_time && patch.end_time && patch.end_time <= patch.start_time) throw new Error('A habit must end after it starts.');
   const { data, error } = await admin().from('habits').update(row).eq('id', id).select('*').single();
-  if (error) throw new Error(`habit_update: ${error.message}`);
+  if (error) throw new Error(`habit_update: ${error.message.includes('start_time') || error.message.includes('gtask_title') ? 'run migration 0015 (and 0010) first' : error.message}`);
   return data as Habit;
 }
 

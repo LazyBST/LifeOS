@@ -23,6 +23,7 @@ const MIGRATION_FILES = [
   '0012_books.sql',
   '0013_external_ids.sql',
   '0014_ui_state_habit_links_indexes.sql',
+  '0015_calendar_sync_state_habit_times.sql',
 ];
 
 // Supabase provides these for free; PGlite does not, so we stub the minimum

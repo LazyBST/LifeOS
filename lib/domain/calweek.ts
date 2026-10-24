@@ -2,11 +2,14 @@ import 'server-only';
 import { admin } from '@/lib/supabase/admin';
 import { addDays } from '@/lib/time';
 import { istInstant } from '@/lib/time';
+import { listHabits, habitDueOn } from './habits';
+import { minutesOfTime } from './day-layout';
 
 export type EditableEvent = { id: string; summary: string; start: string; end: string; allDay: boolean; description: string | null; location: string | null; canEdit: boolean; recurring: boolean };
-export type WeekBlock = { id: string; title: string; start: string; end: string; kind: 'event' | 'task'; done?: boolean; href?: string; event?: EditableEvent };
+export type WeekBlock = { id: string; title: string; start: string; end: string; kind: 'event' | 'task' | 'habit'; done?: boolean; href?: string; event?: EditableEvent; habit?: { id: string; date: string; emoji: string | null; missed: boolean } };
+export type UntimedItem = { kind: 'task' | 'habit'; id: string; title: string; date: string; done: boolean; missed?: boolean; href?: string; emoji?: string | null };
 export type WeekBar = { id: string; title: string; from: string; to: string; kind: 'goal' | 'project'; href: string; color?: string };
-export type WeekData = { weekStart: string; blocks: WeekBlock[]; allDay: { id: string; title: string; date: string; event?: EditableEvent }[]; bars: WeekBar[] };
+export type WeekData = { weekStart: string; blocks: WeekBlock[]; allDay: { id: string; title: string; date: string; event?: EditableEvent }[]; bars: WeekBar[]; untimed: UntimedItem[]; sync: { error: string | null; okAt: string | null; cached: number } | null };
 
 /** Everything the week view draws: calendar events, timed tasks, all-day items, goal/project spans. */
 export async function weekData(weekStart: string): Promise<WeekData> {
@@ -21,8 +24,8 @@ export async function weekData(weekStart: string): Promise<WeekData> {
   const [ev, tasks, goals, projects] = await Promise.all([
     loadEvents(),
     admin().from('tasks').select('id,title,due_at,duration_min,status').is('deleted_at', null).gte('due_at', from).lt('due_at', to).limit(300),
-    admin().from('goals').select('id,title,emoji,start_date,target_date,area_id').is('deleted_at', null).eq('status', 'active').lte('start_date', weekEnd).gte('target_date', weekStart).limit(50),
-    admin().from('projects').select('id,title,emoji,start_date,target_date').is('deleted_at', null).eq('status', 'active').lte('start_date', weekEnd).gte('target_date', weekStart).limit(50),
+    admin().from('goals').select('id,title,emoji,start_date,target_date,area_id').is('deleted_at', null).eq('status', 'active').not('target_date', 'is', null).gte('target_date', weekStart).limit(200),
+    admin().from('projects').select('id,title,emoji,start_date,target_date').is('deleted_at', null).eq('status', 'active').not('target_date', 'is', null).gte('target_date', weekStart).limit(200),
   ]);
   const blocks: WeekBlock[] = [];
   const allDay: WeekData['allDay'] = [];
@@ -39,9 +42,46 @@ export async function weekData(weekStart: string): Promise<WeekData> {
     const end = new Date(new Date(t.due_at).getTime() + (t.duration_min ?? 30) * 60_000).toISOString();
     blocks.push({ id: t.id, title: t.title, start: t.due_at, end, kind: 'task', done: t.status === 'done', href: `/tasks/${t.id}` });
   }
-  const bars: WeekBar[] = [
-    ...((goals.data ?? []) as { id: string; title: string; emoji: string | null; start_date: string; target_date: string }[]).map((g) => ({ id: g.id, title: `${g.emoji ? g.emoji + ' ' : ''}${g.title}`, from: g.start_date, to: g.target_date, kind: 'goal' as const, href: `/goals/${g.id}` })),
-    ...((projects.data ?? []) as { id: string; title: string; emoji: string | null; start_date: string; target_date: string }[]).map((p) => ({ id: p.id, title: `${p.emoji ? p.emoji + ' ' : ''}${p.title}`, from: p.start_date, to: p.target_date, kind: 'project' as const, href: `/projects/${p.id}` })),
-  ];
-  return { weekStart, blocks, allDay, bars };
+  // a goal or project without a start date still shows, as a one-day marker on its target date
+  type Span = { id: string; title: string; emoji: string | null; start_date: string | null; target_date: string };
+  const toBar = (kind: 'goal' | 'project', href: string) => (g: Span): WeekBar | null => {
+    const from = g.start_date ?? g.target_date;
+    return from <= weekEnd ? { id: g.id, title: `${g.emoji ? g.emoji + ' ' : ''}${g.title}`, from, to: g.target_date, kind, href: `${href}${g.id}` } : null;
+  };
+  const bars = [
+    ...((goals.data ?? []) as Span[]).map(toBar('goal', '/goals/')),
+    ...((projects.data ?? []) as Span[]).map(toBar('project', '/projects/')),
+  ].filter((b): b is WeekBar => b !== null);
+
+  // untimed tasks due that day, and every habit due that day (timed ones become blocks)
+  const untimed: UntimedItem[] = [];
+  const dueTasks = await admin().from('tasks').select('id,title,due_date,status').is('deleted_at', null).is('due_at', null).gte('due_date', weekStart).lte('due_date', weekEnd).limit(300);
+  for (const t of (dueTasks.data ?? []) as { id: string; title: string; due_date: string; status: string }[]) {
+    untimed.push({ kind: 'task', id: t.id, title: t.title, date: t.due_date, done: t.status === 'done', href: `/tasks/${t.id}` });
+  }
+  try {
+    const [habits, checks] = await Promise.all([
+      listHabits(),
+      admin().from('habit_checkins').select('habit_id,checkin_date,value').gte('checkin_date', weekStart).lte('checkin_date', weekEnd),
+    ]);
+    const value = new Map(((checks.data ?? []) as { habit_id: string; checkin_date: string; value: number }[]).map((c) => [`${c.habit_id}|${c.checkin_date}`, Number(c.value)]));
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(weekStart, i);
+      for (const h of habits) {
+        if (h.created_at.slice(0, 10) > date || !habitDueOn(h, date)) continue;
+        const v = value.get(`${h.id}|${date}`);
+        const done = (v ?? 0) >= Number(h.target_value);
+        const missed = v !== undefined && v < 0;
+        const sMin = minutesOfTime(h.start_time);
+        if (sMin === null) { untimed.push({ kind: 'habit', id: h.id, title: h.name, date, done, missed, emoji: h.emoji }); continue; }
+        const eMin = minutesOfTime(h.end_time) ?? sMin + 30;
+        const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+        blocks.push({ id: `habit-${h.id}-${date}`, title: h.name, start: istInstant(date, hhmm(sMin)).toISOString(), end: istInstant(date, hhmm(Math.min(eMin, 24 * 60 - 1))).toISOString(), kind: 'habit', done, habit: { id: h.id, date, emoji: h.emoji, missed } });
+      }
+    }
+  } catch { /* habits are optional on this view */ }
+
+  const { data: st } = await admin().from('calendar_sync_state').select('last_error,last_ok_at,cached_events').maybeSingle();
+  const sync = st ? { error: (st.last_error as string | null) ?? null, okAt: (st.last_ok_at as string | null) ?? null, cached: Number(st.cached_events ?? 0) } : null;
+  return { weekStart, blocks, allDay, bars, untimed, sync };
 }

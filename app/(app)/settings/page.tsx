@@ -2,6 +2,7 @@ import { SetPageContext } from '@/components/chat/page-context';
 import { SettingsForm, AccountsPanel, CategoriesPanel } from '@/components/settings/SettingsForm';
 import { PushSetup } from '@/components/settings/PushSetup';
 import { GoogleConnect } from '@/components/settings/GoogleConnect';
+import { GoogleSyncNow } from '@/components/settings/GoogleSyncNow';
 import { getConfig } from '@/lib/domain/config';
 import { admin } from '@/lib/supabase/admin';
 import { keyEnvName } from '@/lib/agent/model';
@@ -61,6 +62,15 @@ function envStatus(name: string): boolean {
   return Boolean(process.env[name] && process.env[name]!.length > 0);
 }
 
+async function loadCalendarState() {
+  try {
+    const { data } = await admin().from('calendar_sync_state').select('*').maybeSingle();
+    return { error: (data?.last_error as string | null) ?? null, ok: (data?.last_ok_at as string | null) ?? null, cached: Number(data?.cached_events ?? 0) };
+  } catch {
+    return { error: null, ok: null, cached: 0 };
+  }
+}
+
 async function loadTasksSync() {
   try {
     const [{ data }, scope, calWrite] = await Promise.all([admin().from('gtasks_sync_state').select('*').maybeSingle(), hasTasksScope().catch(() => false), hasCalendarWriteScope().catch(() => false)]);
@@ -71,7 +81,7 @@ async function loadTasksSync() {
 }
 
 export default async function SettingsPage() {
-  const tasksSync = await loadTasksSync();
+  const [tasksSync, calState] = await Promise.all([loadTasksSync(), loadCalendarState()]);
   const [config, accounts, categories, google, lastSyncError] = await Promise.all([
     getConfig(),
     loadAccounts(),
@@ -111,6 +121,7 @@ export default async function SettingsPage() {
           connectedEmail={google.connectedEmail}
           lastSyncError={lastSyncError}
         />
+        {google.connected && <div className="mt-3"><GoogleSyncNow lastError={calState.error} lastOk={calState.ok} cached={calState.cached} /></div>}
         {google.connected && (
           <div className="mt-3 rounded-lg border px-3 py-2 text-sm">
             <div className="font-medium">Calendar editing</div>

@@ -42,6 +42,9 @@ type FormState = {
   unit: string;
   days_of_week: number[];
   reminder_time: string;
+  start_time: string;
+  end_time: string;
+  gtask_title: string;
   area_id: string | null;
 };
 
@@ -55,6 +58,9 @@ function toState(habit?: Habit | null): FormState {
     unit: habit?.unit ?? '',
     days_of_week: habit?.days_of_week ?? [],
     reminder_time: habit?.reminder_time?.slice(0, 5) ?? '',
+    start_time: habit?.start_time?.slice(0, 5) ?? '',
+    end_time: habit?.end_time?.slice(0, 5) ?? '',
+    gtask_title: habit?.gtask_title ?? '',
     area_id: habit?.area_id ?? null,
   };
 }
@@ -100,6 +106,9 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
       unit: state.kind === 'count' ? state.unit.trim() || null : null,
       days_of_week: state.days_of_week.length ? state.days_of_week : null,
       reminder_time: state.reminder_time || null,
+      start_time: state.start_time || null,
+      end_time: state.end_time || null,
+      gtask_title: state.gtask_title.trim() || null,
       area_id: state.area_id,
     };
     const res =
@@ -224,6 +233,24 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
                 );
               })}
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label>Starts</Label>
+              <Input type="time" value={state.start_time} onChange={(e) => setState((s) => ({ ...s, start_time: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Ends</Label>
+              <Input type="time" value={state.end_time} onChange={(e) => setState((s) => ({ ...s, end_time: e.target.value }))} />
+            </div>
+            <p className="col-span-2 -mt-1 text-xs text-muted-foreground">Gives the habit a block on the day view. Leave empty for “any time”.</p>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Google Task title</Label>
+            <Input placeholder="Only if it differs from the name" value={state.gtask_title} onChange={(e) => setState((s) => ({ ...s, gtask_title: e.target.value }))} />
+            <p className="text-xs text-muted-foreground">A Google Task with this title (or the habit’s name) checks this habit in when you complete it.</p>
           </div>
 
           <div className="flex gap-2">

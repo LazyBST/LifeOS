@@ -47,12 +47,20 @@ type LinkRow = {
 /** Google is optional at runtime: callers (the cron tick) must never break
  * because it is unconfigured or the owner hasn't connected an account. */
 async function connected(): Promise<boolean> {
-  if (!isConfigured()) return false;
+  return (await connectionProblem()) === null;
+}
+
+/** Why Google cannot be used right now, in words the owner can act on; null when it can. */
+export async function connectionProblem(): Promise<string | null> {
+  if (!isConfigured()) return 'Google is not set up: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are missing on the server.';
   try {
     await authedClient();
-    return true;
-  } catch {
-    return false;
+    return null;
+  } catch (e) {
+    const m = e instanceof Error ? e.message : String(e);
+    if (/not connected/i.test(m)) return 'Google is not connected. Open Settings and connect Google Calendar.';
+    if (/invalid_grant|revoked|expired/i.test(m)) return 'Google refused the saved access (it was revoked or expired). Open Settings, disconnect and connect again.';
+    return `Google sign-in failed: ${m}`;
   }
 }
 
@@ -470,6 +478,7 @@ async function pollPrimaryCalendar(): Promise<number> {
   const { events, nextSyncToken } = await listEventsResilient(PRIMARY_CALENDAR_ID);
 
   let changed = 0;
+  let failed = 0;
   for (const event of events) {
     if (!event.id) continue;
     if (event.status === 'cancelled') {
@@ -480,22 +489,46 @@ async function pollPrimaryCalendar(): Promise<number> {
     const row = eventToCacheRow(event);
     if (!row) continue;
     if (await upsertCacheRow(row)) changed += 1;
+    else failed += 1;
   }
 
+  // keep the old token if anything could not be saved, so the next poll sends those events again
+  if (failed > 0) throw new Error(`${failed} event${failed === 1 ? '' : 's'} could not be saved (is migration 0011 applied?)`);
   await setSyncToken(PRIMARY_CALENDAR_ID, nextSyncToken);
   return changed;
 }
 
-/** Google -> app. Polled every 10 minutes by the cron tick. */
-export async function pollCalendar(): Promise<{ changed: number }> {
-  if (!(await connected())) return { changed: 0 };
-  try {
-    const lifeos = await pollLifeosCalendar();
-    const primary = await pollPrimaryCalendar();
-    return { changed: lifeos + primary };
-  } catch (err) {
-    // The cron tick must never break because Google had a bad moment.
-    console.error('pollCalendar failed', err instanceof Error ? err.message : err);
-    return { changed: 0 };
+export type PollResult = { changed: number; errors: string[]; cached: number };
+
+async function recordCalendarState(r: PollResult): Promise<void> {
+  const now = new Date().toISOString();
+  await admin().from('calendar_sync_state').upsert({
+    id: true, last_polled_at: now, ...(r.errors.length === 0 ? { last_ok_at: now } : {}),
+    last_error: r.errors.length ? r.errors.join(' · ').slice(0, 500) : null, last_changed: r.changed, cached_events: r.cached,
+  }, { onConflict: 'id' });
+}
+
+/**
+ * Google -> app. Both calendars are synced independently, so a problem with the LifeOS calendar can no longer
+ * stop your main calendar from loading. Failures are recorded for /settings and the calendar widget instead of
+ * disappearing. `full` throws away the saved sync position and re-reads the whole window.
+ */
+export async function pollCalendar(opts: { full?: boolean } = {}): Promise<PollResult> {
+  const result: PollResult = { changed: 0, errors: [], cached: 0 };
+  const problem = await connectionProblem();
+  if (problem) {
+    result.errors.push(problem);
+    if (isConfigured()) await recordCalendarState(result).catch(() => undefined);
+    return result;
   }
+  if (opts.full) await setSyncToken(PRIMARY_CALENDAR_ID, null);
+  try { result.changed += await pollLifeosCalendar(); }
+  catch (e) { result.errors.push(`LifeOS calendar: ${e instanceof Error ? e.message : String(e)}`); }
+  try { result.changed += await pollPrimaryCalendar(); }
+  catch (e) { result.errors.push(`Main calendar: ${e instanceof Error ? e.message : String(e)}`); }
+  const { count } = await admin().from('calendar_events').select('*', { count: 'exact', head: true });
+  result.cached = count ?? 0;
+  if (result.errors.length) console.error('pollCalendar', result.errors.join(' | '));
+  await recordCalendarState(result).catch(() => undefined);
+  return result;
 }

@@ -28,37 +28,57 @@ async function activeHabits(): Promise<HabitRow[]> {
   return (data ?? []) as HabitRow[];
 }
 
+export type PullReport = {
+  pulled: number;
+  /** Google tasks completed in the last 3 days */
+  found: number;
+  /** of those, how many matched a habit by title */
+  matched: number;
+  /** completed Google task titles that matched no habit (rename the task or set the habit's "Google Task title") */
+  unmatched: string[];
+  /** habits that have no Google Task with the same title (open or completed) */
+  unlinkedHabits: string[];
+  error: string | null;
+};
+
 /**
  * Google Tasks → habits: a task you completed (in Google Tasks or on your calendar) checks in the habit
- * with the same title, on the day you completed it. Never throws: errors are stored for /settings.
+ * with the same title, on the day you completed it. Never throws: the outcome is returned and stored for /settings.
  */
-export async function pullHabitCheckins(now = new Date()): Promise<{ pulled: number }> {
+export async function pullHabitCheckins(now = new Date()): Promise<PullReport> {
+  const empty: PullReport = { pulled: 0, found: 0, matched: 0, unmatched: [], unlinkedHabits: [], error: null };
   const r = await ready();
   if (!r.ok) {
-    if (r.reason) await record({ last_error: r.reason });
-    return { pulled: 0 };
+    const error = r.reason ?? 'Google is not connected.';
+    await record({ last_error: error }).catch(() => undefined);
+    return { ...empty, error };
   }
   try {
     const habits = await activeHabits();
-    if (habits.length === 0) { await record({ last_error: null, last_pulled: 0 }); return { pulled: 0 }; }
+    if (habits.length === 0) { await record({ last_error: null, last_pulled: 0 }); return empty; }
     const since = new Date(now.getTime() - 3 * 86_400_000).toISOString();
-    const done = (await listGoogleTasks({ completedMin: since })).filter((t) => t.status === 'completed' && t.completed);
-    let pulled = 0;
+    const all = await listGoogleTasks({ completedMin: since });
+    const done = all.filter((t) => t.status === 'completed' && t.completed);
+    const report: PullReport = { ...empty, found: done.length };
     const { checkinHabit } = await import('@/lib/domain/habits'); // lazy: habits.ts imports this module
     for (const t of done) {
       const h = matchHabit(t.title, habits);
-      if (!h) continue;
+      if (!h) { report.unmatched.push(t.title); continue; }
+      report.matched += 1;
       const date = istDay(t.completed!);
       const { data: existing } = await admin().from('habit_checkins').select('value').eq('habit_id', h.id).eq('checkin_date', date).maybeSingle();
       if (existing && Number(existing.value) >= Number((h as HabitRow).target_value)) continue;
       await checkinHabit(h.id, { date, note: 'from Google Tasks', source: 'gtasks' });
-      pulled += 1;
+      report.pulled += 1;
     }
-    await record({ last_error: null, last_pulled: pulled });
-    return { pulled };
+    report.unlinkedHabits = habits.filter((h) => !all.some((t) => matchHabit(t.title, [h]))).map((h) => h.name);
+    report.unmatched = [...new Set(report.unmatched)].slice(0, 20);
+    await record({ last_error: null, last_pulled: report.pulled });
+    return report;
   } catch (e) {
-    await record({ last_error: e instanceof Error ? e.message.slice(0, 300) : String(e) }).catch(() => undefined);
-    return { pulled: 0 };
+    const error = e instanceof Error ? e.message.slice(0, 300) : String(e);
+    await record({ last_error: error }).catch(() => undefined);
+    return { ...empty, error };
   }
 }
 

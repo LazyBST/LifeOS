@@ -108,7 +108,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             />
             <span className="field">
               Due
-              <DueDateTime taskId={task.id} dueDate={task.due_date} dueAt={task.due_at} />
+              <DueDateTime taskId={task.id} dueDate={task.due_date} dueAt={task.due_at} durationMin={task.duration_min} />
             </span>
             <span className="field">
               Duration (min)

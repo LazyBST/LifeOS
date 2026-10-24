@@ -20,3 +20,20 @@ describe('habit links and ui_state', () => {
     expect(r!.value.lg).toEqual([1]);
   });
 });
+
+describe('habit time blocks and calendar sync state', () => {
+  test('a habit end time must be after its start time', async () => {
+    const db = await freshDb();
+    await db.query(`insert into habits (name, start_time, end_time) values ('Gym', '07:00', '08:00')`);
+    await db.query(`insert into habits (name, start_time) values ('Read', '21:00')`);
+    await expect(db.query(`insert into habits (name, start_time, end_time) values ('Bad', '09:00', '08:00')`)).rejects.toThrow();
+  });
+  test('calendar_sync_state is a single row that can be claimed atomically', async () => {
+    const db = await freshDb();
+    expect(await rows(db, 'select 1 from calendar_sync_state')).toHaveLength(1);
+    const first = await rows(db, `update calendar_sync_state set last_polled_at = now() where id and (last_polled_at is null or last_polled_at < now() - interval '5 minutes') returning id`);
+    const second = await rows(db, `update calendar_sync_state set last_polled_at = now() where id and (last_polled_at is null or last_polled_at < now() - interval '5 minutes') returning id`);
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(0); // someone already claimed this window
+  });
+});
