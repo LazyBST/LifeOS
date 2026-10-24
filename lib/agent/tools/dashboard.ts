@@ -36,6 +36,20 @@ const top3Set: ToolDef<typeof setTop3Schema> = {
   },
 };
 
+const getTop3Schema = z.object({ day: z.enum(['today', 'tomorrow']).default('today') });
+const top3Get: ToolDef<typeof getTop3Schema> = {
+  name: 'top3_get',
+  description: "Read the user's top priorities (up to 3) for today or tomorrow, and whether each is done. Use for \"what are my top three today?\".",
+  schema: getTop3Schema,
+  part: 1,
+  handler: async (input, ctx) => {
+    const date = input.day === 'tomorrow' ? addDays(istDate(ctx.now), 1) : istDate(ctx.now);
+    const items = (await getPriorities(date)).filter((p): p is NonNullable<typeof p> => !!p);
+    if (items.length === 0) return { message: `No top priorities set for ${input.day}. Ask the user for up to three and call top3_set.` };
+    return { message: `Top priorities for ${input.day} (${formatDate(date)}): ${items.map((p) => `${p.position}. ${p.text}${p.done ? ' ✓' : ''}`).join('; ')}.`, data: items };
+  },
+};
+
 const doneSchema = z.object({ position: z.number().int().min(1).max(3) });
 const top3Done: ToolDef<typeof doneSchema> = {
   name: 'top3_toggle',
@@ -112,4 +126,4 @@ const scheduleReport: ToolDef<typeof ledgerSchema> = {
   },
 };
 
-export const dashboardTools: ToolDef[] = [top3Set, top3Done, improvementSet, scheduleReport] as unknown as ToolDef[];
+export const dashboardTools: ToolDef[] = [top3Set, top3Get, top3Done, improvementSet, scheduleReport] as unknown as ToolDef[];

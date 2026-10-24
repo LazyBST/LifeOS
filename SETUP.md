@@ -201,6 +201,11 @@ still shows every proactive message.
 
 ---
 
+## Optional: talk to LifeOS from Gemini CLI or another MCP client
+
+See [docs/MCP.md](docs/MCP.md): generate `MCP_API_KEY` (`openssl rand -hex 32`), set it in Vercel, redeploy,
+then add the `lifeos` server to your client.
+
 ## Running it locally
 
 ```bash

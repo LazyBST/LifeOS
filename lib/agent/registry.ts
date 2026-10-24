@@ -50,10 +50,10 @@ export const registry: ToolRegistry = registerTools(
  * safety cap (spec section 7). `undo_last` is here too: it rewrites rows via
  * the stored `before`, but that's reversing an existing action, not a new
  * one, and auditing it would make it reverse itself on a second undo. */
-const READONLY_TOOLS = new Set([
+export const READONLY_TOOLS = new Set([
   'search', 'get', 'task_list', 'notes_read', 'get_today', 'undo_last',
   'habit_status', 'journal_get', 'reminder_list',
-  'wallet', 'finance_summary', 'report', 'schedule_report',
+  'wallet', 'finance_summary', 'report', 'schedule_report', 'top3_get',
 ]);
 
 const MAX_FREE_MUTATIONS = 3;
