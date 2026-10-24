@@ -46,7 +46,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
   }
 
   return (
-    <div className="rounded-xl border border-border">
+    <div className="rounded-xl border border-border bg-card">
       <Table>
         <TableHeader>
           <TableRow>

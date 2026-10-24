@@ -22,7 +22,7 @@ type EntityGroupProps = {
 export function EntityGroup({ title, href, meta, defaultOpen = true, children, className }: EntityGroupProps) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className={cn('rounded-lg ring-1 ring-foreground/10', className)}>
+    <section className={cn('rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(27,31,42,0.06)]', className)}>
       <div className="flex w-full items-center justify-between gap-2 px-3 py-2">
         <button
           type="button"

@@ -19,7 +19,7 @@ export function GoogleSyncNow({ lastError, lastOk, cached }: { lastError: string
   }
   const problems = [...(report?.calendar.errors ?? []), ...(report?.tasks.error ? [`Google Tasks: ${report.tasks.error}`] : [])];
   return (
-    <div className="space-y-2 rounded-lg border px-3 py-2 text-sm">
+    <div className="space-y-2 rounded-lg border bg-card px-3 py-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <div className="font-medium">Sync</div>
         <span className="text-xs text-muted-foreground">

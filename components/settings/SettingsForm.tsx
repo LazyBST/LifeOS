@@ -66,7 +66,7 @@ export function SettingsForm({ config }: { config: AppConfig }) {
             onChange={(e) => setEstimate(e.target.value)}
           />
         </div>
-        <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+        <div className="flex items-center justify-between rounded-lg border bg-card px-3 py-2">
           <Label htmlFor="push_enabled">Push notifications on</Label>
           <Switch id="push_enabled" checked={pushEnabled} onCheckedChange={setPushEnabled} />
         </div>
@@ -130,7 +130,7 @@ export function AccountsPanel({ accounts }: { accounts: Account[] }) {
           <p className="text-xs text-muted-foreground">No accounts yet.</p>
         ) : (
           list.map((a) => (
-            <li key={a.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
+            <li key={a.id} className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2">
               <span>
                 {a.name} {a.is_default ? <span className="text-xs text-muted-foreground">(default)</span> : null}
               </span>

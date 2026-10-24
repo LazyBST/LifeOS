@@ -45,7 +45,7 @@ export function GoogleConnect({ connected, connectedEmail, lastSyncError }: Goog
 
   return (
     <div className="flex flex-col gap-3 text-sm">
-      <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+      <div className="flex items-center justify-between rounded-lg border bg-card px-3 py-2">
         <span>
           Status:{' '}
           <span className="font-medium">

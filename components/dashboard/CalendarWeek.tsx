@@ -110,7 +110,7 @@ export function CalendarWeek() {
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border">
+      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-card">
         <div className="grid text-xs" style={{ gridTemplateColumns: `52px repeat(${days.length}, minmax(${mode === 'week' ? 90 : 240}px, 1fr))`, minWidth: mode === 'week' ? 680 : 360 }}>
           <div className="sticky top-0 z-20 bg-card" />
           {days.map((d, i) => (

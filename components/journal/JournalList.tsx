@@ -20,7 +20,7 @@ export function JournalList({ entries, className }: JournalListProps) {
       {sorted.map((e) => {
         const firstLines = e.body_md.trim().split('\n').slice(0, 2).join(' ').slice(0, 160);
         return (
-          <li key={e.entry_date} className="rounded-lg border border-border p-2.5">
+          <li key={e.entry_date} className="rounded-lg border border-border bg-card p-2.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-medium text-muted-foreground">{formatDate(e.entry_date)}</span>
               {e.mood != null && <span className="text-sm">{MOOD_EMOJI[e.mood] ?? e.mood}</span>}

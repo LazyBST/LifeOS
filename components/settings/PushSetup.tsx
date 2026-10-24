@@ -177,7 +177,7 @@ export function PushSetup() {
         know a push will actually wake the phone.
       </p>
 
-      <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+      <div className="flex items-center justify-between rounded-lg border bg-card px-3 py-2">
         <span>
           Permission: <span className="font-medium">{permissionLabel[permission]}</span>
         </span>
@@ -202,7 +202,7 @@ export function PushSetup() {
         ) : (
           <ul className="flex flex-col gap-1">
             {devices.map((d) => (
-              <li key={d.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
+              <li key={d.id} className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2">
                 <div className="flex flex-col overflow-hidden">
                   <span className="truncate font-medium">{hostOf(d.endpoint)}</span>
                   <span className="truncate text-xs text-muted-foreground">
