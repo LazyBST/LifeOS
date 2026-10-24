@@ -13,10 +13,10 @@ export async function MoneyWidget() {
       {!t ? <p className="text-sm text-muted-foreground">No money data yet.</p> : (
         <>
           <div className="mb-2 grid grid-cols-4 gap-2 text-xs">
-            <div><div className="text-muted-foreground">Balance</div><div className="text-sm font-semibold">{formatINR(t.current)}</div></div>
-            <div><div className="text-muted-foreground">30 days</div><div className={`text-sm font-semibold ${t.monthChange >= 0 ? pos : neg}`}>{t.monthChange >= 0 ? '+' : ''}{formatINR(t.monthChange)}</div></div>
-            <div><div className="text-muted-foreground">Owed to me</div><div className={`text-sm font-semibold ${pos}`}>{formatINR(w?.owed_to_me ?? 0)}</div></div>
-            <div><div className="text-muted-foreground">I owe</div><div className={`text-sm font-semibold ${neg}`}>{formatINR(w?.i_owe ?? 0)}</div></div>
+            <div><div className="text-muted-foreground">Balance</div><div className="text-xl font-bold tracking-tight">{formatINR(t.current)}</div></div>
+            <div><div className="text-muted-foreground">30 days</div><div className={`text-xl font-bold tracking-tight ${t.monthChange >= 0 ? pos : neg}`}>{t.monthChange >= 0 ? '+' : ''}{formatINR(t.monthChange)}</div></div>
+            <div><div className="text-muted-foreground">Owed to me</div><div className={`text-xl font-bold tracking-tight ${pos}`}>{formatINR(w?.owed_to_me ?? 0)}</div></div>
+            <div><div className="text-muted-foreground">I owe</div><div className={`text-xl font-bold tracking-tight ${neg}`}>{formatINR(w?.i_owe ?? 0)}</div></div>
           </div>
           <TrendChart weeks={t.weeks} ahead={t.ahead} series={t.series} height={170} unit="thousands" />
         </>
