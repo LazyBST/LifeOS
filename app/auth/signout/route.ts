@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseSession } from '@/lib/auth';
-import { env } from '@/lib/env';
+import { requestOrigin } from '@/lib/origin';
 
 export async function GET() {
   const supabase = await supabaseSession();
   await supabase.auth.signOut();
-  return NextResponse.redirect(new URL('/login', env.appUrl));
+  return NextResponse.redirect(new URL('/login', await requestOrigin()));
 }
 
 export async function POST() {

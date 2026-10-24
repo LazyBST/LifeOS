@@ -26,20 +26,30 @@ export async function supabaseSession() {
 
 export type Session = { userId: string; email: string };
 
-/** The signed-in owner, or null. Rejects any account other than OWNER_EMAIL. */
-export async function currentUser(): Promise<Session | null> {
+export type AuthCheck =
+  | { ok: true; session: Session }
+  | { ok: false; reason: 'no_session' | 'wrong_account' | 'owner_mismatch' };
+
+/** Why a user is (not) allowed in: lets the login page say what actually failed. */
+export async function checkUser(): Promise<AuthCheck> {
   const sb = await supabaseSession();
   const { data } = await sb.auth.getUser();
   const user = data.user;
-  if (!user?.email) return null;
-  if (user.email.toLowerCase() !== env.ownerEmail) {
+  if (!user?.email) return { ok: false, reason: 'no_session' };
+  if (user.email.trim().toLowerCase() !== env.ownerEmail.trim().toLowerCase()) {
     await sb.auth.signOut();
-    return null;
+    return { ok: false, reason: 'wrong_account' };
   }
   const cfg = await getConfig(true);
   if (!cfg.owner_user_id) await claimOwner(user.id);
-  else if (cfg.owner_user_id !== user.id) return null;
-  return { userId: user.id, email: user.email };
+  else if (cfg.owner_user_id !== user.id) return { ok: false, reason: 'owner_mismatch' };
+  return { ok: true, session: { userId: user.id, email: user.email } };
+}
+
+/** The signed-in owner, or null. Rejects any account other than OWNER_EMAIL. */
+export async function currentUser(): Promise<Session | null> {
+  const r = await checkUser();
+  return r.ok ? r.session : null;
 }
 
 export async function requireUser(): Promise<Session> {

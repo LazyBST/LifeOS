@@ -57,6 +57,24 @@ files depend on the earlier ones.
    first successful sign-in records your user id in `app_config.owner_user_id`,
    which every row-level-security policy checks from then on.
 
+
+### Sign-in troubleshooting
+
+- **Google sign-in lands on `localhost` from the Vercel site.** Supabase falls
+  back to its *Site URL* whenever the `redirectTo` is not on the allow-list.
+  In Supabase → Authentication → URL Configuration set **Site URL** to your
+  Vercel URL and add `https://<your-app>.vercel.app/**` and
+  `http://localhost:3000/**` under **Redirect URLs**. The app now builds the
+  redirect from the incoming request, so `APP_URL` no longer matters for login.
+- **"That Google account is not the owner."** The email you signed in with
+  differs from `OWNER_EMAIL` (compared case-insensitively). Fix the env var in
+  `.env` locally and in Vercel, then restart/redeploy.
+- **"A different user is already recorded as owner."** An earlier sign-in with
+  another Google account claimed `app_config.owner_user_id`. Reset it in the
+  SQL editor: `update app_config set owner_user_id = null;` and sign in again.
+- Use the same port everywhere: `npm run dev` serves on 3000, and the Supabase
+  redirect URL must match the port you open.
+
 ## 4. Create the Anthropic API key
 
 1. Go to <https://console.anthropic.com/settings/keys>, create a key named
