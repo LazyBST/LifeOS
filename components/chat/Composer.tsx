@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, type KeyboardEvent } from 'react';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { SendHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,11 +8,25 @@ import { Textarea } from '@/components/ui/textarea';
 export function Composer({
   disabled,
   onSend,
+  prefill,
 }: {
   disabled: boolean;
   onSend: (text: string) => void;
+  /** text dropped into the box by another part of the app (the Settle
+   *  buttons on /money); the user edits and sends it themselves */
+  prefill?: { text: string; at: number } | null;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || !prefill?.text) return;
+    el.value = prefill.text;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [prefill]);
 
   function submit() {
     const el = textareaRef.current;

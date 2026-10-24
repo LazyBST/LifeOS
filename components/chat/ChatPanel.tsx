@@ -19,6 +19,7 @@ const DESKTOP_QUERY = '(min-width: 768px)';
 export function ChatPanel() {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [prefill, setPrefill] = useState<{ text: string; at: number } | null>(null);
 
   const pageContext = usePageContext();
   const pageContextRef = useRef(pageContext);
@@ -68,11 +69,20 @@ export function ChatPanel() {
     function handleToggle() {
       setOpen((prev) => !prev);
     }
+    // /money's Settle buttons drop a draft message into the composer.
+    function handlePrefill(e: Event) {
+      const text = (e as CustomEvent<{ text?: string }>).detail?.text;
+      if (!text) return;
+      setOpen(true);
+      setPrefill({ text, at: Date.now() });
+    }
     window.addEventListener('lifeos:chat:open', handleOpen);
     window.addEventListener('lifeos:toggle-chat', handleToggle);
+    window.addEventListener('lifeos:chat:prefill', handlePrefill);
     return () => {
       window.removeEventListener('lifeos:chat:open', handleOpen);
       window.removeEventListener('lifeos:toggle-chat', handleToggle);
+      window.removeEventListener('lifeos:chat:prefill', handlePrefill);
     };
   }, []);
 
@@ -128,7 +138,7 @@ export function ChatPanel() {
           <MessageList messages={messages} sending={sending} onPickOption={handlePickOption} />
         </div>
 
-        <Composer disabled={sending} onSend={(text) => void send(text)} />
+        <Composer disabled={sending} prefill={prefill} onSend={(text) => void send(text)} />
       </div>
     </>
   );

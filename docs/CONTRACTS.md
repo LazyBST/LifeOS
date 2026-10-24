@@ -178,3 +178,24 @@ Rules for Part 2:
   — no row returned means another tick already did it.
 - Google Calendar, push and the LLM are all optional at runtime: a missing
   env var must degrade gracefully, never crash the tick.
+
+---
+
+# Part 3 contracts
+
+| File | What it gives you |
+| --- | --- |
+| `lib/domain/money.ts` | `listAccounts`, `defaultAccount`, `accountByName`, `createAccount`, `archiveAccount`, `listCategories`, `categoryByName`, `createCategory`, `guessCategoryName`, `addExpense`, `addIncome`, `settle`, `listTransactions`, `deleteTransaction`, `restoreTransaction`, `owedByLabel`, `accountBalances`, `wallet`, `mySpending`, `spendByCategory`, `formatINR`; types `ExpenseInput`, `IncomeInput`, `SettleInput`, `RecordedTransaction`, `SpendRow` |
+| `lib/domain/money-math.ts` | pure: `owedOf`, `owedByLabel`, `walletFrom`, `splitEqually` (no Supabase — safe in client components) |
+| `lib/domain/analytics.ts` | `goalForecasts`, `goalForecast`, `projectForecasts`, `completedDaily`, `globalVelocity` |
+| `lib/domain/progress.ts` | `progressPct`, `remainingHours`, `velocityFor`, `forecast`, `habitStreak` |
+
+Money rules (spec section 5), already implemented in the domain layer — do not
+re-derive them in the UI:
+
+- `owed = paid - my_share`; positive means others owe him (green), negative
+  means he owes (red).
+- Settlements are signed (`+` received, `-` paid) and are **not** spending.
+- Analytics always use `my_share` (`v_my_spending`), never the cash paid.
+- Default account is the one flagged `is_default`; default category is guessed
+  from the description, else Misc, and the choice is echoed.

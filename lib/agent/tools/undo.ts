@@ -13,8 +13,9 @@ import { setNotes } from '@/lib/domain/notes';
 import { archiveHabit, updateHabit, type HabitPatch } from '@/lib/domain/habits';
 import { writeJournal } from '@/lib/domain/journal';
 import { cancelReminder } from '@/lib/domain/reminders';
+import { deleteTransaction } from '@/lib/domain/money';
 import { admin } from '@/lib/supabase/admin';
-import type { AgentAction, Goal, Habit, HabitCheckin, Project, Reminder, Task } from '@/lib/types/db';
+import type { AgentAction, Goal, Habit, HabitCheckin, Project, Reminder, Task, Transaction } from '@/lib/types/db';
 
 function goalPatch(g: Goal): GoalPatch {
   return {
@@ -136,6 +137,13 @@ async function reverseOne(action: AgentAction): Promise<string> {
       const after = action.after as Reminder;
       await cancelReminder(after.id);
       return `Cancelled reminder "${after.text}"`;
+    }
+    case 'expense_add':
+    case 'income_add':
+    case 'settle': {
+      const after = action.after as Transaction;
+      await deleteTransaction(after.id);
+      return `Removed ${action.tool === 'expense_add' ? 'expense' : action.tool === 'income_add' ? 'income' : 'settlement'} of ${after.amount}`;
     }
     default:
       return `Nothing to undo for "${action.tool}"`;

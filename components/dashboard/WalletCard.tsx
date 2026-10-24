@@ -1,54 +1,60 @@
-import { admin } from '@/lib/supabase/admin';
+import Link from 'next/link';
+import { wallet } from '@/lib/domain/money';
+import type { Wallet } from '@/lib/types/db';
 
-type WalletRow = { cash_on_hand: number; owed_to_me: number; i_owe: number; net: number };
-
-async function loadWallet(): Promise<WalletRow | null> {
+async function loadWallet(): Promise<Wallet | null> {
   try {
-    const { data, error } = await admin().from('v_wallet').select('*').maybeSingle();
-    if (error || !data) return null;
-    return data as WalletRow;
+    return await wallet();
   } catch {
-    // money tables are Part 3; render an empty state until they exist
+    // money tables may be empty or mid-migration; render an empty state
     return null;
   }
 }
 
-function money(n: number): string {
-  const sign = n < 0 ? '-' : '';
-  return `${sign}₹${Math.abs(Math.round(n)).toLocaleString('en-IN')}`;
+function formatINR(amount: number): string {
+  const n = Math.round(amount * 100) / 100;
+  const s = Math.abs(n).toLocaleString('en-IN', {
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+  return `${n < 0 ? '-' : ''}₹${s}`;
 }
 
-/** Four numbers: cash on hand, owed to me (green), I owe (red), net (spec section 5). */
+/** Compact wallet card for the dashboard: four numbers, links to /money
+ *  (spec section 6). */
 export async function WalletCard() {
-  const wallet = await loadWallet();
+  const w = await loadWallet();
   return (
-    <div className="rounded-xl border border-border bg-card p-3">
+    <Link
+      href="/money"
+      className="block rounded-xl border border-border bg-card p-3 transition-colors hover:border-foreground/20"
+    >
       <h2 className="mb-2 text-sm font-semibold">Wallet</h2>
-      {!wallet ? (
+      {!w ? (
         <p className="text-sm text-muted-foreground">No money data yet.</p>
       ) : (
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <div className="text-xs text-muted-foreground">Cash on hand</div>
-            <div className="font-medium">{money(wallet.cash_on_hand)}</div>
+            <div className="font-medium">{formatINR(w.cash_on_hand)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">Net</div>
-            <div className={`font-medium ${wallet.net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-              {money(wallet.net)}
+            <div className={`font-medium ${w.net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+              {formatINR(w.net)}
             </div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">Owed to me</div>
-            <div className="font-medium text-emerald-600 dark:text-emerald-400">{money(wallet.owed_to_me)}</div>
+            <div className="font-medium text-emerald-600 dark:text-emerald-400">{formatINR(w.owed_to_me)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">I owe</div>
-            <div className="font-medium text-red-600 dark:text-red-400">{money(wallet.i_owe)}</div>
+            <div className="font-medium text-red-600 dark:text-red-400">{formatINR(w.i_owe)}</div>
           </div>
         </div>
       )}
-    </div>
+    </Link>
   );
 }
 

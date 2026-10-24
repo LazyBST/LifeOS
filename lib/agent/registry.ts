@@ -18,6 +18,8 @@ import { entityTools } from './tools/entities';
 import { notesTools } from './tools/notes';
 import { undoTools } from './tools/undo';
 import { dailyTools } from './tools/daily';
+import { moneyTools } from './tools/money';
+import { reportTools } from './tools/report';
 
 function toRegistry(defs: ToolDef[]): ToolRegistry {
   const out: ToolRegistry = {};
@@ -39,14 +41,18 @@ export const registry: ToolRegistry = registerTools(
   undoTools,
   // PART 2/3 PLUG-IN POINT:
   dailyTools,
-  // moneyTools, reportTools,
+  moneyTools, reportTools,
 );
 
 /** Tools that never write and never count against the "more than 3 entities"
  * safety cap (spec section 7). `undo_last` is here too: it rewrites rows via
  * the stored `before`, but that's reversing an existing action, not a new
  * one, and auditing it would make it reverse itself on a second undo. */
-const READONLY_TOOLS = new Set(['search', 'get', 'task_list', 'notes_read', 'get_today', 'undo_last']);
+const READONLY_TOOLS = new Set([
+  'search', 'get', 'task_list', 'notes_read', 'get_today', 'undo_last',
+  'habit_status', 'journal_get', 'reminder_list',
+  'wallet', 'finance_summary', 'report',
+]);
 
 const MAX_FREE_MUTATIONS = 3;
 
