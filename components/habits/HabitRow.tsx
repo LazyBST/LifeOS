@@ -18,7 +18,7 @@ const dow = (d: string) => new Date(`${d}T00:00:00Z`).getUTCDay();
  * One line per habit: a small check for today, the name, the last 7 days as tiny squares (tap any day to correct
  * it), and the streak. Target, longest streak and count entry open under the row from the ⋯ button.
  */
-export function HabitRow({ h, onUnlink }: { h: HabitRowData; onUnlink?: () => void }) {
+export function HabitRow({ h, onUnlink, onEdit, onArchive }: { h: HabitRowData; onUnlink?: () => void; onEdit?: () => void; onArchive?: () => void }) {
   const router = useRouter();
   const [week, setWeek] = useState(h.week);
   const [value, setValue] = useState(h.value);
@@ -106,7 +106,8 @@ export function HabitRow({ h, onUnlink }: { h: HabitRowData; onUnlink?: () => vo
               <button type="button" onClick={() => setCount(value + 1)} className="size-6 rounded border border-input text-foreground">+</button>
             </span>
           )}
-          <Link href="/habits" className="underline">Edit in Habits</Link>
+          {onEdit ? <button type="button" onClick={onEdit} className="underline">Edit</button> : <Link href="/habits" className="underline">Edit in Habits</Link>}
+          {onArchive && <button type="button" onClick={onArchive} className="text-red-600 hover:underline dark:text-red-400">Archive</button>}
           {onUnlink && <button type="button" onClick={onUnlink} className="text-red-600 hover:underline dark:text-red-400">Unlink</button>}
         </div>
       )}

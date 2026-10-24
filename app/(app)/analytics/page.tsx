@@ -12,6 +12,12 @@ import { HabitConsistency } from '@/components/analytics/HabitConsistency';
 import { SpendByCategoryChart } from '@/components/analytics/SpendByCategoryChart';
 import { MoodChart } from '@/components/analytics/MoodChart';
 import type { HabitConsistencyItem } from '@/app/actions/analytics';
+import { WidgetGrid, type GridItem } from '@/components/widgets/WidgetGrid';
+import { WidgetCard } from '@/components/dashboard/WidgetCard';
+import { getUiState } from '@/lib/domain/uistate';
+import { loadInsights } from '@/lib/domain/insights';
+import type { ResponsiveLayouts } from 'react-grid-layout';
+import { ActivityHeat, Donut, ExecutionWeeks, HourBars, MoneyMonths, PagesBars, PriorityBars, StatTiles, StreakBars } from '@/components/analytics/Insights';
 
 const INITIAL_DAYS = 30 as const;
 const HABIT_DAYS = 90;
@@ -37,7 +43,7 @@ export default async function AnalyticsPage() {
   const cur = monthRange(0, today);
   const prev = monthRange(-1, today);
 
-  const [rows, forecasts, areas, habits, checkins, spendThis, spendLast, journal] = await Promise.all([
+  const [rows, forecasts, areas, habits, checkins, spendThis, spendLast, journal, ins, savedLayout] = await Promise.all([
     completedDaily(INITIAL_DAYS),
     goalForecasts(today),
     listAreas(),
@@ -46,6 +52,8 @@ export default async function AnalyticsPage() {
     spendByCategory(cur.from, cur.to),
     spendByCategory(prev.from, prev.to),
     listJournal(habitFrom, today),
+    loadInsights(today),
+    getUiState<ResponsiveLayouts>('analytics-layout').catch(() => null),
   ]);
 
   const areasWithColor = areas.map((a) => ({ id: a.id, name: a.name, resolvedColor: areaColor(a) }));
@@ -76,48 +84,45 @@ export default async function AnalyticsPage() {
 
   const moodPoints = journal.filter((e) => e.mood != null).map((e) => ({ date: e.entry_date, mood: e.mood }));
 
+  const { summary } = ins;
+  const items: GridItem[] = [
+    { id: 'tiles', w: 4, h: 7, minW: 3, minH: 5, node: (
+      <WidgetCard title="This week" sub="Scheduled work: finished vs pushed (−1 each)">
+        <StatTiles items={[
+          { label: 'Daily score', value: summary.scoreWeek === null ? '—' : `${summary.scoreWeek}%`, tone: summary.scoreWeek === null ? undefined : summary.scoreWeek >= 70 ? 'good' : summary.scoreWeek >= 50 ? 'warn' : 'bad' },
+          { label: 'Finished', value: String(summary.doneWeek), tone: 'good' },
+          { label: 'Pushed', value: String(summary.pushedWeek), tone: summary.pushedWeek > 0 ? 'bad' : undefined },
+          { label: 'Best streak', value: `🔥 ${summary.bestStreak}`, sub: 'days' },
+        ]} />
+      </WidgetCard>) },
+    { id: 'execution', w: 8, h: 7, minW: 5, minH: 6, node: <WidgetCard title="Follow-through by week" sub="Finished and pushed items, with your average daily score"><ExecutionWeeks weeks={ins.weeks} /></WidgetCard> },
+    { id: 'heat', w: 12, h: 6, minW: 6, minH: 5, node: <WidgetCard title="Activity" sub="Units completed each day, last 26 weeks"><ActivityHeat days={ins.heat} /></WidgetCard> },
+    { id: 'throughput', w: 8, h: 11, minW: 5, minH: 8, node: <WidgetCard title="Throughput" sub="Completed per day and effort by Area"><RangeTabs initialDays={INITIAL_DAYS} initialRows={rows} areas={areasWithColor} /></WidgetCard> },
+    { id: 'areaMix', w: 4, h: 11, minW: 3, minH: 7, node: <WidgetCard title="Where your time went" sub="Units completed by Area, last 30 days"><Donut data={ins.areaMix} /></WidgetCard> },
+    { id: 'goals', w: 6, h: 11, minW: 4, minH: 7, node: <WidgetCard title="Goal progress" sub="By effort, with projected finish"><GoalProgressChart forecasts={forecasts} areas={areasWithColor} /></WidgetCard> },
+    { id: 'habits', w: 6, h: 11, minW: 4, minH: 7, node: <WidgetCard title="Habit consistency" sub={`Last ${HABIT_DAYS} days`}><HabitConsistency items={habitItems} /></WidgetCard> },
+    { id: 'streaks', w: 4, h: 9, minW: 3, minH: 6, node: <WidgetCard title="Streaks" sub="Current vs best"><StreakBars streaks={ins.streaks} /></WidgetCard> },
+    { id: 'hours', w: 4, h: 9, minW: 3, minH: 6, node: <WidgetCard title="When you get things done" sub="Tasks completed by hour, last 90 days"><HourBars hours={ins.hours} /></WidgetCard> },
+    { id: 'status', w: 4, h: 9, minW: 3, minH: 6, node: <WidgetCard title="Task status" sub="All tasks"><Donut data={ins.statusMix} /></WidgetCard> },
+    { id: 'priority', w: 4, h: 8, minW: 3, minH: 5, node: <WidgetCard title="Open tasks by priority" sub="What is still waiting"><PriorityBars data={ins.priorityMix} /></WidgetCard> },
+    { id: 'money', w: 8, h: 9, minW: 4, minH: 6, node: <WidgetCard title="Income vs spending" sub="By month, your share only"><MoneyMonths data={ins.money} /></WidgetCard> },
+    { id: 'spend', w: 6, h: 10, minW: 4, minH: 7, node: (
+      <WidgetCard title="Spending by category" sub={`${cur.label} vs ${prev.label}`}>
+        <SpendByCategoryChart thisMonth={spendThis} lastMonth={spendLast} thisMonthLabel={cur.label} lastMonthLabel={prev.label} />
+        <div className="mt-2"><TotalsLine thisMonth={spendThis} lastMonth={spendLast} thisLabel={cur.label} lastLabel={prev.label} /></div>
+      </WidgetCard>) },
+    { id: 'mood', w: 6, h: 10, minW: 4, minH: 6, node: <WidgetCard title="Mood over time" sub="From your journal"><MoodChart points={moodPoints} /></WidgetCard> },
+    { id: 'pages', w: 6, h: 9, minW: 4, minH: 6, node: <WidgetCard title="Reading pace" sub="Pages per day"><PagesBars data={ins.pages} /></WidgetCard> },
+  ];
+
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-4 md:p-6">
+    <div className="space-y-4 p-4 sm:p-6">
       <SetPageContext ctx={{ route: '/analytics', entity_type: 'none' }} />
-
       <header>
-        <h1 className="text-lg font-semibold">Analytics</h1>
-        <p className="text-sm text-muted-foreground">Progress by effort, not task count — every chart backed by a named view.</p>
+        <h1 className="text-xl font-semibold">Analytics</h1>
+        <p className="text-sm text-muted-foreground">Drag a card by its title and resize from the corner. Your layout is saved on every device.</p>
       </header>
-
-      <section>
-        <RangeTabs initialDays={INITIAL_DAYS} initialRows={rows} areas={areasWithColor} />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Goal progress</h2>
-        <GoalProgressChart forecasts={forecasts} areas={areasWithColor} />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Habit consistency — last {HABIT_DAYS} days</h2>
-        <HabitConsistency items={habitItems} />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Spending by category — {cur.label} vs {prev.label}</h2>
-        <div className="rounded-xl border border-border bg-card p-3">
-          <SpendByCategoryChart
-            thisMonth={spendThis}
-            lastMonth={spendLast}
-            thisMonthLabel={cur.label}
-            lastMonthLabel={prev.label}
-          />
-        </div>
-        <TotalsLine thisMonth={spendThis} lastMonth={spendLast} thisLabel={cur.label} lastLabel={prev.label} />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Mood over time</h2>
-        <div className="rounded-xl border border-border bg-card p-3">
-          <MoodChart points={moodPoints} />
-        </div>
-      </section>
+      <WidgetGrid items={items} layoutKey="analytics-layout" initial={savedLayout} />
     </div>
   );
 }

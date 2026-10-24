@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { HabitCard } from '@/components/habits/HabitCard';
+import { HabitRow, type HabitRowData } from '@/components/habits/HabitRow';
 import { HabitForm } from '@/components/habits/HabitForm';
 import { archiveHabitAction } from '@/app/actions/habits';
 import type { HabitStatus } from '@/lib/domain/habits';
@@ -21,10 +21,12 @@ const GROUPS: { key: TimeOfDay; label: string }[] = [
 type HabitBoardProps = {
   initialStatuses: HabitStatus[];
   areas: Area[];
+  /** compact-row data per habit id (today, streaks, last 7 days) */
+  rows: Record<string, HabitRowData>;
 };
 
 /** Habits board grouped Morning / Afternoon / Evening / No Type (spec section 6). */
-export function HabitBoard({ initialStatuses, areas }: HabitBoardProps) {
+export function HabitBoard({ initialStatuses, areas, rows }: HabitBoardProps) {
   const [statuses, setStatuses] = useState(initialStatuses);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<HabitStatus | null>(null);
@@ -63,12 +65,12 @@ export function HabitBoard({ initialStatuses, areas }: HabitBoardProps) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {GROUPS.map((g) => {
           const items = statuses.filter((s) => s.time_of_day === g.key);
           return (
             <div key={g.key} className="space-y-2">
-              <h2 className="text-sm font-medium text-muted-foreground">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {g.label} {items.length > 0 && <span className="text-xs">({items.length})</span>}
               </h2>
               <div className="flex flex-col gap-2">
@@ -77,15 +79,9 @@ export function HabitBoard({ initialStatuses, areas }: HabitBoardProps) {
                     No habits
                   </p>
                 )}
-                {items.map((item) => (
-                  <HabitCard
-                    key={item.id}
-                    status={item}
-                    onChange={(patch) => patchStatus(item.id, patch)}
-                    onEdit={() => setEditing(item)}
-                    onArchive={() => handleArchive(item.id)}
-                  />
-                ))}
+                {items.map((item) => rows[item.id] ? (
+                  <HabitRow key={item.id} h={rows[item.id]} onEdit={() => setEditing(item)} onArchive={() => handleArchive(item.id)} />
+                ) : null)}
               </div>
             </div>
           );

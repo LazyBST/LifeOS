@@ -27,6 +27,8 @@ type HabitHeatmapProps = {
   currentStreak: number;
   longestStreak: number;
   days?: number;
+  /** no card chrome or header: the caller (a dashboard widget) supplies them */
+  bare?: boolean;
 };
 
 /** A 90-day consistency heatmap for one habit. Click any day to mark it done or not done: past days can be corrected. */
@@ -37,6 +39,7 @@ export function HabitHeatmap({
   currentStreak,
   longestStreak,
   days = 90,
+  bare = false,
 }: HabitHeatmapProps) {
   const router = useRouter();
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
@@ -64,8 +67,8 @@ export function HabitHeatmap({
   const padded = [...Array.from({ length: leadPad }, () => null), ...cells] as (typeof cells[number] | null)[];
 
   return (
-    <div className="rounded-xl border border-border bg-card p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className={bare ? '' : 'rounded-xl border border-border bg-card p-3'}>
+      <div className={cn('mb-2 flex items-center justify-between gap-2', bare && 'hidden')}>
         <div className="flex items-center gap-1.5 text-sm font-medium">
           {habit.emoji && <span>{habit.emoji}</span>}
           <span className="truncate">{habit.name}</span>
