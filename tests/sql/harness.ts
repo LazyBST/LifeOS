@@ -20,6 +20,8 @@ const MIGRATION_FILES = [
   '0009_habit_task_link.sql',
   '0010_gtasks_sync.sql',
   '0011_calendar_edit.sql',
+  '0012_books.sql',
+  '0013_external_ids.sql',
 ];
 
 // Supabase provides these for free; PGlite does not, so we stub the minimum

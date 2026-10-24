@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   CheckCircle2,
   Wallet,
+  Library,
   BarChart3,
   Settings,
 } from 'lucide-react';
@@ -17,6 +18,7 @@ export type NavArea = { id: string; name: string; slug: string; color: string };
 const STATIC_LINKS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/habits', label: 'Habits', icon: CheckCircle2 },
+  { href: '/books', label: 'Books', icon: Library },
   { href: '/money', label: 'Money', icon: Wallet },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];

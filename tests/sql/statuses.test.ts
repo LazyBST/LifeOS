@@ -2,11 +2,11 @@ import { describe, expect, test } from 'vitest';
 import { freshDb, row, rows } from './harness';
 
 describe('statuses table', () => {
-  test('seeds the six statuses with colour fields', async () => {
+  test('seeds the task/project/goal statuses (plus book ones) with colour fields', async () => {
     const db = await freshDb();
     const r = await rows<{ key: string; color: string; bg_color: string }>(
       db, `select key, color, bg_color from statuses order by sort_order`);
-    expect(r.map((x) => x.key)).toEqual(['todo', 'doing', 'done', 'active', 'paused', 'dropped']);
+    expect(r.map((x) => x.key)).toEqual(['todo', 'doing', 'done', 'active', 'paused', 'dropped', 'to_read', 'reading', 'finished']);
     expect(r.every((x) => /^#[0-9a-f]{6}$/i.test(x.color) && /^#[0-9a-f]{6}$/i.test(x.bg_color))).toBe(true);
   });
 

@@ -15,6 +15,7 @@ import { InlineDate } from '@/components/entity/InlineDate';
 import { NotesEditor } from '@/components/notes/NotesEditor';
 import { TaskViews } from '@/components/tasks/TaskViews';
 import { ledgerForProject, slipCount } from '@/lib/domain/ledger';
+import { LinkedBooks } from '@/components/books/LinkedBooks';
 import { LedgerSection } from '@/components/ledger/LedgerSection';
 import { PRIORITIES } from '@/lib/types/db';
 import { listStatuses } from '@/lib/domain/statuses';
@@ -124,6 +125,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         defaultView="board"
         defaultGroup="priority"
       />
+
+      <LinkedBooks entityType="project" entityId={project.id} title="Books for this project" />
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-muted-foreground">Notes</h2>

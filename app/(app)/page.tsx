@@ -8,6 +8,7 @@ import { ProjectsWidget } from '@/components/dashboard/ProjectsWidget';
 import { MoneyWidget } from '@/components/dashboard/MoneyWidget';
 import { HabitsCard } from '@/components/dashboard/HabitsCard';
 import { PrioritiesWidget, ImprovementWidget } from '@/components/dashboard/PrioritiesWidget';
+import { BooksWidget } from '@/components/dashboard/BooksWidget';
 import { JournalCard } from '@/components/dashboard/JournalCard';
 import { LifeCalendar } from '@/components/dashboard/LifeCalendar';
 import { CalendarWeek } from '@/components/dashboard/CalendarWeek';
@@ -22,6 +23,7 @@ const Top3 = safe('Today’s top 3', () => PrioritiesWidget());
 const Improve = safe('Last night’s improvement', () => ImprovementWidget());
 const Money = safe('Money', () => MoneyWidget());
 const Projects = safe('Projects', () => ProjectsWidget());
+const Books = safe('Books', () => BooksWidget());
 const Journal = safe('Journal', () => JournalCard());
 const Slip = safe('Schedule', async () => (await SlipBanner()) ?? null);
 
@@ -40,6 +42,7 @@ export default async function DashboardPage() {
     { id: 'tasks', node: <WidgetCard title="Tasks" sub="Board · List — the same view on every page"><TaskViews base={{}} scope="dashboard" /></WidgetCard> },
     { id: 'life', node: <WidgetCard title="Life calendar" sub="One dot per day · green 70%+, yellow 50–70%, red under 50%"><LifeCalendar /></WidgetCard> },
     { id: 'calendar', node: <WidgetCard title="Calendar" sub="Your week · events, timed tasks, goals and projects" bodyClassName="flex flex-col"><CalendarWeek /></WidgetCard> },
+    { id: 'books', node: <S><Books /></S> },
     { id: 'journal', node: <S><Journal /></S> },
   ];
   return (

@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Markdown } from './Markdown';
 import { saveNotesAction } from '@/app/actions/tasks';
 
-type NoteType = 'goal' | 'project' | 'task';
+type NoteType = 'goal' | 'project' | 'task' | 'book';
 type Mode = 'edit' | 'split' | 'preview';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 

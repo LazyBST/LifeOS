@@ -14,7 +14,7 @@ import { breadcrumbFor, getTaskOrThrow, listSubtasks, listTasks } from '@/lib/do
 import { presetFilters, type TaskFilters } from '@/lib/types/filters';
 import type { Priority, TaskStatus, ToolResultCard } from '@/lib/types/db';
 
-const REF_TYPE = z.enum(['goal', 'project', 'task', 'habit']);
+const REF_TYPE = z.enum(['goal', 'project', 'task', 'habit', 'book']);
 
 // ---------------------------------------------------------------------------
 // search

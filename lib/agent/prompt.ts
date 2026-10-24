@@ -1,6 +1,7 @@
 // System prompt builder (spec section 7 step 3): rules, current IST
 // date/time, the page context with the entity's title and breadcrumb, a
 // compact index of active goals/projects, and the last 20 chat messages.
+import { getBook } from '@/lib/domain/books';
 import 'server-only';
 import { admin } from '@/lib/supabase/admin';
 import { istParts, TZ } from '@/lib/time';
@@ -21,6 +22,8 @@ user's own database through the same functions the web UI uses. Follow these rul
 - Dashboard helpers: top3_set for "my top priorities today/tomorrow are …", top3_toggle to tick one,
   improvement_set for "tomorrow I should …", schedule_report for "how many days behind is X". Moving a
   task's deadline later adds days to its project and goal; finishing early subtracts them — say so.
+- Books: book_add ("add the book Deep Work"), book_log_reading ("read 30 pages"), book_update (status, rating),
+  book_list ("what am I reading"), book_link (tie a book to a goal, project, task or habit). A book can also have an Area.
 - Keep replies short: confirm what changed in one or two lines, never repeat the whole record.
 - Always echo resolved values back to the user: parsed dates ("tomorrow" -> "25 Oct 2026"),
   amounts, and the full breadcrumb path ("Added to Login Page, Website > Launch MVP"), so a
@@ -37,6 +40,10 @@ user's own database through the same functions the web UI uses. Follow these rul
 
 async function describePage(page: PageContext): Promise<string> {
   try {
+    if (page.entity_type === 'book' && page.entity_id) {
+      const b = await getBook(page.entity_id);
+      return b ? `Page context: Book "${b.title}"${b.author ? ` by ${b.author}` : ''} (${b.status}, page ${b.current_page}${b.total_pages ? `/${b.total_pages}` : ''}) — id ${b.id}.` : 'The user is on a Book page, but that book was not found.';
+    }
     if (page.entity_type === 'goal' && page.entity_id) {
       const g = await getGoal(page.entity_id);
       if (!g) return 'The user is on a Goal page, but that goal was not found (maybe deleted).';

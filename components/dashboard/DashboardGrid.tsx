@@ -20,10 +20,11 @@ export const DEFAULT_LG: Item[] = [
   { i: 'tasks', x: 4, y: 23, w: 8, h: 15, minW: 4, minH: 8 },
   { i: 'life', x: 0, y: 38, w: 12, h: 20, minW: 6, minH: 10 },
   { i: 'calendar', x: 0, y: 58, w: 12, h: 18, minW: 4, minH: 8 },
-  { i: 'journal', x: 0, y: 76, w: 4, h: 8, minW: 3, minH: 5 },
+  { i: 'books', x: 0, y: 76, w: 6, h: 12, minW: 3, minH: 6 },
+  { i: 'journal', x: 6, y: 76, w: 6, h: 12, minW: 3, minH: 5 },
 ];
 const STACK = (items: Item[]): Item[] => items.map((it, n) => ({ ...it, x: 0, w: 1, y: n * 100 }));
-const KEY = 'lifeos:dash:layout:v1';
+const KEY = 'lifeos:dash:layout:v2';
 
 /** Drag the header, resize from the corner. The arrangement is remembered in this browser. */
 export function DashboardGrid({ widgets }: { widgets: GridWidget[] }) {

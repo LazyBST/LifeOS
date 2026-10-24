@@ -38,7 +38,9 @@ Then, only if you want test data to click around in:
 9. `0009_habit_task_link.sql` — habits can hang off a task
 10. `0010_gtasks_sync.sql` — Google Tasks ↔ habits sync state
 11. `0011_calendar_edit.sql` — edit events on your main calendar from the app, with an undo log
-12. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
+12. `0012_books.sql` — books, reading log and links to goals, projects, tasks and habits
+13. `0013_external_ids.sql` — remembers where imported rows came from (used by the AppFlowy import)
+14. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
    two goals, three projects, about a dozen tasks, three habits, five
    transactions and two journal entries.
 
@@ -205,6 +207,10 @@ and push notifications are the only things affected — the in-app chat feed
 still shows every proactive message.
 
 ---
+
+## Moving your AppFlowy data in
+
+See [docs/APPFLOWY_IMPORT.md](docs/APPFLOWY_IMPORT.md).
 
 ## Running it locally
 

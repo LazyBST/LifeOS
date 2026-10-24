@@ -187,7 +187,7 @@ export type ChatContent = {
 };
 
 export type ToolResultCard = {
-  kind: 'task' | 'goal' | 'project' | 'habit' | 'journal' | 'money' | 'report' | 'info' | 'error';
+  kind: 'task' | 'goal' | 'project' | 'habit' | 'book' | 'journal' | 'money' | 'report' | 'info' | 'error';
   title: string;
   subtitle?: string;
   href?: string;
@@ -337,7 +337,7 @@ export type CompletedDailyRow = {
 
 // ---- agent page context ----------------------------------------------------
 
-export type EntityType = 'goal' | 'project' | 'task' | 'area' | 'habit' | 'none';
+export type EntityType = 'goal' | 'project' | 'task' | 'area' | 'habit' | 'book' | 'none';
 
 export type PageContext = {
   route: string;
@@ -346,3 +346,32 @@ export type PageContext = {
   area_id?: UUID | null;
   filters?: Record<string, unknown> | null;
 };
+
+// ---- books -----------------------------------------------------------------
+
+export type Book = {
+  id: UUID;
+  title: string;
+  author: string | null;
+  status: string;
+  rating: number | null;
+  total_pages: number | null;
+  current_page: number;
+  area_id: UUID | null;
+  start_date: DateStr | null;
+  target_date: DateStr | null;
+  original_target_date: DateStr | null;
+  started_on: DateStr | null;
+  finished_on: DateStr | null;
+  tags: string[];
+  notes_md: string;
+  cover_url: string | null;
+  created_at: Instant;
+  updated_at: Instant;
+  deleted_at: Instant | null;
+};
+
+export type ReadingLogRow = { id: UUID; book_id: UUID; read_on: DateStr; pages: number; minutes: number | null; note: string | null; created_at: Instant };
+
+export type BookLinkType = 'goal' | 'project' | 'task' | 'habit';
+export type BookLink = { book_id: UUID; entity_type: BookLinkType; entity_id: UUID; created_at: Instant };

@@ -1,5 +1,6 @@
 // notes_append, notes_read (spec section 7 tool table). Appends never
 // rewrite, so nothing the user wrote by hand is lost (lib/domain/notes.ts).
+import { getBook } from '@/lib/domain/books';
 import 'server-only';
 import { z } from 'zod';
 import type { ToolDef, ToolOutcome } from '../types';
@@ -9,7 +10,7 @@ import { breadcrumbFor, getTaskOrThrow } from '@/lib/domain/tasks';
 import { getGoal } from '@/lib/domain/goals';
 import { getProject } from '@/lib/domain/projects';
 
-const REF_TYPES = ['goal', 'project', 'task'] as const;
+const REF_TYPES = ['goal', 'project', 'task', 'book'] as const;
 
 type NoteResolution = { stop: ToolOutcome } | { type: NoteEntity; id: string; path?: string };
 
@@ -24,7 +25,7 @@ async function resolveNoteEntity(
     return { stop: { message: askMessage('entity', res.options), pending: toPendingChoice(tool, input, 'entity_ref', res.options) } };
   }
   if (res.kind === 'none') {
-    return { stop: { message: `No goal, project or task matching "${ref}".` } };
+    return { stop: { message: `No goal, project, task or book matching "${ref}".` } };
   }
   return { type: res.pick.type as NoteEntity, id: res.pick.id, path: res.pick.path };
 }
@@ -39,6 +40,10 @@ async function pathAndTitle(type: NoteEntity, id: string): Promise<{ path: strin
     const g = p?.goal_id ? await getGoal(p.goal_id) : null;
     const path = g ? `${g.title} > ${p?.title}` : p?.title ?? id;
     return { path, title: p?.title ?? id };
+  }
+  if (type === 'book') {
+    const b = await getBook(id);
+    return { path: b?.title ?? id, title: b?.title ?? id };
   }
   const t = await getTaskOrThrow(id);
   const bc = await breadcrumbFor(t);

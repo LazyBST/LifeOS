@@ -3,7 +3,7 @@
 
 export type Candidate = {
   id: string;
-  type: 'goal' | 'project' | 'task' | 'habit';
+  type: 'goal' | 'project' | 'task' | 'habit' | 'book';
   title: string;
   path?: string;
   /** trigram similarity 0..1 from Postgres */

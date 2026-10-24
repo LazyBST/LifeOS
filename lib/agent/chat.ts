@@ -25,8 +25,8 @@ export type RunAgentResult = {
   actions: { tool: string; input: unknown }[];
 };
 
-const HREF_RE = /^\/(goals|projects|tasks)\/([0-9a-f-]{36})/i;
-const HREF_TYPE: Record<string, string> = { goals: 'goal', projects: 'project', tasks: 'task' };
+const HREF_RE = /^\/(goals|projects|tasks|books)\/([0-9a-f-]{36})/i;
+const HREF_TYPE: Record<string, string> = { goals: 'goal', projects: 'project', tasks: 'task', books: 'book' };
 
 /** Seeds ctx.recent from the cards of recent assistant replies, so "it"/
  * "this" can resolve to something touched earlier in the conversation even

@@ -18,13 +18,13 @@ import { rank, resolveRanked, type Candidate, type Resolution, type Scored } fro
 import type { ToolContext } from './types';
 import type { PendingChoice } from '@/lib/types/db';
 
-export type RefType = 'goal' | 'project' | 'task' | 'habit';
+export type RefType = 'goal' | 'project' | 'task' | 'habit' | 'book';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PRONOUNS = new Set(['this', 'it', 'here', 'that', 'current']);
 
-const TABLE: Record<RefType, string> = { goal: 'goals', project: 'projects', task: 'tasks', habit: 'habits' };
-const TITLE_KEY: Record<RefType, string> = { goal: 'title', project: 'title', task: 'title', habit: 'name' };
+const TABLE: Record<RefType, string> = { goal: 'goals', project: 'projects', task: 'tasks', habit: 'habits', book: 'books' };
+const TITLE_KEY: Record<RefType, string> = { goal: 'title', project: 'title', task: 'title', habit: 'name', book: 'title' };
 
 function isPronoun(ref: string): boolean {
   return PRONOUNS.has(ref.trim().toLowerCase());
@@ -234,7 +234,7 @@ export async function searchEntities(
 ): Promise<Scored[]> {
   const all: Candidate[] = [];
   for (const t of types) all.push(...(await fetchCandidatesForType(t, query)));
-  const filtered = opts.includeDone ? all : all.filter((c) => c.status !== 'done' && c.status !== 'dropped');
+  const filtered = opts.includeDone ? all : all.filter((c) => c.status !== 'done' && c.status !== 'dropped' && c.status !== 'finished');
   const top = rank(filtered).slice(0, opts.limit ?? 10);
   return enrich(top) as Promise<Scored[]>;
 }

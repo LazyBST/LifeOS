@@ -12,6 +12,8 @@ import { deleteTask, restoreTask, updateTask, type TaskPatch } from '@/lib/domai
 import { setNotes } from '@/lib/domain/notes';
 import { archiveHabit, updateHabit, type HabitPatch } from '@/lib/domain/habits';
 import { writeJournal } from '@/lib/domain/journal';
+import { undoLogReading } from '@/lib/domain/books';
+import type { Book } from '@/lib/types/db';
 import { setPriority } from '@/lib/domain/priorities';
 import { setImprovement } from '@/lib/domain/improvement';
 import { cancelReminder } from '@/lib/domain/reminders';
@@ -134,6 +136,28 @@ async function reverseOne(action: AgentAction): Promise<string> {
       }
       await writeJournal({ date: before.date, body_md: before.before, mood: before.mood, mode: 'replace' });
       return 'Reverted a journal entry';
+    }
+    case 'book_add': {
+      const after = action.after as { id: string };
+      await admin().from('books').update({ deleted_at: new Date().toISOString() }).eq('id', after.id);
+      return 'Removed the book you added';
+    }
+    case 'book_update': {
+      const before = action.before as Book;
+      await admin().from('books').update({ title: before.title, author: before.author, status: before.status, rating: before.rating, total_pages: before.total_pages, current_page: before.current_page, target_date: before.target_date, area_id: before.area_id, started_on: before.started_on, finished_on: before.finished_on }).eq('id', before.id);
+      return `Reverted "${before.title}"`;
+    }
+    case 'book_log_reading': {
+      const logId = (action.after as { logId?: string } | null)?.logId;
+      const before = action.before as Book;
+      if (logId) await undoLogReading(logId);
+      await admin().from('books').update({ status: before.status, current_page: before.current_page, started_on: before.started_on, finished_on: before.finished_on }).eq('id', before.id);
+      return 'Took back the pages you logged';
+    }
+    case 'book_link': {
+      const after = action.after as { book_id: string; type: 'goal' | 'project' | 'task' | 'habit'; entity_id: string };
+      await admin().from('book_links').delete().eq('book_id', after.book_id).eq('entity_type', after.type).eq('entity_id', after.entity_id);
+      return 'Removed the book link';
     }
     case 'top3_set':
     case 'top3_toggle': {
