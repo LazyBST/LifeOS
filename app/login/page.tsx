@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -33,7 +32,7 @@ export default async function LoginPage({
               {MESSAGES[error] ?? 'Sign-in failed.'}
             </p>
           )}
-          <Button size="lg" className="touch-target" render={<Link href="/auth/signin" />}>
+          <Button size="lg" className="touch-target" nativeButton={false} render={<a href="/auth/signin" />}>
             Continue with Google
           </Button>
         </CardContent>
