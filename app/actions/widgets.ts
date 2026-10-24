@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth';
-import { updateConfig } from '@/lib/domain/config';
 import { setPriority, togglePriority } from '@/lib/domain/priorities';
 import { setImprovement, setImprovementFollowed } from '@/lib/domain/improvement';
 import { istDate } from '@/lib/time';
@@ -45,28 +44,6 @@ export async function followImprovementAction(date: string, followed: boolean): 
   return run(async () => {
     await requireUser();
     await setImprovementFollowed(date, followed);
-    revalidatePath('/');
-    return null;
-  });
-}
-
-/** Accepts only a calendar.google.com embed link; anything else is refused. */
-export async function setCalendarEmbedAction(url: string): Promise<ActionResult<null>> {
-  return run(async () => {
-    await requireUser();
-    const clean = url.trim();
-    if (clean) {
-      let u: URL;
-      try { u = new URL(clean); } catch { throw new Error('That is not a valid link.'); }
-      if (u.protocol !== 'https:' || u.hostname !== 'calendar.google.com' || !u.pathname.startsWith('/calendar/embed')) {
-        throw new Error('Use the embed link from Google Calendar: Settings → your calendar → Integrate calendar → Public URL / embed code (it starts with https://calendar.google.com/calendar/embed).');
-      }
-    }
-    try {
-      await updateConfig({ calendar_embed_url: clean || null });
-    } catch {
-      throw new Error('Could not save. Run supabase/migrations/0008_deadlines_priorities.sql first.');
-    }
     revalidatePath('/');
     return null;
   });

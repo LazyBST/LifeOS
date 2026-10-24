@@ -4,6 +4,7 @@ import { PushSetup } from '@/components/settings/PushSetup';
 import { GoogleConnect } from '@/components/settings/GoogleConnect';
 import { getConfig } from '@/lib/domain/config';
 import { admin } from '@/lib/supabase/admin';
+import { hasTasksScope } from '@/lib/google/auth';
 import type { Account, Category } from '@/lib/types/db';
 
 async function loadAccounts(): Promise<Account[]> {
@@ -59,7 +60,17 @@ function envStatus(name: string): boolean {
   return Boolean(process.env[name] && process.env[name]!.length > 0);
 }
 
+async function loadTasksSync() {
+  try {
+    const [{ data }, scope] = await Promise.all([admin().from('gtasks_sync_state').select('*').maybeSingle(), hasTasksScope().catch(() => false)]);
+    return { scope, polled: (data?.last_polled_at as string | null) ?? null, error: (data?.last_error as string | null) ?? null, pulled: Number(data?.last_pulled ?? 0) };
+  } catch {
+    return { scope: false, polled: null, error: null, pulled: 0 };
+  }
+}
+
 export default async function SettingsPage() {
+  const tasksSync = await loadTasksSync();
   const [config, accounts, categories, google, lastSyncError] = await Promise.all([
     getConfig(),
     loadAccounts(),
@@ -99,6 +110,20 @@ export default async function SettingsPage() {
           connectedEmail={google.connectedEmail}
           lastSyncError={lastSyncError}
         />
+        {google.connected && (
+          <div className="mt-3 rounded-lg border px-3 py-2 text-sm">
+            <div className="font-medium">Google Tasks ↔ habits</div>
+            {tasksSync.scope ? (
+              <p className="text-xs text-muted-foreground">
+                Completing a task whose title matches a habit checks the habit in, and checking a habit completes that task.
+                {tasksSync.polled ? ` Last sync ${new Date(tasksSync.polled).toLocaleString()} · ${tasksSync.pulled} check-in${tasksSync.pulled === 1 ? '' : 's'} pulled.` : ' Waiting for the first sync (runs every 10 minutes).'}
+              </p>
+            ) : (
+              <p className="text-xs text-amber-600 dark:text-amber-400">Not enabled yet: disconnect and connect Google again to grant Tasks access (and enable the Google Tasks API in Google Cloud).</p>
+            )}
+            {tasksSync.error && <p className="mt-1 text-xs text-destructive">Last error: {tasksSync.error}</p>}
+          </div>
+        )}
       </section>
 
       <section className="rounded-xl border border-border bg-card p-3">

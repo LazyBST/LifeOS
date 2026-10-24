@@ -35,7 +35,9 @@ run each file from `supabase/migrations/` **one at a time, in this order**:
 
 Then, only if you want test data to click around in:
 
-9. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
+9. `0009_habit_task_link.sql` — habits can hang off a task
+10. `0010_gtasks_sync.sql` — Google Tasks ↔ habits sync state
+11. `supabase/seed.sql` — four Areas are already inserted by `0001`; this adds
    two goals, three projects, about a dozen tasks, three habits, five
    transactions and two journal entries.
 
@@ -123,6 +125,13 @@ It prints a public key and a private key. Set:
 8. After the app is deployed, open `/settings` and press **Connect Google
    Calendar**. The first connect creates a calendar called **LifeOS** in your
    account and saves its id; your primary calendar stays read-only.
+
+### Google Tasks ↔ habits (optional)
+
+1. In Google Cloud (same project as step 6) → **APIs & Services** → **Library** → enable **Google Tasks API**.
+2. In the OAuth consent screen scopes, add `https://www.googleapis.com/auth/tasks`.
+3. In LifeOS **/settings**, disconnect Google and connect again so Google asks for Tasks access.
+4. Keep each habit as a Google Task with the same title as the habit (emoji and capitals are ignored). Completing it checks the habit in within 10 minutes; checking the habit in LifeOS completes the open task. Google Tasks only stores a due *date*, so LifeOS can match by title and day but cannot read or set the time of day.
 
 ## 7. Deploy to Vercel and set the environment variables
 

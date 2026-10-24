@@ -10,10 +10,9 @@ import { HabitsCard } from '@/components/dashboard/HabitsCard';
 import { PrioritiesWidget, ImprovementWidget } from '@/components/dashboard/PrioritiesWidget';
 import { JournalCard } from '@/components/dashboard/JournalCard';
 import { LifeCalendar } from '@/components/dashboard/LifeCalendar';
-import { CalendarEmbed } from '@/components/dashboard/CalendarEmbed';
+import { CalendarWeek } from '@/components/dashboard/CalendarWeek';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
 import { TaskViews } from '@/components/tasks/TaskViews';
-import { getConfig } from '@/lib/domain/config';
 import { safe } from '@/components/dashboard/safe';
 
 const Areas = safe('Life areas report', () => LifeAreasWidget());
@@ -30,7 +29,6 @@ const Loading = () => <div className="h-full w-full animate-pulse rounded-2xl bg
 const S = ({ children }: { children: ReactNode }) => <Suspense fallback={<Loading />}>{children}</Suspense>;
 
 export default async function DashboardPage() {
-  const cfg = await getConfig().catch(() => null);
   const widgets: GridWidget[] = [
     { id: 'areas', node: <S><Areas /></S> },
     { id: 'goals', node: <S><Goals /></S> },
@@ -41,7 +39,7 @@ export default async function DashboardPage() {
     { id: 'projects', node: <S><Projects /></S> },
     { id: 'tasks', node: <WidgetCard title="Tasks" sub="Board · List — the same view on every page"><TaskViews base={{}} scope="dashboard" /></WidgetCard> },
     { id: 'life', node: <WidgetCard title="Life calendar" sub="One dot per day · green 70%+, yellow 50–70%, red under 50%"><LifeCalendar /></WidgetCard> },
-    { id: 'calendar', node: <WidgetCard title="Google Calendar" sub="Embedded view of your calendar" bodyClassName="flex flex-col"><CalendarEmbed url={cfg?.calendar_embed_url ?? null} /></WidgetCard> },
+    { id: 'calendar', node: <WidgetCard title="Calendar" sub="Your week · events, timed tasks, goals and projects" bodyClassName="flex flex-col"><CalendarWeek /></WidgetCard> },
     { id: 'journal', node: <S><Journal /></S> },
   ];
   return (

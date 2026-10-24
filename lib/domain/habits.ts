@@ -102,7 +102,7 @@ export async function checkinsBetween(from: string, to: string, habitId?: UUID):
 /** Upsert today's check-in. `value` defaults to the habit's target. */
 export async function checkinHabit(
   id: UUID,
-  opts: { date?: string; value?: number; note?: string } = {},
+  opts: { date?: string; value?: number; note?: string; /** 'gtasks' = came from Google Tasks, so do not push it back */ source?: 'app' | 'gtasks' } = {},
 ): Promise<{ habit: Habit; checkin: HabitCheckin; current_streak: number; longest_streak: number }> {
   const habit = await getHabit(id);
   if (!habit) throw new Error(`No habit ${id}`);
@@ -115,6 +115,11 @@ export async function checkinHabit(
     .single();
   if (error) throw new Error(`habit_checkin: ${error.message}`);
   const { current, longest } = await streakFor(habit, date);
+  if (opts.source !== 'gtasks' && value >= Number(habit.target_value)) {
+    // keep Google Tasks in step; a failure here must never fail the check-in
+    const { pushHabitCheckin } = await import('@/lib/google/habit-sync');
+    await pushHabitCheckin(habit, date).catch(() => false);
+  }
   return { habit, checkin: data as HabitCheckin, current_streak: current, longest_streak: longest };
 }
 

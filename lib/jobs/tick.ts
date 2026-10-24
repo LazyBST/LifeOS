@@ -12,6 +12,7 @@ import { runMorningPlan } from './morning';
 import { runNightlyReview } from './nightly';
 import type { OwedByLabel, Wallet } from '@/lib/types/db';
 import { drainOutbox, pollCalendar } from '@/lib/google/sync';
+import { pullHabitCheckins } from '@/lib/google/habit-sync';
 
 export type TickError = { job: string; error: string };
 export type TickResult = { ran: string[]; skipped: string[]; errors: TickError[] };
@@ -158,6 +159,11 @@ export async function runTick(now: Date = new Date()): Promise<TickResult> {
       const [{ changed }, { pushed }] = await Promise.all([pollCalendar(), drainOutbox()]);
       return changed > 0 || pushed > 0;
     });
+  }
+
+  // Google Tasks -> habits: same cadence, so a task ticked on the phone checks the habit in.
+  if (Number(time.slice(3)) % 10 === 5) {
+    await runJob('gtasks-pull', result, async () => (await pullHabitCheckins()).pulled > 0);
   }
 
   return result;

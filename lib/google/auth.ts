@@ -14,7 +14,17 @@ import { admin } from '@/lib/supabase/admin';
 export const SCOPES = [
   'https://www.googleapis.com/auth/calendar.app.created',
   'https://www.googleapis.com/auth/calendar.readonly',
+  // Google Tasks <-> habits sync (read and complete tasks)
+  'https://www.googleapis.com/auth/tasks',
 ];
+
+export const TASKS_SCOPE = 'https://www.googleapis.com/auth/tasks';
+
+/** True when the stored consent includes the Google Tasks scope (older connections need to reconnect). */
+export async function hasTasksScope(): Promise<boolean> {
+  const row = await getTokenRow();
+  return !!row?.refresh_token && (row.scope ?? '').includes(TASKS_SCOPE);
+}
 
 type TokenRow = {
   refresh_token: string | null;
