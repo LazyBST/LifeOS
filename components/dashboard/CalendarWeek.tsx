@@ -360,10 +360,6 @@ export function CalendarWeek() {
       </div>
       {menu && <ActionMenu m={menu} onClose={() => setMenu(null)} onAct={(a) => void menuAct(menu, a)} />}
       <EventDialog target={dialog} onClose={() => setDialog(null)} onChanged={() => void load(ws)} />
-      <p className="text-[12px] text-muted-foreground">
-        <span className="mr-3">■ <span className="text-emerald-600">Google events</span></span><span className="mr-3">■ <span className="text-indigo-600">Tasks (start → end)</span></span><span className="mr-3">■ <span className="text-amber-600">Habits (their time block)</span></span>
-        Click an empty slot to add an event, an event to edit it; tap the circle to tick a habit off; tap a habit or task for a menu (done, missed, open); drag to move. Give habits a time in Habits → Edit.
-      </p>
     </div>
   );
 }
