@@ -29,7 +29,7 @@ export type TaskInput = {
   sort_order?: number;
 };
 
-export type TaskPatch = Partial<TaskInput> & { completed_at?: string | null };
+export type TaskPatch = Partial<TaskInput> & { completed_at?: string | null; original_due_date?: string | null };
 
 export type Breadcrumb = {
   area?: { id: UUID; name: string } | null;
@@ -173,7 +173,7 @@ export async function updateTask(id: UUID, patch: TaskPatch): Promise<Task> {
   for (const k of [
     'title', 'project_id', 'goal_id', 'parent_task_id', 'status', 'priority',
     'due_date', 'due_at', 'duration_min', 'estimate_min', 'notes_md', 'tags',
-    'sort_order', 'completed_at',
+    'sort_order', 'completed_at', 'original_due_date',
   ] as const) {
     if (patch[k] !== undefined) row[k] = patch[k];
   }

@@ -15,6 +15,8 @@ import { areaColor } from '@/lib/domain/areas-colors';
 import { SetPageContext } from '@/components/chat/page-context';
 import { PropertiesHeader } from '@/components/entity/PropertiesHeader';
 import { ProgressBar } from '@/components/entity/ProgressBar';
+import { getOrder } from '@/lib/domain/order';
+import { Reorderable } from '@/components/widgets/Reorderable';
 import { EntityGroup } from '@/components/entity/EntityGroup';
 import { InlineText } from '@/components/entity/InlineText';
 import { InlineSelect } from '@/components/entity/InlineSelect';
@@ -30,6 +32,7 @@ import { formatDate, dueLabel } from '@/lib/time';
 import type { Task } from '@/lib/types/db';
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const projectOrder = await getOrder(`goal-projects-${(await params).id}`);
   const statusOptions = statusesFor(await listStatuses(), 'goal').map((s) => ({ value: s.key, label: s.label }));
   const { id } = await params;
   const [goal, areas] = await Promise.all([getGoal(id), listAreas()]);
@@ -114,7 +117,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         )}
       </PropertiesHeader>
 
-      <LedgerSection name={goal.title} agreed={goal.original_target_date ?? goal.target_date} current={goal.target_date} completedOn={goal.completed_on ?? null} ledger={ledger} slips={slips} />
+      <LedgerSection name={goal.title} agreed={goal.original_target_date ?? goal.target_date} current={goal.target_date} completedOn={goal.completed_on ?? null} ledger={ledger} slips={slips} agreedSave={{ entity: 'goal', id: goal.id, field: 'original_target_date', mode: 'nullable' }} completedSave={{ entity: 'goal', id: goal.id, field: 'completed_on', mode: 'nullable' }} />
 
       <LinkedHabits entityType="goal" entityId={goal.id} areaId={goal.area_id} title="Habits for this goal" />
 
@@ -127,8 +130,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
       <div className="space-y-3">
         {projects.length === 0 && <p className="text-sm text-muted-foreground">No projects yet.</p>}
-        {projects.map((p) => (
-          <EntityGroup key={p.id} href={`/projects/${p.id}`} title={`${p.emoji ? `${p.emoji} ` : ''}${p.title}`} meta={<StatusLabel status={p.status} compact />}>
+        <Reorderable orderKey={`goal-projects-${goal.id}`} order={projectOrder} className="space-y-3" items={projects.map((p) => ({ id: p.id, node: (
+          <EntityGroup href={`/projects/${p.id}`} title={`${p.emoji ? `${p.emoji} ` : ''}${p.title}`} meta={<StatusLabel status={p.status} compact />}>
             <TaskViews
               defaultPreset="all"
               base={{ project_id: p.id }}
@@ -138,7 +141,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               defaultGroup="status"
             />
           </EntityGroup>
-        ))}
+        ) }))} />
 
         <EntityGroup title="Unsorted" meta={`${unsorted.length} open`}>
           {unsorted.length === 0 ? (

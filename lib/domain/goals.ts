@@ -19,7 +19,7 @@ export type GoalInput = {
   notes_md?: string;
 };
 
-export type GoalPatch = Partial<GoalInput>;
+export type GoalPatch = Partial<GoalInput> & { original_target_date?: DateStr | null; completed_on?: DateStr | null };
 
 async function resolveAreaId(input: { area?: string | null; area_id?: UUID | null }) {
   if (input.area_id) return input.area_id;
@@ -62,7 +62,7 @@ export async function createGoal(input: GoalInput): Promise<Goal> {
 export async function updateGoal(id: UUID, patch: GoalPatch): Promise<Goal> {
   const area_id = await resolveAreaId(patch);
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const k of ['title', 'emoji', 'description', 'status', 'priority', 'start_date', 'target_date', 'notes_md'] as const) {
+  for (const k of ['title', 'emoji', 'description', 'status', 'priority', 'start_date', 'target_date', 'notes_md', 'original_target_date', 'completed_on'] as const) {
     if (patch[k] !== undefined) row[k] = patch[k];
   }
   if (area_id !== undefined) row.area_id = area_id;

@@ -72,9 +72,16 @@ export function Board({ tasks, onMove, onComplete, onDelete, onCreate, createDef
 
     const destList = columns[destStatus].filter((t) => t.id !== activeId);
     const overIndex = destList.findIndex((t) => t.id === over.id);
+    // dragging down inside a column drops the card AFTER the one it is over (dragging up drops it before)
+    const src = columns[task.status] ?? [];
+    const movedDown = destStatus === task.status && src.findIndex((t) => t.id === activeId) < src.findIndex((t) => t.id === over.id);
     let newOrder: number;
     if (overIndex === -1) {
       newOrder = destList.length ? destList[destList.length - 1].sort_order + 1 : Date.now() / 1000;
+    } else if (movedDown) {
+      const prev = destList[overIndex];
+      const next = destList[overIndex + 1];
+      newOrder = next ? (prev.sort_order + next.sort_order) / 2 : prev.sort_order + 1;
     } else {
       const prev = destList[overIndex - 1];
       const next = destList[overIndex];

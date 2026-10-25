@@ -25,6 +25,7 @@ const MIGRATION_FILES = [
   '0014_ui_state_habit_links_indexes.sql',
   '0015_calendar_sync_state_habit_times.sql',
   '0016_budgets_scheduled_payments.sql',
+  '0017_editable_agreed_and_completed.sql',
 ];
 
 // Supabase provides these for free; PGlite does not, so we stub the minimum

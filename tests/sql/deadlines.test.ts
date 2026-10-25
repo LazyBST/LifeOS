@@ -34,6 +34,26 @@ describe('first agreed deadline', () => {
   });
 });
 
+describe('correcting the first agreed deadline and completion date by hand', () => {
+  test('an edited original survives later moves, and one set together with a move is kept', async () => {
+    const db = await freshDb();
+    const t = await row<{ id: string }>(db, `insert into tasks (title, due_date) values ('x', '2026-10-22') returning id`);
+    await db.query(`update tasks set original_due_date = '2026-10-10' where id=$1`, [t!.id]);
+    await db.query(`update tasks set due_date = '2026-10-30' where id=$1`, [t!.id]);
+    expect((await row<{ o: string }>(db, `select original_due_date::text o from tasks where id=$1`, [t!.id]))!.o).toBe('2026-10-10');
+    await db.query(`update tasks set due_date = '2026-11-05', original_due_date = '2026-10-01' where id=$1`, [t!.id]);
+    expect((await row<{ o: string }>(db, `select original_due_date::text o from tasks where id=$1`, [t!.id]))!.o).toBe('2026-10-01');
+  });
+  test('a completion date set by hand is not overwritten when the status is set to done together with it', async () => {
+    const db = await freshDb();
+    const g = await row<{ id: string }>(db, `insert into goals (title, target_date) values ('g', '2026-12-31') returning id`);
+    await db.query(`update goals set status='done', completed_on='2026-03-01' where id=$1`, [g!.id]);
+    expect((await row<{ c: string }>(db, `select completed_on::text c from goals where id=$1`, [g!.id]))!.c).toBe('2026-03-01');
+    await db.query(`update goals set completed_on='2026-04-02' where id=$1`, [g!.id]);
+    expect((await row<{ c: string }>(db, `select completed_on::text c from goals where id=$1`, [g!.id]))!.c).toBe('2026-04-02');
+  });
+});
+
 describe('daily priorities', () => {
   test('at most three positions per day', async () => {
     const db = await freshDb();

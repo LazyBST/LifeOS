@@ -17,7 +17,7 @@ export type ProjectInput = {
   notes_md?: string;
 };
 
-export type ProjectPatch = Partial<ProjectInput>;
+export type ProjectPatch = Partial<ProjectInput> & { original_target_date?: DateStr | null; completed_on?: DateStr | null };
 
 export async function listProjects(opts: { goal_id?: UUID; area_id?: UUID; status?: EntityStatus[] } = {}): Promise<Project[]> {
   let q = admin().from('projects').select('*').is('deleted_at', null);
@@ -60,7 +60,7 @@ export async function createProject(input: ProjectInput): Promise<Project> {
  */
 export async function updateProject(id: UUID, patch: ProjectPatch): Promise<Project> {
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const k of ['goal_id', 'title', 'emoji', 'description', 'status', 'priority', 'start_date', 'target_date', 'notes_md'] as const) {
+  for (const k of ['goal_id', 'title', 'emoji', 'description', 'status', 'priority', 'start_date', 'target_date', 'notes_md', 'original_target_date', 'completed_on'] as const) {
     if (patch[k] !== undefined) row[k] = patch[k];
   }
   if (patch.area_id !== undefined) row.area_id = patch.area_id;

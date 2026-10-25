@@ -141,7 +141,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         }
       />
 
-      <LedgerSection name={task.title} agreed={task.original_due_date ?? task.due_date} current={task.due_date} completedOn={task.completed_at ? istDay(task.completed_at) : null} ledger={ledger} slips={slips} />
+      <LedgerSection name={task.title} agreed={task.original_due_date ?? task.due_date} current={task.due_date} completedOn={task.completed_at ? istDay(task.completed_at) : null} ledger={ledger} slips={slips} agreedSave={{ entity: 'task', id: task.id, field: 'original_due_date', mode: 'nullable' }} completedSave={{ entity: 'task', id: task.id, field: 'completed_at', mode: 'noon' }} />
 
       <LinkedHabits entityType="task" entityId={task.id} areaId={task.area_id} title="Habits for this task" />
 

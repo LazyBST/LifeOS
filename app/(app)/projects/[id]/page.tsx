@@ -112,7 +112,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         />
       </PropertiesHeader>
 
-      <LedgerSection name={project.title} agreed={project.original_target_date ?? project.target_date} current={project.target_date} completedOn={project.completed_on ?? null} ledger={ledger} slips={slips} />
+      <LedgerSection name={project.title} agreed={project.original_target_date ?? project.target_date} current={project.target_date} completedOn={project.completed_on ?? null} ledger={ledger} slips={slips} agreedSave={{ entity: 'project', id: project.id, field: 'original_target_date', mode: 'nullable' }} completedSave={{ entity: 'project', id: project.id, field: 'completed_on', mode: 'nullable' }} />
 
       <TaskViews
               defaultPreset="all"

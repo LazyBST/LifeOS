@@ -2,6 +2,7 @@ import { updateGoalAction } from '@/app/actions/goals';
 import { updateProjectAction } from '@/app/actions/projects';
 import { updateTaskAction } from '@/app/actions/tasks';
 import { updateBookAction } from '@/app/actions/books';
+import { istInstant } from '@/lib/time';
 import type { ActionResult } from '@/app/actions/_result';
 
 /**
@@ -13,7 +14,7 @@ export type FieldSave = {
   id: string;
   field: string;
   /** text: as typed · nullable: empty string becomes null · int: empty → null, else a non-negative integer · tags: comma list */
-  mode?: 'text' | 'nullable' | 'int' | 'tags';
+  mode?: 'text' | 'nullable' | 'int' | 'tags' | 'noon';
 };
 
 export function saveField(spec: FieldSave, raw: string | null): Promise<ActionResult<unknown>> {
@@ -21,6 +22,7 @@ export function saveField(spec: FieldSave, raw: string | null): Promise<ActionRe
   let value: unknown = v;
   if (spec.mode === 'nullable') value = v === '' ? null : v;
   else if (spec.mode === 'int') value = v.trim() === '' ? null : Math.max(0, parseInt(v, 10) || 0);
+  else if (spec.mode === 'noon') value = v === '' ? null : istInstant(v, '12:00').toISOString(); // a completion DATE stored as a midday instant
   else if (spec.mode === 'tags') value = v.split(',').map((t) => t.trim()).filter(Boolean);
   const patch = { [spec.field]: value };
   if (spec.entity === 'goal') return updateGoalAction(spec.id, patch);

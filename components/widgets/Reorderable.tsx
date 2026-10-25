@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, rectSortingStrategy, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
 import { saveOrderAction } from '@/app/actions/order';
@@ -31,7 +31,7 @@ function Row({ id, children, handleClass }: { id: string; children: ReactNode; h
  * A list whose rows can be dragged into any order (grab the ⋮⋮ grip). The order is remembered per `orderKey`
  * in the database, so it is the same on every device. `onReorder` replaces that when the order lives elsewhere.
  */
-export function Reorderable({ orderKey, order = [], items, className = 'flex flex-col gap-3', onReorder }: { orderKey: string; order?: string[]; items: ReorderItem[]; className?: string; onReorder?: (ids: string[]) => void | Promise<void> }) {
+export function Reorderable({ orderKey, order = [], items, className = 'flex flex-col gap-3', grid = false, onReorder }: { orderKey: string; order?: string[]; items: ReorderItem[]; className?: string; /** lay the rows out in a grid rather than a single column */ grid?: boolean; onReorder?: (ids: string[]) => void | Promise<void> }) {
   const [ids, setIds] = useState(() => applyOrder(items, order).map((i) => i.id));
   const key = items.map((i) => i.id).join('|');
   const orderSig = order.join('|');
@@ -52,7 +52,7 @@ export function Reorderable({ orderKey, order = [], items, className = 'flex fle
 
   return (
     <DndContext id={`reorder-${orderKey}`} sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => void end(e)}>
-      <SortableContext items={shown} strategy={verticalListSortingStrategy}>
+      <SortableContext items={shown} strategy={grid ? rectSortingStrategy : verticalListSortingStrategy}>
         <div className={`no-drag ${className}`}>
           {shown.map((id) => <Row key={id} id={id}>{byId.get(id)}</Row>)}
         </div>
