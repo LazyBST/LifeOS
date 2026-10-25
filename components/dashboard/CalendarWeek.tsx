@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
 import { syncGoogleNowAction } from '@/app/actions/google';
@@ -14,7 +14,8 @@ import { addDays, daysBetween, istDate, istInstant, istParts } from '@/lib/time'
 import { draggedRange } from '@/lib/domain/calendar-drag';
 import { weekStart as mondayOf } from '@/lib/domain/lifecal-math';
 
-const ROW = 44; // px per hour
+const DEFAULT_ROW = 44; // px per hour, the normal zoom
+const MAX_ROW = 360; // 5 minutes = 30px
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const minutesOf = (iso: string) => { const p = istParts(new Date(iso)); return p.hour * 60 + p.minute; };
 
@@ -66,6 +67,30 @@ export function CalendarWeek() {
   const [loading, setLoading] = useState(false);
   const [dialog, setDialog] = useState<DialogTarget>(null);
   const [menu, setMenu] = useState<MenuTarget | null>(null);
+
+  // zoom: pixels per hour. Pinch (or ctrl + wheel, or the buttons) changes it; fully zoomed out shows the whole day.
+  const [row, setRowState] = useState(DEFAULT_ROW);
+  const [fitRow, setFitRow] = useState(24);
+  const rowRef = useRef(DEFAULT_ROW);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const anchor = useRef<{ min: number; y: number } | null>(null); // the minute under the fingers stays put while zooming
+  const setRow = useCallback((n: number) => {
+    const v = Math.round(Math.min(MAX_ROW, Math.max(fitRowRef.current, n)));
+    rowRef.current = v;
+    setRowState(v);
+    try { localStorage.setItem('lifeos:cal:row', String(v)); } catch {}
+  }, []);
+  const fitRowRef = useRef(24);
+  useEffect(() => { try { const v = Number(localStorage.getItem('lifeos:cal:row')); if (v >= 14 && v <= MAX_ROW) { rowRef.current = v; setRowState(v); } } catch {} }, []);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => { const f = Math.max(14, (el.clientHeight - 90) / 24); fitRowRef.current = f; setFitRow(f); };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => { try { const m = localStorage.getItem('lifeos:cal:mode'); if (m === 'day' || m === 'week') setMode(m); else if (window.innerWidth < 768) setMode('day'); } catch {} }, []);
   const chooseMode = (m: 'week' | 'day') => { setMode(m); try { localStorage.setItem('lifeos:cal:mode', m); } catch {} };
@@ -140,11 +165,53 @@ export function CalendarWeek() {
 
   // visible hour range follows the content, never narrower than 6:00–22:00
   const visible = days.flatMap((d) => (data?.blocks ?? []).filter((b) => istParts(new Date(b.start)).date === d));
-  const startH = Math.min(6, ...visible.map((b) => Math.floor(minutesOf(b.start) / 60)));
-  const endH = Math.max(22, ...visible.map((b) => Math.ceil(minutesOf(b.end) / 60) || 0)) + 0;
+  const zoomed = row !== DEFAULT_ROW;
+  const startH = zoomed ? 0 : Math.min(6, ...visible.map((b) => Math.floor(minutesOf(b.start) / 60)));
+  const endH = zoomed ? 23 : Math.max(22, ...visible.map((b) => Math.ceil(minutesOf(b.end) / 60) || 0)) + 0;
   const hours = Array.from({ length: Math.max(1, Math.min(24, endH + 1) - startH) }, (_, i) => startH + i);
-  const gridH = hours.length * ROW;
-  const topOf = (min: number) => ((Math.max(startH * 60, min) - startH * 60) / 60) * ROW;
+  const gridH = hours.length * row;
+  const topOf = (min: number) => ((Math.max(startH * 60, min) - startH * 60) / 60) * row;
+
+  // keep the minute under the fingers where it was while the scale changes
+  useLayoutEffect(() => {
+    const el = scrollRef.current, a = anchor.current;
+    const grid = el?.querySelector('[data-timegrid]') as HTMLElement | null;
+    if (!el || !a || !grid) return;
+    const top = grid.getBoundingClientRect().top;
+    const want = a.y - ((a.min - startH * 60) / 60) * row;
+    el.scrollTop += top - want;
+  }, [row, startH]);
+  const minuteAt = useCallback((clientY: number) => {
+    const grid = scrollRef.current?.querySelector('[data-timegrid]') as HTMLElement | null;
+    if (!grid) return null;
+    const sh = rowRef.current === DEFAULT_ROW ? startH : 0;
+    return { min: sh * 60 + ((clientY - grid.getBoundingClientRect().top) / rowRef.current) * 60, y: clientY };
+  }, [startH]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let d0 = 0, row0 = 0;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const start = (e: TouchEvent) => { if (e.touches.length === 2) { d0 = dist(e.touches); row0 = rowRef.current; anchor.current = minuteAt((e.touches[0].clientY + e.touches[1].clientY) / 2); } else d0 = 0; };
+    const move = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !d0) return;
+      e.preventDefault(); // two fingers zoom the calendar instead of the page
+      setRow(row0 * (dist(e.touches) / d0));
+    };
+    const end = () => { d0 = 0; };
+    const wheel = (e: WheelEvent) => { // trackpad pinch and ctrl + scroll
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      anchor.current = minuteAt(e.clientY);
+      setRow(rowRef.current * Math.exp(-e.deltaY * 0.01));
+    };
+    el.addEventListener('touchstart', start, { passive: true });
+    el.addEventListener('touchmove', move, { passive: false });
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
+    el.addEventListener('wheel', wheel, { passive: false });
+    return () => { el.removeEventListener('touchstart', start); el.removeEventListener('touchmove', move); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.removeEventListener('wheel', wheel); };
+  }, [minuteAt, setRow]);
 
   const bars = (data?.bars ?? []).filter((b) => b.to >= days[0] && b.from <= days[days.length - 1]);
 
@@ -161,7 +228,12 @@ export function CalendarWeek() {
         <button onClick={() => setFocus(addDays(focus, step))} className="rounded-md border px-2 py-1" aria-label={`Next ${mode}`}>›</button>
         <span className="ml-1 font-medium">{title}</span>
         {loading && <span className="text-xs text-muted-foreground">loading…</span>}
-        <span className="ml-auto flex gap-2">
+        <span className="ml-auto flex items-center gap-2">
+          <span className="flex overflow-hidden rounded-md border text-xs" role="group" aria-label="Zoom">
+            <button onClick={() => { anchor.current = null; setRow(row / 1.5); }} className="px-2 py-1 hover:bg-muted" aria-label="Zoom out" title="Zoom out (or pinch)">−</button>
+            <button onClick={() => { anchor.current = null; setRow(fitRow); }} className="border-x px-2 py-1 hover:bg-muted" title="Fit the whole day on screen">Fit</button>
+            <button onClick={() => { anchor.current = null; setRow(row * 1.5); }} className="px-2 py-1 hover:bg-muted" aria-label="Zoom in" title="Zoom in down to 5 minutes (or pinch)">+</button>
+          </span>
           <button onClick={syncNow} className="rounded-md border px-2 py-1 text-xs" title="Fetch what changed in Google Calendar since the last sync">Sync Google</button>
           <button onClick={() => setDialog({ mode: 'create', date: focus, hour: Math.min(22, Math.max(startH, istParts().hour + 1)) })} className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground">+ Event</button>
         </span>
@@ -178,7 +250,7 @@ export function CalendarWeek() {
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-card">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-card" style={{ overscrollBehavior: 'contain' }}>
         <div className="grid text-xs" style={{ gridTemplateColumns: `52px repeat(${days.length}, minmax(${mode === 'week' ? 90 : 240}px, 1fr))`, minWidth: mode === 'week' ? 680 : 360 }}>
           <div className="sticky top-0 z-20 bg-card" />
           {days.map((d, i) => (
@@ -227,17 +299,17 @@ export function CalendarWeek() {
           })}
 
           {/* time grid */}
-          <div className="relative" style={{ height: gridH }}>
-            {hours.map((h) => <div key={h} className="absolute right-1 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h - startH) * ROW }}>{h === 0 ? 12 : h > 12 ? h - 12 : h}{h >= 12 && h < 24 ? 'p' : 'a'}</div>)}
+          <div data-timegrid className="relative" style={{ height: gridH }}>
+            {hours.map((h) => <div key={h} className="absolute right-1 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h - startH) * row }}>{h === 0 ? 12 : h > 12 ? h - 12 : h}{h >= 12 && h < 24 ? 'p' : 'a'}</div>)}
           </div>
           {days.map((d) => {
             const dayBlocks = (data?.blocks ?? []).filter((b) => istParts(new Date(b.start)).date === d);
             const placed = new Map(assignColumns(dayBlocks.map((b) => ({ id: b.id, start: minutesOf(b.start), end: Math.max(minutesOf(b.end), minutesOf(b.start) + 20) }))).map((p) => [p.id, p]));
             return (
               <div key={d} data-daycol={d} className="relative cursor-cell border-l border-border" style={{ height: gridH }}
-                onClick={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); setDialog({ mode: 'create', date: d, hour: Math.min(23, startH + Math.floor((ev.clientY - r.top) / ROW)) }); }}>
-                {hours.map((h) => <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: (h - startH) * ROW }} />)}
-                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={Math.max(20, ((Math.max(minutesOf(b.end), minutesOf(b.start) + 20) - minutesOf(b.start)) / 60) * ROW - 2)} detailed={mode === 'day'} row={ROW} days={days} day={d} onMove={(bl, date, sMin, eMin) => void moveBlock(bl, date, sMin, eMin)} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} onMenu={(m) => setMenu(m)} />)}
+                onClick={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); setDialog({ mode: 'create', date: d, hour: Math.min(23, startH + Math.floor((ev.clientY - r.top) / row)) }); }}>
+                {hours.map((h) => <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: (h - startH) * row }} />)}
+                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={Math.max(16, ((Math.max(minutesOf(b.end), minutesOf(b.start) + 5) - minutesOf(b.start)) / 60) * row - 2)} detailed={mode === 'day'} row={row} days={days} day={d} onMove={(bl, date, sMin, eMin) => void moveBlock(bl, date, sMin, eMin)} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} onMenu={(m) => setMenu(m)} />)}
                 {d === today && (() => { const m = minutesOf(new Date().toISOString()); return m >= startH * 60 && m < (endH + 1) * 60 ? <div className="absolute inset-x-0 z-10 h-0.5 bg-red-500" style={{ top: topOf(m) }} /> : null; })()}
               </div>
             );
