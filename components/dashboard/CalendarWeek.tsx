@@ -25,6 +25,10 @@ const KIND = {
   habit: 'bg-amber-100 text-amber-900 dark:bg-amber-500/25 dark:text-amber-100 border-amber-300/60',
 } as const;
 
+/** The look of a task or habit: tinted with its Area's colour, with a solid edge. Without an Area, the plain kind colours. */
+const tinted = (color?: string): React.CSSProperties | undefined =>
+  color ? { backgroundColor: `color-mix(in srgb, ${color} 22%, var(--card))`, borderColor: `color-mix(in srgb, ${color} 45%, transparent)`, borderLeft: `3px solid ${color}`, color: 'var(--foreground)' } : undefined;
+
 /** A small, quiet tick box: hairline ring when open, soft fill with a tick when done, a dash when missed. */
 function Tick({ done, missed, onClick, label, title }: { done: boolean; missed?: boolean; onClick: (e: React.MouseEvent) => void; label: string; title: string }) {
   return (
@@ -319,12 +323,12 @@ export function CalendarWeek() {
                   <button key={a.id} onClick={() => a.event && setDialog({ mode: 'edit', event: a.event })} className={`truncate rounded border px-1.5 py-0.5 text-left text-[12px] ${KIND.event}`}>{a.title}</button>
                 ))}
                 {any.map((u) => u.kind === 'habit' ? (
-                  <div key={`h-${u.id}`} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-left text-[12px] ${KIND.habit} ${u.done ? 'line-through opacity-60' : ''}`}>
+                  <div key={`h-${u.id}`} style={tinted(u.color)} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-left text-[12px] ${u.color ? '' : KIND.habit} ${u.done ? 'line-through opacity-60' : ''}`}>
                     <Tick done={u.done} missed={!!u.missed} label={u.done ? `Undo ${u.title}` : `Tick off ${u.title}`} title={u.done ? 'Done · tap to undo' : 'Tick off'} onClick={() => void toggleHabit(u.id, d, u.done)} />
                     <button type="button" onClick={(e) => setMenu({ kind: 'habit', id: u.id, title: u.title, date: d, done: u.done, missed: !!u.missed, href: `/habits#habit-${u.id}`, x: e.clientX, y: e.clientY })} className="min-w-0 flex-1 truncate text-left">{u.emoji ? `${u.emoji} ` : ''}{u.title}</button>
                   </div>
                 ) : (
-                  <div key={`t-${u.id}`} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-[12px] ${KIND.task} ${u.done ? 'line-through opacity-60' : ''}`}>
+                  <div key={`t-${u.id}`} style={tinted(u.color)} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-[12px] ${u.color ? '' : KIND.task} ${u.done ? 'line-through opacity-60' : ''}`}>
                     <Tick done={u.done} label={u.done ? `Reopen ${u.title}` : `Complete ${u.title}`} title={u.done ? 'Done · tap to reopen' : 'Mark done'} onClick={() => void toggleTask(u.id, u.done)} />
                     <Link href={u.href ?? '#'} className="min-w-0 flex-1 truncate">{u.title}</Link>
                   </div>
@@ -372,9 +376,9 @@ function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, o
   const preview = drag ? draggedRange(startMin, endMin, (drag.dy / row) * 60, drag.mode) : null;
   const shownTop = preview ? top + ((preview.start - startMin) / 60) * row : top;
   const shownH = preview ? Math.max(14, height + ((preview.end - preview.start - (endMin - startMin)) / 60) * row) : height;
-  const style = { top: shownTop, height: shownH, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${(1 / cols) * 100}% - 4px)`, ...(drag?.mode === 'move' ? { transform: `translateX(${drag.dx}px)` } : {}), ...(drag ? { zIndex: 30, opacity: 0.85 } : {}) };
+  const style = { ...tinted(b.color), top: shownTop, height: shownH, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${(1 / cols) * 100}% - 4px)`, ...(drag?.mode === 'move' ? { transform: `translateX(${drag.dx}px)` } : {}), ...(drag ? { zIndex: 30, opacity: 0.85 } : {}) };
   const range = `${fmtTime(preview?.start ?? startMin)}–${fmtTime(preview?.end ?? endMin)}`;
-  const cls = `absolute select-none [-webkit-touch-callout:none] overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[12px] leading-tight ${KIND[b.kind]} ${b.done ? 'opacity-60 line-through' : ''} ${drag ? 'cursor-grabbing shadow-lg' : 'cursor-grab'}`;
+  const cls = `absolute select-none [-webkit-touch-callout:none] overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[12px] leading-tight ${b.color ? '' : KIND[b.kind]} ${b.done ? 'opacity-60 line-through' : ''} ${drag ? 'cursor-grabbing shadow-lg' : 'cursor-grab'}`;
 
   // Press and drag a block to move it, or pull its bottom edge to change how long it lasts.
   // With a mouse (or the edge grip on touch) a drag starts at once; with a finger the block is picked up by
