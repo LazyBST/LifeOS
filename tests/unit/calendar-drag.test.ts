@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { draggedRange, snapMinutes } from '@/lib/domain/calendar-drag';
+import { draggedRange, scaleStep, snapMinutes } from '@/lib/domain/calendar-drag';
 
 describe('calendar drag', () => {
   it('snaps to 5 minutes', () => { expect(snapMinutes(7)).toBe(5); expect(snapMinutes(8)).toBe(10); expect(snapMinutes(-12)).toBe(-10); });
@@ -11,5 +11,9 @@ describe('calendar drag', () => {
   it('resizes only the end, with a minimum length', () => {
     expect(draggedRange(600, 660, 30, 'resize')).toEqual({ start: 600, end: 690 });
     expect(draggedRange(600, 660, -600, 'resize')).toEqual({ start: 600, end: 605 });
+  });
+  it('divides the scale more finely the further you zoom in', () => {
+    expect([44, 60, 100, 150, 290, 360].map(scaleStep)).toEqual([60, 30, 15, 10, 5, 5]);
+    expect(scaleStep(14)).toBe(60);
   });
 });

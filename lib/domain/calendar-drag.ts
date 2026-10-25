@@ -13,3 +13,11 @@ export function draggedRange(start: number, end: number, dyMin: number, mode: 'm
   const s = Math.min(24 * 60 - 1 - len, Math.max(0, start + d));
   return { start: s, end: s + len };
 }
+
+/**
+ * How finely the time scale is divided at a zoom of `row` pixels per hour: the smallest step (5, 10, 15, 30 or 60
+ * minutes) whose labels still have room (at least 24px between them).
+ */
+export function scaleStep(row: number): 5 | 10 | 15 | 30 | 60 {
+  return ([5, 10, 15, 30] as const).find((st) => (row * st) / 60 >= 24) ?? 60;
+}

@@ -17,6 +17,9 @@ export type PomoTimer = {
   pauses: number;
   label: string;
   status: 'running' | 'paused' | 'done';
+  /** work sessions finished in this run, and the focused seconds they added up to */
+  doneWork?: number;
+  focusedSec?: number;
 };
 
 export type Segment = {
@@ -31,7 +34,7 @@ export const remainingMs = (t: PomoTimer, now: number): number => Math.max(0, ph
 export const endInstant = (t: PomoTimer): number => t.phaseStartedAt + t.pausedMs + phaseMs(t);
 
 export function startRun(cfg: PomoConfig, now: number, runId: string, label: string): PomoTimer {
-  return { runId, cfg, phase: 'work', cycle: 1, phaseStartedAt: now, pausedAt: null, pausedMs: 0, pauses: 0, label, status: 'running' };
+  return { runId, cfg, phase: 'work', cycle: 1, phaseStartedAt: now, pausedAt: null, pausedMs: 0, pauses: 0, label, status: 'running', doneWork: 0, focusedSec: 0 };
 }
 
 export function pause(t: PomoTimer, now: number): PomoTimer {
@@ -55,6 +58,7 @@ export function segmentOf(t: PomoTimer, now: number, completed: boolean): Segmen
 /** Close the current phase (finished, or skipped when `completed` is false) and start whatever comes next. */
 export function advance(t: PomoTimer, now: number, label: string, completed = true): { segment: Segment; next: PomoTimer } {
   const segment = segmentOf(t, now, completed);
+  if (t.phase === 'work' && completed) t = { ...t, doneWork: (t.doneWork ?? 0) + 1, focusedSec: (t.focusedSec ?? 0) + segment.actual_sec };
   const fresh = (phase: Phase, cycle: number): PomoTimer => ({ ...t, phase, cycle, phaseStartedAt: now, pausedAt: null, pausedMs: 0, pauses: 0, label, status: 'running' });
   const lastWork = t.cfg.repeats !== null && t.cycle >= t.cfg.repeats;
   if (t.phase === 'work') {
@@ -87,4 +91,20 @@ export function summariseDay(segments: Pick<Segment, 'kind' | 'planned_sec' | 'a
     coverage: plannedWorkMin > 0 ? workSec / 60 / plannedWorkMin : null,
     focusShare: workSec + breakSec > 0 ? workSec / (workSec + breakSec) : null,
   };
+}
+
+export type Celebration = 'sparkle' | 'confetti' | 'lanterns' | 'rocket' | 'diwali';
+
+/**
+ * What to show when a phase finishes. Every finished work session sparkles. Finishing the set you decided on, or
+ * every 4th session in a row, is a big win: the longer you focused in the run, the bigger the show.
+ */
+export function celebrationFor(finished: PomoTimer, next: PomoTimer, rand: () => number = Math.random): Celebration | null {
+  if (finished.phase !== 'work') return null;
+  const sessions = (finished.doneWork ?? 0) + 1;
+  const big = next.status === 'done' || sessions % 4 === 0;
+  if (!big) return 'sparkle';
+  const minutes = ((next.focusedSec ?? 0) || 0) / 60;
+  const pool: Celebration[] = minutes < 60 ? ['confetti', 'lanterns'] : minutes < 120 ? ['rocket', 'confetti', 'lanterns'] : ['diwali', 'rocket'];
+  return pool[Math.floor(rand() * pool.length)];
 }

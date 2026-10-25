@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advance, clock, elapsedMs, endInstant, pause, remainingMs, resume, segmentOf, startRun, summariseDay } from '@/lib/domain/pomodoro-math';
+import { advance, celebrationFor, clock, elapsedMs, endInstant, pause, remainingMs, resume, segmentOf, startRun, summariseDay } from '@/lib/domain/pomodoro-math';
 
 const MIN = 60_000;
 const cfg = { workMin: 25, breakMin: 5, repeats: 2 };
@@ -50,5 +50,28 @@ describe('day summary', () => {
     expect(s.coverage).toBeCloseTo(0.35);
     expect(s.focusShare).toBeCloseTo(2100 / 2400);
     expect(summariseDay([], 0)).toMatchObject({ coverage: null, focusShare: null });
+  });
+});
+
+describe('celebrations', () => {
+  const run = { workMin: 25, breakMin: 5, repeats: null };
+  it('sparkles after an ordinary session and goes big on the 4th in a row (100 focused minutes: a rocket)', () => {
+    let t = startRun(run, 0, 'r', 'a');
+    const seen: (string | null)[] = [];
+    for (let i = 0; i < 4; i++) {
+      const w = advance(t, endInstant(t), 'a');
+      seen.push(celebrationFor(t, w.next, () => 0));
+      const b = advance(w.next, endInstant(w.next), 'a');
+      seen.push(celebrationFor(w.next, b.next, () => 0)); // a break never celebrates
+      t = b.next;
+    }
+    expect(seen).toEqual(['sparkle', null, 'sparkle', null, 'sparkle', null, 'rocket', null]);
+  });
+  it('goes big when a set number of sessions is finished, and scales with focused time', () => {
+    let t = startRun({ workMin: 90, breakMin: 5, repeats: 2 }, 0, 'r', 'a');
+    t = advance(advance(t, endInstant(t), 'a').next, 0, 'a', true).next; // first work + break
+    const last = advance(t, endInstant(t), 'a');
+    expect(last.next.status).toBe('done');
+    expect(['diwali', 'rocket']).toContain(celebrationFor(t, last.next, () => 0.9));
   });
 });

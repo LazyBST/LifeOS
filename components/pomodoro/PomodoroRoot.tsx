@@ -5,11 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
 import { logPomodoroSegmentAction } from '@/app/actions/pomodoro';
-import { advance, clock, elapsedMs, endInstant, pause, phaseMs, remainingMs, resume, segmentOf, startRun, type PomoConfig, type PomoTimer, type Segment } from '@/lib/domain/pomodoro-math';
+import { advance, celebrationFor, clock, elapsedMs, endInstant, pause, phaseMs, remainingMs, resume, segmentOf, startRun, type Celebration as CelebrationKind, type PomoConfig, type PomoTimer, type Segment } from '@/lib/domain/pomodoro-math';
 import { istDate, istParts } from '@/lib/time';
 import { weekStart } from '@/lib/domain/lifecal-math';
 import type { WeekBlock } from '@/lib/domain/calweek';
 import { FocusDay } from './FocusDay';
+import { Celebration } from './Celebration';
 
 const LS_TIMER = 'lifeos:pomo:timer', LS_UI = 'lifeos:pomo:ui', LS_CFG = 'lifeos:pomo:cfg', LS_LOGGED = 'lifeos:pomo:logged';
 const MIN = 60_000;
@@ -33,10 +34,26 @@ function pickCurrent(blocks: WeekBlock[], now: number): Current {
   return next ? { title: 'Focus time', sub: `Next on your calendar: ${next.title} at ${hm(minutesOf(next.start))}` } : { title: 'Focus time', sub: 'Nothing scheduled right now' };
 }
 
-const PHASE = {
-  work: { name: 'Focus', grad: 'from-rose-500 via-orange-500 to-amber-500', solid: '#f43f5e', ring: '#fb7185' },
-  break: { name: 'Break', grad: 'from-emerald-500 via-teal-500 to-cyan-500', solid: '#10b981', ring: '#34d399' },
-} as const;
+const PHASE = { work: { name: 'Focus' }, break: { name: 'Break' } } as const;
+
+/** Muted by default; each theme has a look for focus and a calmer one for breaks. `ink` is the colour of the play button. */
+type Look = { bg: string; accent: string; ink: string };
+const THEMES: Record<string, { name: string; work: Look; break: Look }> = {
+  dusk: { name: 'Dusk', work: { bg: 'linear-gradient(135deg,#3f4468,#2a2d48)', accent: '#f4a99b', ink: '#3f4468' }, break: { bg: 'linear-gradient(135deg,#2f5c61,#1f4146)', accent: '#8be0cc', ink: '#2f5c61' } },
+  forest: { name: 'Forest', work: { bg: 'linear-gradient(135deg,#34523f,#1f3328)', accent: '#a8d8b0', ink: '#34523f' }, break: { bg: 'linear-gradient(135deg,#355a6b,#233e4b)', accent: '#9ad4ea', ink: '#355a6b' } },
+  ember: { name: 'Ember', work: { bg: 'linear-gradient(135deg,#6a4036,#3d2521)', accent: '#f2b08c', ink: '#6a4036' }, break: { bg: 'linear-gradient(135deg,#365a5e,#223e42)', accent: '#9fe0d0', ink: '#365a5e' } },
+  ocean: { name: 'Ocean', work: { bg: 'linear-gradient(135deg,#2a4f78,#17304b)', accent: '#86c9f2', ink: '#2a4f78' }, break: { bg: 'linear-gradient(135deg,#2f625e,#1d3f3c)', accent: '#98e0cf', ink: '#2f625e' } },
+  orchid: { name: 'Orchid', work: { bg: 'linear-gradient(135deg,#54426e,#33264b)', accent: '#dcb0f2', ink: '#54426e' }, break: { bg: 'linear-gradient(135deg,#325d5c,#213f3e)', accent: '#9ee0d4', ink: '#325d5c' } },
+  mono: { name: 'Mono', work: { bg: 'linear-gradient(135deg,#2c2c30,#18181b)', accent: '#e4e4e7', ink: '#2c2c30' }, break: { bg: 'linear-gradient(135deg,#27312f,#161c1b)', accent: '#a7f3d0', ink: '#27312f' } },
+  bright: { name: 'Bright', work: { bg: 'linear-gradient(135deg,#f43f5e,#f97316,#f59e0b)', accent: '#fff', ink: '#f43f5e' }, break: { bg: 'linear-gradient(135deg,#10b981,#14b8a6,#06b6d4)', accent: '#fff', ink: '#0d9488' } },
+};
+const PAUSED: Look = { bg: 'linear-gradient(135deg,#5b6472,#3a414d)', accent: '#e2e8f0', ink: '#4b5563' };
+type Prefs = { theme: string; cover: string };
+const DEFAULT_PREFS: Prefs = { theme: 'dusk', cover: '' };
+const LS_PREFS = 'lifeos:pomo:prefs';
+/** The card and full-screen background: the theme's gradient, or the chosen cover image under a dark veil. */
+const surface = (look: Look, cover: string): React.CSSProperties =>
+  cover ? { background: `linear-gradient(180deg, rgba(0,0,0,0.30), rgba(0,0,0,0.68)), url("${cover.replace(/"/g, '')}") center / cover` } : { background: look.bg };
 
 function Ring({ size, stroke, pct, color, children }: { size: number; stroke: number; pct: number; color: string; children?: React.ReactNode }) {
   const r = (size - stroke) / 2, c = 2 * Math.PI * r;
@@ -60,6 +77,7 @@ const Icon = {
   expand: <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>,
   shrink: <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" /></svg>,
   down: <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>,
+  palette: <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a9 9 0 100 18c1.1 0 1.6-.8 1.6-1.6 0-.5-.3-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 004-4c0-4.4-4-8-9-8z" /><circle cx="7.5" cy="11" r="1" fill="currentColor" /><circle cx="10" cy="7" r="1" fill="currentColor" /><circle cx="15" cy="7" r="1" fill="currentColor" /></svg>,
   close: <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>,
 };
 
@@ -70,6 +88,9 @@ export function PomodoroRoot() {
   const [hidden, setHidden] = useState(false);
   const [setup, setSetup] = useState(false);
   const [cfg, setCfg] = useState<PomoConfig>(DEFAULT_CFG);
+  const [prefs, setPrefsState] = useState<Prefs>(DEFAULT_PREFS);
+  const [party, setParty] = useState<{ kind: CelebrationKind; key: number; text: string | null } | null>(null);
+  const setPrefs = (p: Prefs) => { setPrefsState(p); try { localStorage.setItem(LS_PREFS, JSON.stringify(p)); } catch {} };
   const [now, setNow] = useState(() => Date.now());
   const [current, setCurrent] = useState<Current>({ title: 'Focus time', sub: null });
   const [statsKey, setStatsKey] = useState(0);
@@ -96,6 +117,8 @@ export function PomodoroRoot() {
       if (ui.view) setView(ui.view);
       const c = JSON.parse(localStorage.getItem(LS_CFG) ?? 'null') as PomoConfig | null;
       if (c && c.workMin > 0) setCfg(c);
+      const pr = JSON.parse(localStorage.getItem(LS_PREFS) ?? 'null') as Prefs | null;
+      if (pr && THEMES[pr.theme]) setPrefsState({ theme: pr.theme, cover: typeof pr.cover === 'string' ? pr.cover : '' });
     } catch {}
     setReady(true);
     const onStorage = (e: StorageEvent) => {
@@ -181,6 +204,11 @@ export function PomodoroRoot() {
       log(r.segment);
       commit({ ...r.next, label: r.next.phase === 'work' ? currentRef.current.title : 'Break' });
       announce(r.next);
+      const kind = celebrationFor(t, r.next);
+      if (kind) {
+        const text = kind === 'sparkle' ? null : r.next.status === 'done' ? 'All sessions done!' : `${(t.doneWork ?? 0) + 1} sessions in a row!`;
+        setParty({ kind, key: Date.now(), text });
+      }
     }, 250);
     return () => clearInterval(id);
   }, [timer?.status, timer?.phaseStartedAt, timer?.runId, commit, log, announce]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -237,8 +265,9 @@ export function PomodoroRoot() {
   const mem = useMemo(() => {
     if (!timer) return null;
     const total = phaseMs(timer), left = remainingMs(timer, now);
-    return { left, pct: total ? 1 - left / total : 0, c: PHASE[timer.phase], elapsed: elapsedMs(timer, now) };
-  }, [timer, now]);
+    const th = THEMES[prefs.theme] ?? THEMES.dusk;
+    return { left, pct: total ? 1 - left / total : 0, c: timer.status === 'paused' ? PAUSED : th[timer.phase], elapsed: elapsedMs(timer, now) };
+  }, [timer, now, prefs.theme]);
 
   if (!ready) return null;
   const done = timer?.status === 'done';
@@ -250,7 +279,7 @@ export function PomodoroRoot() {
   const controls = (big: boolean) => timer && !done && (
     <div className="flex items-center justify-center gap-3">
       <button type="button" onClick={skip} className={`flex items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 ${big ? 'size-12' : 'size-10'}`} aria-label={timer.phase === 'work' ? 'Skip to break' : 'Skip break'} title="Skip this part">{Icon.skip}</button>
-      <button type="button" onClick={togglePause} className={`flex items-center justify-center rounded-full bg-white shadow-lg ${big ? 'size-20' : 'size-14'}`} style={{ color: mem?.c.solid }} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? Icon.play : Icon.pause}</button>
+      <button type="button" onClick={togglePause} className={`flex items-center justify-center rounded-full bg-white shadow-lg ${big ? 'size-20' : 'size-14'}`} style={{ color: mem?.c.ink }} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? Icon.play : Icon.pause}</button>
       <button type="button" onClick={stop} className={`flex items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 ${big ? 'size-12' : 'size-10'}`} aria-label="Stop" title="Stop the timer">{Icon.stop}</button>
     </div>
   );
@@ -264,9 +293,9 @@ export function PomodoroRoot() {
 
       {/* running: the small round timer */}
       {!hidden && timer && mem && view === 'mini' && (
-        <button type="button" onClick={() => setView('card')} aria-label="Open the timer" className={`${fab} rounded-full shadow-xl transition-transform hover:scale-105 ${paused ? 'opacity-90' : ''}`} style={{ background: paused ? '#64748b' : mem.c.solid }}>
+        <button type="button" onClick={() => setView('card')} aria-label="Open the timer" className={`${fab} rounded-full shadow-xl transition-transform hover:scale-105 ${paused ? 'opacity-90' : ''}`} style={{ background: mem.c.bg }}>
           {done ? <span className="flex size-16 items-center justify-center text-2xl text-white">✓</span> : (
-            <Ring size={64} stroke={4} pct={mem.pct} color="#fff">
+            <Ring size={64} stroke={4} pct={mem.pct} color={mem.c.accent}>
               <span className="text-[13px] font-bold tabular-nums text-white">{paused ? '❚❚' : clock(mem.left)}</span>
             </Ring>
           )}
@@ -275,9 +304,11 @@ export function PomodoroRoot() {
 
       {/* running: the card */}
       {!hidden && timer && mem && view === 'card' && (
-        <div className={`fixed right-3 bottom-20 left-3 z-[45] overflow-hidden rounded-3xl bg-gradient-to-br text-white shadow-2xl sm:left-auto sm:w-80 md:right-4 md:bottom-20 ${paused ? 'from-slate-500 via-slate-600 to-slate-700' : mem.c.grad}`}>
+        <div className="fixed right-3 bottom-20 left-3 z-[45] overflow-hidden rounded-3xl text-white shadow-2xl sm:left-auto sm:w-80 md:right-4 md:bottom-20" style={surface(mem.c, prefs.cover)}>
+          <div className="h-1" style={{ background: mem.c.accent }} />
           <div className="flex items-center gap-1 px-4 pt-3 text-[11px] font-semibold uppercase tracking-widest text-white/85">
             <span className="flex-1">{done ? 'Finished' : `${paused ? 'Paused · ' : ''}${sessionText}`}</span>
+            <button type="button" onClick={() => { const ids = Object.keys(THEMES); setPrefs({ ...prefs, theme: ids[(ids.indexOf(prefs.theme) + 1) % ids.length] }); }} className="rounded-full p-1.5 hover:bg-white/20" aria-label="Change colours" title={`Colours: ${THEMES[prefs.theme]?.name}`}>{Icon.palette}</button>
             <button type="button" onClick={() => setView('full')} className="rounded-full p-1.5 hover:bg-white/20" aria-label="Full screen" title="Full screen">{Icon.expand}</button>
             <button type="button" onClick={() => setView('mini')} className="rounded-full p-1.5 hover:bg-white/20" aria-label="Minimise" title="Minimise">{Icon.down}</button>
             <button type="button" onClick={() => setHidden(true)} className="rounded-full p-1.5 hover:bg-white/20" aria-label="Hide the timer" title="Hide (keeps running)">{Icon.close}</button>
@@ -286,7 +317,7 @@ export function PomodoroRoot() {
             <h2 className="line-clamp-2 min-h-[3.2rem] text-xl leading-tight font-extrabold tracking-tight">{done ? 'Great work!' : heading}</h2>
             {!done && current.sub && timer.phase === 'work' && <p className="mt-0.5 line-clamp-1 text-xs text-white/80">{current.sub}</p>}
             {done ? (
-              <div className="mt-3 space-y-3"><p className="text-sm text-white/90">All your sessions are done.</p><button type="button" onClick={() => commit(null)} className="rounded-full bg-white px-5 py-2 text-sm font-semibold" style={{ color: '#f43f5e' }}>Close</button></div>
+              <div className="mt-3 space-y-3"><p className="text-sm text-white/90">All your sessions are done.</p><button type="button" onClick={() => commit(null)} className="rounded-full bg-white px-5 py-2 text-sm font-semibold" style={{ color: mem.c.ink }}>Close</button></div>
             ) : (
               <>
                 <div className="my-3 text-6xl font-black tracking-tight tabular-nums">{clock(mem.left)}</div>
@@ -300,7 +331,7 @@ export function PomodoroRoot() {
 
       {/* running: full screen */}
       {!hidden && timer && mem && view === 'full' && (
-        <div className={`fixed inset-0 z-[70] overflow-y-auto bg-gradient-to-br text-white ${paused ? 'from-slate-600 via-slate-700 to-slate-900' : mem.c.grad}`}>
+        <div className="fixed inset-0 z-[70] overflow-y-auto text-white" style={surface(mem.c, prefs.cover)}>
           <div className="flex items-center gap-1 px-4 pt-4 sm:px-6">
             <span className="flex-1 text-xs font-bold uppercase tracking-[0.3em] text-white/85">{done ? 'Finished' : `${paused ? 'Paused · ' : ''}${sessionText}`}</span>
             <button type="button" onClick={() => setView('card')} className="rounded-full p-2 hover:bg-white/20" aria-label="Exit full screen" title="Exit full screen (Esc)">{Icon.shrink}</button>
@@ -309,9 +340,9 @@ export function PomodoroRoot() {
           <div className="mx-auto flex max-w-3xl flex-col items-center px-5 pb-16 text-center">
             <h1 className="mt-6 mb-2 max-w-2xl text-4xl leading-tight font-black tracking-tight drop-shadow sm:text-6xl">{done ? 'Great work!' : heading}</h1>
             {!done && current.sub && timer.phase === 'work' && <p className="mb-6 text-base text-white/85 sm:text-lg">{current.sub}</p>}
-            {done ? <button type="button" onClick={() => { commit(null); setView('mini'); }} className="mt-8 rounded-full bg-white px-8 py-3 text-lg font-bold text-rose-600">Close</button> : (
+            {done ? <button type="button" onClick={() => { commit(null); setView('mini'); }} className="mt-8 rounded-full bg-white px-8 py-3 text-lg font-bold" style={{ color: mem.c.ink }}>Close</button> : (
               <>
-                <div className="my-4"><Ring size={300} stroke={14} pct={mem.pct} color="#fff"><span className="text-7xl font-black tracking-tight tabular-nums drop-shadow sm:text-8xl">{clock(mem.left)}</span></Ring></div>
+                <div className="my-4"><Ring size={300} stroke={14} pct={mem.pct} color={mem.c.accent}><span className="text-7xl font-black tracking-tight tabular-nums drop-shadow sm:text-8xl">{clock(mem.left)}</span></Ring></div>
                 <div className="mb-8 flex items-center gap-2">
                   {(timer.cfg.repeats ? Array.from({ length: timer.cfg.repeats }, (_, i) => i + 1) : Array.from({ length: Math.max(4, timer.cycle) }, (_, i) => i + 1)).map((n) => (
                     <span key={n} className={`size-2.5 rounded-full ${n < timer.cycle || (n === timer.cycle && timer.phase === 'break') ? 'bg-white' : n === timer.cycle ? 'bg-white/90 ring-2 ring-white/50' : 'bg-white/30'}`} />
@@ -326,18 +357,25 @@ export function PomodoroRoot() {
         </div>
       )}
 
+      {party && (
+        <>
+          <Celebration key={party.key} kind={party.kind} onDone={() => setParty(null)} />
+          {party.text && <div className="pointer-events-none fixed inset-x-0 top-1/3 z-[81] text-center text-4xl font-black text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] sm:text-6xl">{party.text}</div>}
+        </>
+      )}
+
       {/* start a timer */}
       <Dialog open={setup} onOpenChange={setSetup}>
         <DialogContent>
           <DialogHeader><DialogTitle>Start a Pomodoro</DialogTitle></DialogHeader>
-          <SetupForm initial={cfg} heading={current} onStart={start} onHide={() => { setSetup(false); setHidden(true); }} />
+          <SetupForm initial={cfg} prefs={prefs} onPrefs={setPrefs} heading={current} onStart={start} onHide={() => { setSetup(false); setHidden(true); }} />
         </DialogContent>
       </Dialog>
     </>
   );
 }
 
-function SetupForm({ initial, heading, onStart, onHide }: { initial: PomoConfig; heading: Current; onStart: (c: PomoConfig) => void; onHide: () => void }) {
+function SetupForm({ initial, prefs, onPrefs, heading, onStart, onHide }: { initial: PomoConfig; prefs: Prefs; onPrefs: (p: Prefs) => void; heading: Current; onStart: (c: PomoConfig) => void; onHide: () => void }) {
   const [work, setWork] = useState(String(initial.workMin));
   const [brk, setBrk] = useState(String(initial.breakMin));
   const [forever, setForever] = useState(initial.repeats === null);
@@ -363,6 +401,19 @@ function SetupForm({ initial, heading, onStart, onHide }: { initial: PomoConfig;
           <button type="button" onClick={() => setForever(false)} className={`flex-1 rounded-md px-3 py-1.5 font-medium ${!forever ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>Repeat a set number</button>
         </div>
         {!forever && <div className="flex items-center gap-2"><Input type="number" min={1} max={50} value={times} onChange={(e) => setTimes(e.target.value)} className="w-24" /><span className="text-muted-foreground">work sessions</span></div>}
+      </div>
+      <div className="space-y-2">
+        <div className="font-medium">Look</div>
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(THEMES).map(([id, th]) => (
+            <button key={id} type="button" onClick={() => onPrefs({ ...prefs, theme: id })} aria-label={`${th.name} colours`} title={th.name} className={`size-9 rounded-full ring-offset-2 ring-offset-background ${prefs.theme === id ? 'ring-2 ring-primary' : ''}`} style={{ background: `linear-gradient(135deg, ${th.work.accent} 0 50%, ${th.break.accent} 50% 100%)`, boxShadow: 'inset 0 0 0 3px ' + th.work.ink }} />
+          ))}
+        </div>
+        <label className="block space-y-1">
+          <span className="text-xs text-muted-foreground">Cover image link (optional)</span>
+          <Input type="url" inputMode="url" placeholder="https://…/photo.jpg" value={prefs.cover} onChange={(e) => onPrefs({ ...prefs, cover: e.target.value.trim() })} />
+        </label>
+        {prefs.cover && <div className="h-16 overflow-hidden rounded-xl" style={surface((THEMES[prefs.theme] ?? THEMES.dusk).work, prefs.cover)} aria-label="Cover preview" />}
       </div>
       {problem && <p className="text-xs text-red-600">{problem}</p>}
       <div className="flex items-center justify-between gap-2">
