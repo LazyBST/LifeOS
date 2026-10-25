@@ -23,6 +23,7 @@ import { BudgetsCard } from '@/components/money/BudgetsCard';
 import { ScheduledCard } from '@/components/money/ScheduledCard';
 import { budgetStatus } from '@/lib/domain/budgeting';
 import { moneyInsights } from '@/lib/domain/money-insights';
+import { getOrder } from '@/lib/domain/order';
 import { getUiState } from '@/lib/domain/uistate';
 import type { ResponsiveLayouts } from 'react-grid-layout';
 
@@ -59,6 +60,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   const offset = sp.month === 'last' ? -1 : 0;
   const { from, to, label } = monthRange(offset);
 
+  const budgetOrder = await getOrder('money-budgets');
   const [w, owed, balances, accounts, categories, spend, transactions, insights, budgets, savedLayout, prevSpend] = await Promise.all([
     wallet(),
     owedByLabel(),
@@ -176,7 +178,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     ) },
     { id: 'budgets', w: 4, h: 12, minW: 3, minH: 8, node: (
       <WidgetCard title="Budgets" sub={`Monthly, ${label}`}>
-        <BudgetsCard rows={budgets.rows} categories={categories} ready={budgets.ready} />
+        <BudgetsCard rows={budgets.rows} categories={categories} ready={budgets.ready} order={budgetOrder} />
       </WidgetCard>
     ) },
     { id: 'top', w: 4, h: 12, minW: 3, minH: 6, node: (

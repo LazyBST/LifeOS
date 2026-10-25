@@ -2,13 +2,14 @@
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
+import { Reorderable } from '@/components/widgets/Reorderable';
 import { setBudgetAction } from '@/app/actions/budgeting';
 import { formatINR } from '@/lib/format';
 
 export type BudgetItem = { category_id: string; category: string; budget: number | null; spent: number };
 
 /** Monthly budget per category: bar turns amber past 80% and red past 100%. Click an amount to change it. */
-export function BudgetsCard({ rows, categories, ready }: { rows: BudgetItem[]; categories: { id: string; name: string }[]; ready: boolean }) {
+export function BudgetsCard({ rows, categories, ready, order = [] }: { rows: BudgetItem[]; categories: { id: string; name: string }[]; ready: boolean; order?: string[] }) {
   const [pending, start] = useTransition();
   const [adding, setAdding] = useState('');
   const [amount, setAmount] = useState('');
@@ -32,12 +33,12 @@ export function BudgetsCard({ rows, categories, ready }: { rows: BudgetItem[]; c
           <span className={`ml-2 text-xs ${totalSpent > totalBudget ? 'text-red-600' : 'text-muted-foreground'}`}>{totalSpent > totalBudget ? `${formatINR(totalSpent - totalBudget)} over` : `${formatINR(totalBudget - totalSpent)} left`}</span>
         </div>
       )}
-      <ul className="space-y-2.5">
-        {rows.map((r) => {
+      <Reorderable orderKey="money-budgets" order={order} className="space-y-2.5" items={
+        rows.map((r) => {
           const pct = r.budget ? (r.spent / r.budget) * 100 : 0;
           const color = pct > 100 ? 'bg-red-500' : pct > 80 ? 'bg-amber-500' : 'bg-emerald-500';
-          return (
-            <li key={r.category_id} className="text-sm">
+          return { id: r.category_id, node: (
+            <div className="text-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate">{r.category}</span>
                 <span className="no-drag flex items-center gap-1 text-xs text-muted-foreground">
@@ -48,10 +49,9 @@ export function BudgetsCard({ rows, categories, ready }: { rows: BudgetItem[]; c
               </div>
               {r.budget ? <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, Math.max(2, pct))}%` }} /></div>
                 : <div className="mt-0.5 text-[11px] text-muted-foreground">No budget set</div>}
-            </li>
-          );
-        })}
-      </ul>
+            </div>
+          ) };
+        })} />
       <div className="no-drag flex flex-wrap items-center gap-2 border-t pt-3">
         <select value={adding} onChange={(e) => setAdding(e.target.value)} className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm" aria-label="Category">
           <option value="">Add a budget…</option>

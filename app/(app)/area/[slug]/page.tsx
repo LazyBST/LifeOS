@@ -12,6 +12,8 @@ import { EntityGroup } from '@/components/entity/EntityGroup';
 import { TaskViews } from '@/components/tasks/TaskViews';
 import { StatusLabel } from '@/components/status/StatusLabel';
 import { dueLabel } from '@/lib/time';
+import { getOrder } from '@/lib/domain/order';
+import { Reorderable } from '@/components/widgets/Reorderable';
 import type { Task } from '@/lib/types/db';
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
@@ -41,6 +43,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
     }),
   );
 
+  const [groupOrder, itemOrders] = await Promise.all([getOrder(`area-goals-${area.id}`), Promise.all(groups.map((g) => getOrder(`goal-items-${g.goal.id}`)))]);
   const color = areaColor(area);
 
   return (
@@ -59,11 +62,10 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
         <ProgressBar pct={pct} label="Overall progress" />
       </PropertiesHeader>
 
-      <div className="space-y-3">
-        {groups.length === 0 && <p className="text-sm text-muted-foreground">No goals in this Area yet.</p>}
-        {groups.map(({ goal, projects, unsorted }) => (
+      {groups.length === 0 && <p className="text-sm text-muted-foreground">No goals in this Area yet.</p>}
+      <Reorderable orderKey={`area-goals-${area.id}`} order={groupOrder} className="space-y-3" items={
+        groups.map(({ goal, projects, unsorted }, gi) => ({ id: goal.id, node: (
           <EntityGroup
-            key={goal.id}
             href={`/goals/${goal.id}`}
             title={`${goal.emoji ? `${goal.emoji} ` : ''}${goal.title}`}
             meta={`${projects.length} ${projects.length === 1 ? 'project' : 'projects'} · ${unsorted.length} open`}
@@ -71,26 +73,21 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
             {projects.length === 0 && unsorted.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing here yet.</p>
             ) : (
-              <div className="space-y-1">
-                {projects.map((p) => (
-                  <Link
-                    key={p.id}
-                    href={`/projects/${p.id}`}
-                    className="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted"
-                  >
+              <Reorderable orderKey={`goal-items-${goal.id}`} order={itemOrders[gi]} className="space-y-1" items={[
+                ...projects.map((p) => ({ id: p.id, node: (
+                  <Link href={`/projects/${p.id}`} className="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted">
                     <span className="truncate">
                       {p.emoji ? `${p.emoji} ` : ''}
                       {p.title}
                     </span>
                     <StatusLabel status={p.status} compact />
                   </Link>
-                ))}
-                {unsorted.map((t) => <TaskRow key={t.id} task={t} />)}
-              </div>
+                ) })),
+                ...unsorted.map((t) => ({ id: t.id, node: <TaskRow task={t} /> })),
+              ]} />
             )}
           </EntityGroup>
-        ))}
-      </div>
+        ) }))} />
 
       <TaskViews base={{ area_id: area.id }} scope={`area:${area.id}`} title="All tasks in this Area" />
     </div>

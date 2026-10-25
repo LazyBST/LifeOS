@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth';
-import { setPriority, togglePriority } from '@/lib/domain/priorities';
+import { reorderPriorities, setPriority, togglePriority } from '@/lib/domain/priorities';
 import { setImprovement, setImprovementFollowed } from '@/lib/domain/improvement';
 import { istDate } from '@/lib/time';
 import { type ActionResult, run } from './_result';
@@ -45,6 +45,15 @@ export async function followImprovementAction(date: string, followed: boolean): 
     await requireUser();
     await setImprovementFollowed(date, followed);
     revalidatePath('/');
+    return null;
+  });
+}
+
+export async function reorderPrioritiesAction(order: number[]): Promise<ActionResult<null>> {
+  return run(async () => {
+    await requireUser();
+    await reorderPriorities(istDate(), order);
+    revalidatePath('/', 'layout');
     return null;
   });
 }

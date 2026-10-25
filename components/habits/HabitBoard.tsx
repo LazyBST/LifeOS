@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HabitRow, type HabitRowData } from '@/components/habits/HabitRow';
 import { HabitForm } from '@/components/habits/HabitForm';
+import { Reorderable } from '@/components/widgets/Reorderable';
 import { archiveHabitAction } from '@/app/actions/habits';
 import type { HabitStatus } from '@/lib/domain/habits';
 import type { Area, Habit, TimeOfDay } from '@/lib/types/db';
@@ -23,10 +24,12 @@ type HabitBoardProps = {
   areas: Area[];
   /** compact-row data per habit id (today, streaks, last 7 days) */
   rows: Record<string, HabitRowData>;
+  /** saved order per time-of-day group */
+  orders?: Record<string, string[]>;
 };
 
 /** Habits board grouped Morning / Afternoon / Evening / No Type (spec section 6). */
-export function HabitBoard({ initialStatuses, areas, rows }: HabitBoardProps) {
+export function HabitBoard({ initialStatuses, areas, rows, orders = {} }: HabitBoardProps) {
   const [statuses, setStatuses] = useState(initialStatuses);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<HabitStatus | null>(null);
@@ -79,9 +82,7 @@ export function HabitBoard({ initialStatuses, areas, rows }: HabitBoardProps) {
                     No habits
                   </p>
                 )}
-                {items.map((item) => rows[item.id] ? (
-                  <HabitRow key={item.id} h={rows[item.id]} onEdit={() => setEditing(item)} onArchive={() => handleArchive(item.id)} />
-                ) : null)}
+                <Reorderable orderKey={`habits-${g.key}`} order={orders[g.key] ?? []} className="flex flex-col gap-2" items={items.filter((item) => rows[item.id]).map((item) => ({ id: item.id, node: <HabitRow h={rows[item.id]} onEdit={() => setEditing(item)} onArchive={() => handleArchive(item.id)} /> }))} />
               </div>
             </div>
           );

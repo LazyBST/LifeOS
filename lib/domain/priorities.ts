@@ -34,3 +34,17 @@ export async function togglePriority(date: string, position: 1 | 2 | 3): Promise
   if (error) throw new Error(error.message);
   if (data.task_id) await (done ? completeTask(data.task_id) : reopenTask(data.task_id));
 }
+
+/** Reorder the three slots: `order[newIndex]` is the position (1-3) that slot used to have. */
+export async function reorderPriorities(date: string, order: number[]): Promise<void> {
+  if (order.length !== 3 || new Set(order).size !== 3 || order.some((p) => ![1, 2, 3].includes(p))) throw new Error('Bad order.');
+  const { data } = await admin().from('daily_priorities').select('*').eq('plan_date', date);
+  const rows = (data ?? []) as { position: number; text: string; task_id: string | null; done_at: string | null }[];
+  const moved = order.map((old, i) => { const r = rows.find((x) => x.position === old); return r ? { ...r, position: i + 1, plan_date: date } : null; }).filter((r) => r !== null);
+  const del = await admin().from('daily_priorities').delete().eq('plan_date', date);
+  if (del.error) throw new Error(del.error.message);
+  if (moved.length) {
+    const { error } = await admin().from('daily_priorities').insert(moved);
+    if (error) throw new Error(error.message);
+  }
+}

@@ -2,12 +2,15 @@ import Link from 'next/link';
 import { listBooks, recentSessions, statsFor } from '@/lib/domain/books';
 import { istDate } from '@/lib/time';
 import { BookCard } from '@/components/books/BookCard';
+import { getOrder } from '@/lib/domain/order';
+import { Reorderable } from '@/components/widgets/Reorderable';
 import { WidgetCard } from './WidgetCard';
 
 /** What you are reading, how fast, and the shelf at a glance. */
 export async function BooksWidget() {
   const [books, sessions] = await Promise.all([listBooks().catch(() => null), recentSessions(30).catch(() => [])]);
   const today = istDate();
+  const order = await getOrder('dash-books');
   if (books === null) return <WidgetCard title="Books" sub="Reading and shelf"><p className="text-sm text-muted-foreground">Run migration 0012 to enable books.</p></WidgetCard>;
   const reading = books.filter((b) => b.status === 'reading');
   const waiting = books.filter((b) => b.status === 'to_read').length;
@@ -24,9 +27,7 @@ export async function BooksWidget() {
       {reading.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing in progress. <Link href="/books" className="underline">Start a book</Link> from your shelf.</p>
       ) : (
-        <div className="flex flex-col gap-2">
-          {reading.map((b) => <BookCard key={b.id} book={b} stats={statsFor(b, sessions.filter((s) => s.book_id === b.id), today)} />)}
-        </div>
+        <Reorderable orderKey="dash-books" order={order} className="flex flex-col gap-2" items={reading.map((b) => ({ id: b.id, node: <BookCard book={b} stats={statsFor(b, sessions.filter((s) => s.book_id === b.id), today)} /> }))} />
       )}
     </WidgetCard>
   );

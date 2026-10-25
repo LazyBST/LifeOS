@@ -2,22 +2,24 @@ import Link from 'next/link';
 import { projectForecasts } from '@/lib/domain/analytics';
 import { listProjects } from '@/lib/domain/projects';
 import { ledgerForProject } from '@/lib/domain/ledger';
+import { getOrder } from '@/lib/domain/order';
+import { Reorderable } from '@/components/widgets/Reorderable';
 import { WidgetCard } from './WidgetCard';
 
 export async function ProjectsWidget() {
   const [projects, forecasts] = await Promise.all([listProjects({ status: ['active'] }), projectForecasts()]);
   const fm = new Map(forecasts.map((f) => [f.project_id, f]));
-  const ledgers = await Promise.all(projects.map((p) => ledgerForProject(p.id)));
+  const [ledgers, order] = await Promise.all([Promise.all(projects.map((p) => ledgerForProject(p.id))), getOrder('dash-projects')]);
   return (
     <WidgetCard title="Projects" sub="Progress in units · days gained or lost">
       {projects.length === 0 ? <p className="text-sm text-muted-foreground">No active projects.</p> : (
-        <div className="flex flex-col gap-3">
-          {projects.map((p, i) => {
+        <Reorderable orderKey="dash-projects" order={order} className="flex flex-col gap-3" items={
+          projects.map((p, i) => {
             const f = fm.get(p.id);
             const pct = f?.progressPct ?? 0;
             const net = ledgers[i].net;
-            return (
-              <Link key={p.id} href={`/projects/${p.id}`} className="group flex flex-col gap-1">
+            return { id: p.id, node: (
+              <Link href={`/projects/${p.id}`} className="group flex flex-col gap-1">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="truncate font-medium group-hover:underline">{p.emoji ? `${p.emoji} ` : ''}{p.title}</span>
                   <span className="ml-auto text-xs text-muted-foreground">{pct}%</span>
@@ -25,9 +27,8 @@ export async function ProjectsWidget() {
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max(2, pct)}%` }} /></div>
               </Link>
-            );
-          })}
-        </div>
+            ) };
+          })} />
       )}
     </WidgetCard>
   );

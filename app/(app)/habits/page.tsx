@@ -8,6 +8,7 @@ import { HabitHeatmap } from '@/components/habits/HabitHeatmap';
 import { WidgetGrid, type GridItem } from '@/components/widgets/WidgetGrid';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
 import { StatTiles } from '@/components/analytics/Insights';
+import { getOrder } from '@/lib/domain/order';
 import { getUiState } from '@/lib/domain/uistate';
 import type { ResponsiveLayouts } from 'react-grid-layout';
 
@@ -22,6 +23,7 @@ export default async function HabitsPage() {
     getUiState<ResponsiveLayouts>('habits-layout').catch(() => null),
     loadHabitRows(),
   ]);
+  const orders = Object.fromEntries(await Promise.all((['morning', 'afternoon', 'evening', 'any'] as const).map(async (g) => [g, await getOrder(`habits-${g}`)])));
 
   const checkinsByHabit = new Map<string, Record<string, number>>();
   for (const c of checkins) {
@@ -43,7 +45,7 @@ export default async function HabitsPage() {
           { label: 'Habits', value: String(allHabits.length) },
         ]} />
       </WidgetCard>) },
-    { id: 'board', w: 8, h: 14, minW: 5, minH: 8, node: <WidgetCard title="Habits" sub="Check in, edit, archive"><HabitBoard initialStatuses={statuses} areas={areas} rows={Object.fromEntries(rows)} /></WidgetCard> },
+    { id: 'board', w: 8, h: 14, minW: 5, minH: 8, node: <WidgetCard title="Habits" sub="Check in, edit, archive"><HabitBoard initialStatuses={statuses} areas={areas} rows={Object.fromEntries(rows)} orders={orders} /></WidgetCard> },
     ...allHabits.map((h): GridItem => ({
       id: `hm-${h.id}`, w: 4, h: 6, minW: 3, minH: 5,
       node: (
