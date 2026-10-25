@@ -10,8 +10,7 @@ type AccountsPanelProps = {
  *  themselves happens on /settings. */
 export function AccountsPanel({ balances }: AccountsPanelProps) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <h2 className="mb-2 text-sm font-semibold">Accounts</h2>
+    <div>
       {balances.length === 0 ? (
         <p className="text-sm text-muted-foreground">No accounts yet. Add one in Settings.</p>
       ) : (

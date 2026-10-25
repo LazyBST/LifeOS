@@ -19,7 +19,7 @@ export function WalletSummary({ wallet, owed }: WalletSummaryProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="Cash on hand" value={formatINR(wallet.cash_on_hand)} />
         <Stat label="Owed to me" value={formatINR(wallet.owed_to_me)} tone="green" />

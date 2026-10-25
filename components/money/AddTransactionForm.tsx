@@ -148,8 +148,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <h2 className="mb-3 text-sm font-semibold">Add</h2>
+    <div>
       <Tabs defaultValue="expense">
         <TabsList>
           <TabsTrigger value="expense">Expense</TabsTrigger>

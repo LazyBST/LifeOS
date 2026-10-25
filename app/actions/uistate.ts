@@ -4,7 +4,7 @@ import { requireUser } from '@/lib/auth';
 import { setUiState } from '@/lib/domain/uistate';
 import { type ActionResult, run } from './_result';
 
-const KEYS = new Set(['dashboard-layout', 'analytics-layout', 'habits-layout']);
+const KEYS = new Set(['dashboard-layout', 'analytics-layout', 'habits-layout', 'money-layout']);
 const MAX_BYTES = 40_000;
 
 export async function saveUiStateAction(key: string, value: unknown): Promise<ActionResult<null>> {
