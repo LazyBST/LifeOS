@@ -2,7 +2,7 @@
 export const AREA_COLORS: Record<string, string> = {
   Business: '#6366f1',
   'Health & Fitness': '#10b981',
-  Relationships: '#f59e0b',
+  Relationships: '#f43f5e',
   Finances: '#06b6d4',
 };
 
