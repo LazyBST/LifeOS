@@ -88,7 +88,7 @@ export async function detailItems(from: string, to: string): Promise<DetailItem[
     }
   }
 
-  const habits = await listHabits(true);
+  const habits = await listHabits(); // archived habits take no part in the score, past or present
   const last = to < today ? to : today;
   if (habits.length && from <= last) {
     const checkins = await paged<{ habit_id: string; checkin_date: string; value: number }>((a, b) =>
@@ -96,7 +96,7 @@ export async function detailItems(from: string, to: string): Promise<DetailItem[
     const value = new Map(checkins.map((c) => [`${c.habit_id}|${c.checkin_date}`, Number(c.value)]));
     for (let d = from; d <= last; d = addDays(d, 1)) {
       for (const h of habits) {
-        if (h.created_at.slice(0, 10) > d || (h.archived_at && h.archived_at.slice(0, 10) <= d) || !habitDueOn(h, d)) continue;
+        if (h.created_at.slice(0, 10) > d || !habitDueOn(h, d)) continue;
         const outcome = habitOutcome(value.get(`${h.id}|${d}`), Number(h.target_value), d, today);
         if (outcome) out.push(make({ kind: 'habit', id: h.id, title: h.name, area_id: h.area_id, date: d, href: null, outcome }));
       }

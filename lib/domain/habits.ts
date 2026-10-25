@@ -103,6 +103,17 @@ export async function archiveHabit(id: UUID): Promise<Habit> {
   return updateHabit(id, { archived_at: new Date().toISOString() });
 }
 
+export async function unarchiveHabit(id: UUID): Promise<Habit> {
+  return updateHabit(id, { archived_at: null });
+}
+
+/** Archived habits, most recently archived first. */
+export async function listArchivedHabits(): Promise<Habit[]> {
+  const { data, error } = await admin().from('habits').select('*').not('archived_at', 'is', null).order('archived_at', { ascending: false });
+  if (error) throw new Error(`habits: ${error.message}`);
+  return data as Habit[];
+}
+
 /** A habit with no days_of_week is due every day. */
 export function habitDueOn(habit: Pick<Habit, 'days_of_week'>, date: string): boolean {
   if (!habit.days_of_week || habit.days_of_week.length === 0) return true;
@@ -114,6 +125,11 @@ export function habitDueOn(habit: Pick<Habit, 'days_of_week'>, date: string): bo
 export async function checkinsBetween(from: string, to: string, habitId?: UUID): Promise<HabitCheckin[]> {
   let q = admin().from('habit_checkins').select('*').gte('checkin_date', from).lte('checkin_date', to);
   if (habitId) q = q.eq('habit_id', habitId);
+  else {
+    // every habit at once means every ACTIVE habit: archived ones count for nothing
+    const { data: active } = await admin().from('habits').select('id').is('archived_at', null);
+    q = q.in('habit_id', (active ?? []).map((h: { id: string }) => h.id));
+  }
   const { data, error } = await q.order('checkin_date');
   if (error) throw new Error(`habit_checkins: ${error.message}`);
   return data as HabitCheckin[];

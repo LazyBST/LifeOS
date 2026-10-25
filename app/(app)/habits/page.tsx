@@ -1,4 +1,6 @@
-import { habitStatuses, checkinsBetween, listHabits } from '@/lib/domain/habits';
+import { habitStatuses, checkinsBetween, listHabits, listArchivedHabits } from '@/lib/domain/habits';
+import { ArchivedHabits } from '@/components/habits/ArchivedHabits';
+import { scheduleLabel } from '@/lib/domain/habit-rows';
 import { loadHabitRows } from '@/lib/domain/habit-rows';
 import { listAreas } from '@/lib/domain/areas';
 import { addDays, istDate } from '@/lib/time';
@@ -23,6 +25,7 @@ export default async function HabitsPage() {
     getUiState<ResponsiveLayouts>('habits-layout').catch(() => null),
     loadHabitRows(),
   ]);
+  const archived = await listArchivedHabits().catch(() => []);
   const orders = Object.fromEntries(await Promise.all((['morning', 'afternoon', 'evening', 'any'] as const).map(async (g) => [g, await getOrder(`habits-${g}`)])));
 
   const checkinsByHabit = new Map<string, Record<string, number>>();
@@ -46,6 +49,10 @@ export default async function HabitsPage() {
         ]} />
       </WidgetCard>) },
     { id: 'board', w: 8, h: 14, minW: 5, minH: 8, node: <WidgetCard title="Habits" sub="Check in, edit, archive"><HabitBoard initialStatuses={statuses} areas={areas} rows={Object.fromEntries(rows)} orders={orders} /></WidgetCard> },
+    { id: 'archived', w: 8, h: 8, minW: 4, minH: 5, node: (
+      <WidgetCard title="Archived habits" sub={`${archived.length} paused · hidden from every widget and analytic until restored`}>
+        <ArchivedHabits items={archived.map((h) => ({ id: h.id, name: h.name, emoji: h.emoji, schedule: scheduleLabel(h.days_of_week), time: h.start_time ? `${h.start_time.slice(0, 5)}${h.end_time ? `–${h.end_time.slice(0, 5)}` : ''}` : null, archivedOn: (h.archived_at ?? '').slice(0, 10) }))} />
+      </WidgetCard>) },
     ...allHabits.map((h): GridItem => ({
       id: `hm-${h.id}`, w: 4, h: 6, minW: 3, minH: 5,
       node: (

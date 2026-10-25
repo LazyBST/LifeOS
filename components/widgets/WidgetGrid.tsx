@@ -48,11 +48,23 @@ export function defaultsFrom(lg: Item[]): SizedLayouts {
   return { sm: smallFrom(lg), md: mediumFrom(lg), lg, xl: lg };
 }
 
-/** A saved arrangement is only used if it lists exactly these widgets and fits that size's columns. */
-function valid(layout: unknown, ids: string[], cols: number): layout is Item[] {
-  if (!Array.isArray(layout) || layout.length !== ids.length) return false;
-  const seen = new Set(ids);
-  return layout.every((l) => l && seen.delete(l.i) && Number.isFinite(l.x) && Number.isFinite(l.y) && l.w >= 1 && l.h >= 1 && l.x + l.w <= cols);
+/**
+ * A saved arrangement is used for the widgets that still exist and fit that size's columns. A widget that was added
+ * since (or does not fit) takes its default place below the rest, so adding or archiving one never resets the layout.
+ */
+function fit(saved: unknown, fallback: Item[], cols: number, ids: string[]): Item[] {
+  const want = new Set(ids);
+  const kept: Item[] = [];
+  if (Array.isArray(saved)) {
+    for (const l of saved as Item[]) {
+      if (l && want.has(l.i) && Number.isFinite(l.x) && Number.isFinite(l.y) && l.w >= 1 && l.h >= 1 && l.x + l.w <= cols) { kept.push(l); want.delete(l.i); }
+    }
+  }
+  if (kept.length === 0) return fallback;
+  let y = Math.max(0, ...kept.map((l) => l.y + l.h));
+  const missing = fallback.filter((l) => want.has(l.i));
+  for (const l of missing) { kept.push({ ...l, x: 0, y }); y += l.h; }
+  return kept;
 }
 
 export function merge(defaults: SizedLayouts, saved: unknown, ids: string[]): SizedLayouts {
@@ -60,7 +72,7 @@ export function merge(defaults: SizedLayouts, saved: unknown, ids: string[]): Si
   const src = (saved ?? {}) as Partial<Record<Size, unknown>>;
   for (const size of SIZES) {
     const candidate = src[size] ?? (size === 'xl' ? src.lg : undefined);
-    if (valid(candidate, ids, COLS[size])) out[size] = candidate as Item[];
+    if (candidate !== undefined) out[size] = fit(candidate, defaults[size], COLS[size], ids);
   }
   return out;
 }

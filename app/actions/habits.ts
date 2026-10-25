@@ -8,6 +8,7 @@ import {
   type HabitPatch,
   type HabitStatus,
   archiveHabit,
+  unarchiveHabit,
   checkinHabit,
   checkinsBetween,
   createHabit,
@@ -121,5 +122,15 @@ export async function setHabitDayTimeAction(habitId: string, day: string, start:
     await setHabitDayTime(habitId, day, start, end);
     revalidatePath('/', 'layout');
     return null;
+  });
+}
+
+/** Bring an archived habit back, with its history. */
+export async function unarchiveHabitAction(id: string): Promise<ActionResult<Habit>> {
+  return run(async () => {
+    await requireUser();
+    const habit = await unarchiveHabit(id);
+    revalidatePath('/', 'layout');
+    return habit;
   });
 }

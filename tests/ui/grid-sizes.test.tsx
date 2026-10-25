@@ -19,7 +19,20 @@ describe('grid sizes', () => {
     const saved = { md: [{ i: 'a', x: 0, y: 0, w: 8, h: 3 }, { i: 'b', x: 0, y: 3, w: 8, h: 3 }, { i: 'c', x: 0, y: 6, w: 8, h: 3 }], sm: [{ i: 'a', x: 0, y: 0, w: 12, h: 3 }] };
     const m = merge(d, saved, ['a', 'b', 'c']);
     expect(m.md[0].h).toBe(3);
-    expect(m.sm).toBe(d.sm); // wrong widget list / too wide: default kept
+    expect(m.sm).toHaveLength(3); // the too-wide saved item is replaced by the defaults
+    expect(m.sm.every((l) => l.w === 1)).toBe(true);
     expect(m.xl).toBe(d.xl);
+  });
+});
+
+describe('a widget added or removed since the layout was saved', () => {
+  // defaults always describe the widgets that exist now (a, b and the new c)
+  const d = defaultsFrom(packLayout([{ id: 'a', w: 6, h: 4 }, { id: 'b', w: 6, h: 4 }, { id: 'c', w: 6, h: 4 }]));
+  const saved = { lg: [{ i: 'b', x: 0, y: 0, w: 12, h: 3 }, { i: 'a', x: 0, y: 3, w: 12, h: 3 }, { i: 'gone', x: 0, y: 6, w: 12, h: 3 }] };
+  it('keeps the arrangement of the rest, drops the removed one and puts a new one at the bottom', () => {
+    const m = merge(d, saved, ['a', 'b', 'c']).lg;
+    expect(m.map((l) => l.i)).toEqual(['b', 'a', 'c']);
+    expect(m.find((l) => l.i === 'c')!.y).toBe(6);
+    expect(merge(d, saved, ['a', 'b', 'c']).lg.map((l) => l.i)).not.toContain('gone');
   });
 });
