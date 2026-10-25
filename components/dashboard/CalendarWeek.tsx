@@ -25,6 +25,21 @@ const KIND = {
   habit: 'bg-amber-100 text-amber-900 dark:bg-amber-500/25 dark:text-amber-100 border-amber-300/60',
 } as const;
 
+/** A small, quiet tick box: hairline ring when open, soft fill with a tick when done, a dash when missed. */
+function Tick({ done, missed, onClick, label, title }: { done: boolean; missed?: boolean; onClick: (e: React.MouseEvent) => void; label: string; title: string }) {
+  return (
+    <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={onClick} aria-label={label} title={title} className="group/tick -m-1 shrink-0 p-1">
+      <span className={`flex size-3.5 items-center justify-center rounded-full border transition-colors ${done ? 'border-emerald-600 bg-emerald-600 text-white' : missed ? 'border-red-500/80 bg-red-500/15 text-red-600' : 'border-current/40 text-transparent group-hover/tick:border-emerald-600 group-hover/tick:text-emerald-600'}`}>
+        {missed && !done ? (
+          <svg viewBox="0 0 10 10" className="size-2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5" /></svg>
+        ) : (
+          <svg viewBox="0 0 10 10" className="size-2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5.3l2 2L8 3" /></svg>
+        )}
+      </span>
+    </button>
+  );
+}
+
 /** What a tap on a habit or task opens a menu for. */
 type MenuTarget = { kind: 'habit' | 'task'; id: string; title: string; date: string; done: boolean; missed: boolean; href: string; x: number; y: number };
 
@@ -162,6 +177,12 @@ export function CalendarWeek() {
     await load(ws);
   }
 
+  async function toggleTask(id: string, done: boolean) {
+    const r = done ? await reopenTaskAction(id) : await completeTaskAction(id);
+    if (!r.ok) toast.error(r.error);
+    await load(ws);
+  }
+
   async function toggleHabit(habitId: string, date: string, done: boolean) {
     const r = await setHabitDayAction(habitId, date, done ? 'clear' : 'done');
     if (!r.ok) toast.error(r.error);
@@ -179,6 +200,9 @@ export function CalendarWeek() {
   const endH = zoomed ? 23 : Math.max(22, ...visible.map((b) => Math.ceil(minutesOf(b.end) / 60) || 0)) + 0;
   const hours = Array.from({ length: Math.max(1, Math.min(24, endH + 1) - startH) }, (_, i) => startH + i);
   const gridH = hours.length * row;
+  // the further you zoom in, the finer the scale on the left: hourly, then 30, 15, 10 and 5 minutes
+  const stepMin = ([60, 30, 15, 10, 5].find((st) => (row * st) / 60 >= 28) ?? 5);
+  const ticks = Array.from({ length: Math.ceil((hours.length * 60) / stepMin) }, (_, i) => startH * 60 + i * stepMin);
   const topOf = (min: number) => ((Math.max(startH * 60, min) - startH * 60) / 60) * row;
 
   // keep the minute under the fingers where it was while the scale changes
@@ -296,13 +320,14 @@ export function CalendarWeek() {
                 ))}
                 {any.map((u) => u.kind === 'habit' ? (
                   <div key={`h-${u.id}`} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-left text-[12px] ${KIND.habit} ${u.done ? 'line-through opacity-60' : ''}`}>
-                    <button type="button" onClick={() => void toggleHabit(u.id, d, u.done)} title={u.done ? 'Done · tap to undo' : 'Tap to tick off'} aria-label={u.done ? `Undo ${u.title}` : `Tick off ${u.title}`} className={`flex size-4 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold leading-none ${u.done ? 'border-emerald-600 bg-emerald-600 text-white' : u.missed ? 'border-red-500 bg-red-500 text-white' : 'border-current opacity-70'}`}>{u.done ? '✓' : u.missed ? '✕' : ''}</button>
+                    <Tick done={u.done} missed={!!u.missed} label={u.done ? `Undo ${u.title}` : `Tick off ${u.title}`} title={u.done ? 'Done · tap to undo' : 'Tick off'} onClick={() => void toggleHabit(u.id, d, u.done)} />
                     <button type="button" onClick={(e) => setMenu({ kind: 'habit', id: u.id, title: u.title, date: d, done: u.done, missed: !!u.missed, href: `/habits#habit-${u.id}`, x: e.clientX, y: e.clientY })} className="min-w-0 flex-1 truncate text-left">{u.emoji ? `${u.emoji} ` : ''}{u.title}</button>
                   </div>
                 ) : (
-                  <Link key={`t-${u.id}`} href={u.href ?? '#'} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-[12px] ${KIND.task} ${u.done ? 'line-through opacity-60' : ''}`}>
-                    <span>{u.done ? '✓' : '☐'}</span><span className="truncate">{u.title}</span>
-                  </Link>
+                  <div key={`t-${u.id}`} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-[12px] ${KIND.task} ${u.done ? 'line-through opacity-60' : ''}`}>
+                    <Tick done={u.done} label={u.done ? `Reopen ${u.title}` : `Complete ${u.title}`} title={u.done ? 'Done · tap to reopen' : 'Mark done'} onClick={() => void toggleTask(u.id, u.done)} />
+                    <Link href={u.href ?? '#'} className="min-w-0 flex-1 truncate">{u.title}</Link>
+                  </div>
                 ))}
               </div>
             );
@@ -310,7 +335,14 @@ export function CalendarWeek() {
 
           {/* time grid */}
           <div data-timegrid className="relative" style={{ height: gridH }}>
-            {hours.map((h) => <div key={h} className="absolute right-1 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h - startH) * row }}>{h === 0 ? 12 : h > 12 ? h - 12 : h}{h >= 12 && h < 24 ? 'p' : 'a'}</div>)}
+            {ticks.map((m) => {
+              const h = Math.floor(m / 60), mm = m % 60;
+              return (
+                <div key={m} className={`absolute right-1 -translate-y-1/2 tabular-nums ${mm === 0 ? 'text-[11px] font-medium text-muted-foreground' : 'text-[10px] text-muted-foreground/70'}`} style={{ top: ((m - startH * 60) / 60) * row }}>
+                  {mm === 0 ? `${h === 0 ? 12 : h > 12 ? h - 12 : h}${h >= 12 && h < 24 ? 'p' : 'a'}` : `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${String(mm).padStart(2, '0')}`}
+                </div>
+              );
+            })}
           </div>
           {days.map((d) => {
             const dayBlocks = (data?.blocks ?? []).filter((b) => istParts(new Date(b.start)).date === d);
@@ -318,8 +350,8 @@ export function CalendarWeek() {
             return (
               <div key={d} data-daycol={d} className="relative cursor-cell border-l border-border" style={{ height: gridH }}
                 onClick={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); setDialog({ mode: 'create', date: d, hour: Math.min(23, startH + Math.floor((ev.clientY - r.top) / row)) }); }}>
-                {hours.map((h) => <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: (h - startH) * row }} />)}
-                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={Math.max(16, ((Math.max(minutesOf(b.end), minutesOf(b.start) + 5) - minutesOf(b.start)) / 60) * row - 2)} detailed={mode === 'day'} row={row} days={days} day={d} onMove={(bl, date, sMin, eMin) => void moveBlock(bl, date, sMin, eMin)} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} onMenu={(m) => setMenu(m)} />)}
+                {ticks.map((m) => <div key={m} className={`absolute inset-x-0 border-t ${m % 60 === 0 ? 'border-border/70' : 'border-dashed border-border/40'}`} style={{ top: ((m - startH * 60) / 60) * row }} />)}
+                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={Math.max(16, ((Math.max(minutesOf(b.end), minutesOf(b.start) + 5) - minutesOf(b.start)) / 60) * row - 2)} detailed={mode === 'day'} row={row} days={days} day={d} onMove={(bl, date, sMin, eMin) => void moveBlock(bl, date, sMin, eMin)} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} onMenu={(m) => setMenu(m)} onTask={(id, done) => void toggleTask(id, done)} />)}
                 {d === today && (() => { const m = minutesOf(new Date().toISOString()); return m >= startH * 60 && m < (endH + 1) * 60 ? <div className="absolute inset-x-0 z-10 h-0.5 bg-red-500" style={{ top: topOf(m) }} /> : null; })()}
               </div>
             );
@@ -336,7 +368,7 @@ export function CalendarWeek() {
   );
 }
 
-function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, onHabit, onMenu }: { b: WeekBlock; p?: { col: number; cols: number }; top: number; height: number; detailed: boolean; row: number; days: string[]; day: string; onMove: (b: WeekBlock, date: string, startMin: number, endMin: number) => void; onEvent: (e: NonNullable<WeekBlock['event']>) => void; onHabit: (id: string, date: string, done: boolean) => void; onMenu: (m: MenuTarget) => void }) {
+function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, onHabit, onMenu, onTask }: { b: WeekBlock; p?: { col: number; cols: number }; top: number; height: number; detailed: boolean; row: number; days: string[]; day: string; onMove: (b: WeekBlock, date: string, startMin: number, endMin: number) => void; onEvent: (e: NonNullable<WeekBlock['event']>) => void; onHabit: (id: string, date: string, done: boolean) => void; onMenu: (m: MenuTarget) => void; onTask: (id: string, done: boolean) => void }) {
   const [drag, setDrag] = useState<{ dx: number; dy: number; mode: 'move' | 'resize' } | null>(null);
   const justDragged = useRef(false);
   const cols = p?.cols ?? 1, col = p?.col ?? 0;
@@ -418,12 +450,18 @@ function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, o
     </>
   );
   const title = `${b.title} · ${range} — drag to move (press and hold on a touch screen), pull the bottom edge to resize`;
-  if (b.href) return <button type="button" onContextMenu={(e) => e.preventDefault()} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag} onClick={(e) => { e.stopPropagation(); onMenu({ kind: 'task', id: b.id, title: b.title, date: day, done: !!b.done, missed: false, href: b.href!, x: e.clientX, y: e.clientY }); }} className={cls} style={style} title={title}>{label}{grip}</button>;
+  if (b.href) return (
+    <div className={`${cls} flex items-start gap-1`} style={style} title={title} onContextMenu={(e) => e.preventDefault()} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag}>
+      <Tick done={!!b.done} label={b.done ? `Reopen ${b.title}` : `Complete ${b.title}`} title={b.done ? 'Done · tap to reopen' : 'Mark done'} onClick={(e) => { e.stopPropagation(); onTask(b.id, !!b.done); }} />
+      <button type="button" onClick={(e) => { e.stopPropagation(); onMenu({ kind: 'task', id: b.id, title: b.title, date: day, done: !!b.done, missed: false, href: b.href!, x: e.clientX, y: e.clientY }); }} className="min-w-0 flex-1 text-left">{label}</button>
+      {grip}
+    </div>
+  );
   if (b.kind === 'habit' && b.habit) {
     const h = b.habit;
     return (
       <div className={`${cls} flex items-start gap-1`} style={style} title={title} onPointerDown={(e) => down(e, 'move')} onContextMenu={(e) => e.preventDefault()} onClickCapture={noClickAfterDrag}>
-        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onHabit(h.id, h.date, !!b.done); }} title={b.done ? 'Done · tap to undo' : 'Tap to tick off'} aria-label={b.done ? `Undo ${b.title}` : `Tick off ${b.title}`} className={`mt-px flex size-5 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold leading-none ${b.done ? 'border-emerald-600 bg-emerald-600 text-white' : h.missed ? 'border-red-500 bg-red-500 text-white' : 'border-current opacity-70 hover:opacity-100'}`}>{b.done ? '✓' : h.missed ? '✕' : ''}</button>
+        <Tick done={!!b.done} missed={h.missed} label={b.done ? `Undo ${b.title}` : `Tick off ${b.title}`} title={b.done ? 'Done · tap to undo' : 'Tick off'} onClick={(e) => { e.stopPropagation(); onHabit(h.id, h.date, !!b.done); }} />
         <button type="button" onClick={(e) => { e.stopPropagation(); onMenu({ kind: 'habit', id: h.id, title: b.title, date: h.date, done: !!b.done, missed: h.missed, href: `/habits#habit-${h.id}`, x: e.clientX, y: e.clientY }); }} className="min-w-0 flex-1 text-left">{label}</button>
         {grip}
       </div>
