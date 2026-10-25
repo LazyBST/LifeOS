@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
-import { syncGoogleNowAction } from '@/app/actions/google';
+import { syncGoogleNowAction, syncTodayAction } from '@/app/actions/google';
 import { setHabitDayAction, setHabitDayTimeAction } from '@/app/actions/habits';
 import { completeTaskAction, reopenTaskAction, updateTaskAction } from '@/app/actions/tasks';
 import { undoEventEditAction, updateEventAction } from '@/app/actions/calevents';
@@ -121,6 +121,15 @@ export function CalendarWeek() {
     await load(ws);
   }
 
+  async function syncTodayNow() {
+    setLoading(true);
+    const r = await syncTodayAction();
+    if (!r.ok) toast.error(r.error);
+    else if (r.data.errors.length) toast.error(r.data.errors.join(' · '));
+    else toast.success(`Today synced both ways: ${r.data.pulled} from Google${r.data.removed ? `, ${r.data.removed} removed` : ''}, ${r.data.pushed} sent to Google${r.data.failed ? `, ${r.data.failed} failed` : ''}.`);
+    await load(ws);
+  }
+
   /** A block was dragged (moved) or its bottom edge pulled (resized): save the new time to wherever it lives. */
   async function moveBlock(b: WeekBlock, date: string, startMin: number, endMin: number) {
     const hhmm = fmtTime(startMin), hhmmEnd = fmtTime(endMin);
@@ -234,6 +243,7 @@ export function CalendarWeek() {
             <button onClick={() => { anchor.current = null; setRow(fitRow); }} className="border-x px-2 py-1 hover:bg-muted" title="Fit the whole day on screen">Fit</button>
             <button onClick={() => { anchor.current = null; setRow(row * 1.5); }} className="px-2 py-1 hover:bg-muted" aria-label="Zoom in" title="Zoom in down to 5 minutes (or pinch)">+</button>
           </span>
+          <button onClick={syncTodayNow} className="rounded-md border px-2 py-1 text-xs" title="Sync only today's events with Google Calendar, both ways">Sync today</button>
           <button onClick={syncNow} className="rounded-md border px-2 py-1 text-xs" title="Fetch what changed in Google Calendar since the last sync">Sync Google</button>
           <button onClick={() => setDialog({ mode: 'create', date: focus, hour: Math.min(22, Math.max(startH, istParts().hour + 1)) })} className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground">+ Event</button>
         </span>

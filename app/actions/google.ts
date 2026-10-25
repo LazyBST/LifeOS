@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth';
-import { drainOutbox, pollCalendar, type PollResult } from '@/lib/google/sync';
+import { drainOutbox, pollCalendar, syncToday, type PollResult, type TodayResult } from '@/lib/google/sync';
 import { pullHabitCheckins, type PullReport } from '@/lib/google/habit-sync';
 import { type ActionResult, run } from './_result';
 
@@ -17,5 +17,15 @@ export async function syncGoogleNowAction(opts: { full?: boolean } = {}): Promis
     const tasks = await pullHabitCheckins();
     revalidatePath('/', 'layout');
     return { calendar, outbox, tasks };
+  });
+}
+
+/** "Sync today": only today's events, both ways: Google to the app and the app's changes to Google. */
+export async function syncTodayAction(): Promise<ActionResult<TodayResult>> {
+  return run(async () => {
+    await requireUser();
+    const r = await syncToday();
+    revalidatePath('/', 'layout');
+    return r;
   });
 }

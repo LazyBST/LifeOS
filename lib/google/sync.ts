@@ -16,6 +16,7 @@ import {
   httpStatus,
 } from './calendar';
 import { eventToCacheRow, type CacheRow } from './events-math';
+import { addDays, istDate, istInstant } from '@/lib/time';
 
 const MAX_ATTEMPTS = 6;
 const DONE_COLOR_ID = '8'; // grey, for a completed task's event (spec section 9)
@@ -172,10 +173,10 @@ async function processOutboxRow(row: OutboxRow): Promise<void> {
 }
 
 /** App -> Google. Drains up to 20 un-done outbox rows, oldest first. */
-export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
+export async function drainOutbox(opts: { onlyDate?: string } = {}): Promise<{ pushed: number; failed: number }> {
   if (!(await connected())) return { pushed: 0, failed: 0 };
   try {
-    return await drainOutboxInner();
+    return await drainOutboxInner(opts);
   } catch (err) {
     // The cron tick must never break because Google (or Supabase) had a bad moment.
     console.error('drainOutbox failed', err instanceof Error ? err.message : err);
@@ -183,7 +184,7 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
   }
 }
 
-async function drainOutboxInner(): Promise<{ pushed: number; failed: number }> {
+async function drainOutboxInner(opts: { onlyDate?: string } = {}): Promise<{ pushed: number; failed: number }> {
   const { data, error } = await admin()
     .from('gcal_outbox')
     .select('*')
@@ -192,7 +193,14 @@ async function drainOutboxInner(): Promise<{ pushed: number; failed: number }> {
     .limit(OUTBOX_BATCH);
   if (error) return { pushed: 0, failed: 0 };
 
-  const rows = (data ?? []) as OutboxRow[];
+  let rows = (data ?? []) as OutboxRow[];
+  if (opts.onlyDate && rows.length) {
+    // only the tasks that sit on that day
+    const from = istInstant(opts.onlyDate, '00:00').toISOString(), to = istInstant(addDays(opts.onlyDate, 1), '00:00').toISOString();
+    const { data: ts } = await admin().from('tasks').select('id').in('id', rows.map((r) => r.task_id)).gte('due_at', from).lt('due_at', to);
+    const today = new Set(((ts ?? []) as { id: string }[]).map((t) => t.id));
+    rows = rows.filter((r) => today.has(r.task_id));
+  }
   let pushed = 0;
   let failed = 0;
 
@@ -546,5 +554,54 @@ export async function pollCalendar(opts: { full?: boolean } = {}): Promise<PollR
   result.cached = count ?? 0;
   if (result.errors.length) console.error('pollCalendar', result.errors.join(' | '));
   await recordCalendarState(result).catch(() => undefined);
+  return result;
+}
+
+
+export type TodayResult = { date: string; pulled: number; removed: number; pushed: number; failed: number; errors: string[] };
+
+/**
+ * Both ways, for one day only (today by default): read that day's events from Google (LifeOS calendar and main
+ * calendar, including changes and deletions), then send the pending changes of that day's tasks to Google.
+ * It never touches the incremental sync position, so the normal sync is unaffected.
+ */
+export async function syncToday(date: string = istDate()): Promise<TodayResult> {
+  const result: TodayResult = { date, pulled: 0, removed: 0, pushed: 0, failed: 0, errors: [] };
+  const problem = await connectionProblem();
+  if (problem) { result.errors.push(problem); return result; }
+  const timeMin = istInstant(date, '00:00').toISOString(), timeMax = istInstant(addDays(date, 1), '00:00').toISOString();
+
+  // Google -> app, the LifeOS calendar (the events behind your timed tasks)
+  try {
+    const calendarId = await ensureLifeosCalendar();
+    const { events } = await listEvents({ calendarId, timeMin, timeMax });
+    for (const event of events) if (await applyRemoteEvent(calendarId, event)) result.pulled += 1;
+  } catch (e) { result.errors.push(`LifeOS calendar: ${e instanceof Error ? e.message : String(e)}`); }
+
+  // Google -> app, the main calendar: what Google returns replaces what was stored for that day
+  try {
+    await ensurePrimaryCached();
+    const { events } = await listEvents({ calendarId: PRIMARY_CALENDAR_ID, timeMin, timeMax });
+    const rows: CacheRow[] = [];
+    const live = new Set<string>();
+    const gone: string[] = [];
+    for (const event of events) {
+      if (!event.id) continue;
+      if (event.status === 'cancelled') { gone.push(event.id); continue; }
+      const row = eventToCacheRow(event);
+      if (row) { rows.push(row); live.add(row.google_event_id); }
+    }
+    const { data: stored } = await admin().from('calendar_events').select('google_event_id').lt('starts_at', timeMax).gte('ends_at', timeMin);
+    for (const r of (stored ?? []) as { google_event_id: string }[]) if (!live.has(r.google_event_id) && !gone.includes(r.google_event_id)) gone.push(r.google_event_id);
+    if (rows.length && !(await upsertCacheRows(rows))) throw new Error('events could not be saved (is migration 0011 applied?)');
+    for (let k = 0; k < gone.length; k += 200) await admin().from('calendar_events').delete().in('google_event_id', gone.slice(k, k + 200));
+    result.pulled += rows.length;
+    result.removed = gone.length;
+  } catch (e) { result.errors.push(`Main calendar: ${e instanceof Error ? e.message : String(e)}`); }
+
+  // app -> Google, that day's tasks
+  const out = await drainOutbox({ onlyDate: date });
+  result.pushed = out.pushed;
+  result.failed = out.failed;
   return result;
 }
