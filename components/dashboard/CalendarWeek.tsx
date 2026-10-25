@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
 import { syncGoogleNowAction } from '@/app/actions/google';
 import { setHabitDayAction, setHabitDayTimeAction } from '@/app/actions/habits';
-import { updateTaskAction } from '@/app/actions/tasks';
+import { completeTaskAction, reopenTaskAction, updateTaskAction } from '@/app/actions/tasks';
 import { undoEventEditAction, updateEventAction } from '@/app/actions/calevents';
 import { EventDialog, type DialogTarget } from './EventDialog';
 import type { WeekBlock, WeekData } from '@/lib/domain/calweek';
@@ -24,6 +24,38 @@ const KIND = {
   habit: 'bg-amber-100 text-amber-900 dark:bg-amber-500/25 dark:text-amber-100 border-amber-300/60',
 } as const;
 
+/** What a tap on a habit or task opens a menu for. */
+type MenuTarget = { kind: 'habit' | 'task'; id: string; title: string; date: string; done: boolean; missed: boolean; href: string; x: number; y: number };
+
+/** Small action menu at the tap point: tick, mark missed, undo, open. Closes on any outside tap or Escape. */
+function ActionMenu({ m, onClose, onAct }: { m: MenuTarget; onClose: () => void; onAct: (a: 'done' | 'missed' | 'clear' | 'toggle-task') => void }) {
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [onClose]);
+  const W = 200, left = Math.max(8, Math.min(m.x - W / 2, (typeof window === 'undefined' ? 400 : window.innerWidth) - W - 8));
+  const top = Math.max(8, Math.min(m.y + 8, (typeof window === 'undefined' ? 600 : window.innerHeight) - 190));
+  const item = 'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted';
+  return (
+    <>
+      <button type="button" aria-label="Close menu" className="fixed inset-0 z-40 cursor-default" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
+      <div role="menu" className="fixed z-50 rounded-xl border bg-card p-1 shadow-xl" style={{ left, top, width: W }}>
+        <div className="truncate px-3 pt-1.5 pb-1 text-xs font-semibold text-muted-foreground">{m.title}</div>
+        {m.kind === 'habit' ? (
+          <>
+            {m.done ? <button role="menuitem" className={item} onClick={() => onAct('clear')}>↺ Undo done</button> : <button role="menuitem" className={item} onClick={() => onAct('done')}>✓ Mark done</button>}
+            {m.missed ? <button role="menuitem" className={item} onClick={() => onAct('clear')}>↺ Undo missed</button> : !m.done && <button role="menuitem" className={item} onClick={() => onAct('missed')}>✕ Mark missed</button>}
+          </>
+        ) : (
+          <button role="menuitem" className={item} onClick={() => onAct('toggle-task')}>{m.done ? '↺ Reopen' : '✓ Mark done'}</button>
+        )}
+        <Link role="menuitem" href={m.href} className={item} onClick={onClose}>↗ Open {m.kind}</Link>
+      </div>
+    </>
+  );
+}
+
 /** Your own calendar: week or day, with Google events, timed tasks, habit time blocks, and goals/projects as bars. */
 export function CalendarWeek() {
   const today = istDate();
@@ -33,6 +65,7 @@ export function CalendarWeek() {
   const [data, setData] = useState<WeekData | null>(null);
   const [loading, setLoading] = useState(false);
   const [dialog, setDialog] = useState<DialogTarget>(null);
+  const [menu, setMenu] = useState<MenuTarget | null>(null);
 
   useEffect(() => { try { const m = localStorage.getItem('lifeos:cal:mode'); if (m === 'day' || m === 'week') setMode(m); else if (window.innerWidth < 768) setMode('day'); } catch {} }, []);
   const chooseMode = (m: 'week' | 'day') => { setMode(m); try { localStorage.setItem('lifeos:cal:mode', m); } catch {} };
@@ -83,6 +116,15 @@ export function CalendarWeek() {
       if (!r.ok) toast.error(r.error);
       else toast.success(`${b.title} moved to ${hhmm}–${hhmmEnd} for ${b.habit.date} only.`);
     }
+    await load(ws);
+  }
+
+  async function menuAct(m: MenuTarget, a: 'done' | 'missed' | 'clear' | 'toggle-task') {
+    setMenu(null);
+    const r = m.kind === 'habit'
+      ? await setHabitDayAction(m.id, m.date, a === 'toggle-task' ? 'clear' : a)
+      : m.done ? await reopenTaskAction(m.id) : await completeTaskAction(m.id);
+    if (!r.ok) toast.error(r.error);
     await load(ws);
   }
 
@@ -172,8 +214,8 @@ export function CalendarWeek() {
                 ))}
                 {any.map((u) => u.kind === 'habit' ? (
                   <div key={`h-${u.id}`} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-left text-[12px] ${KIND.habit} ${u.done ? 'line-through opacity-60' : ''}`}>
-                    <button type="button" onClick={() => void toggleHabit(u.id, d, u.done)} title={u.done ? 'Done (click to undo)' : 'Click to check in'}>{u.done ? '✓' : u.missed ? '✕' : '○'}</button>
-                    <Link href={`/habits#habit-${u.id}`} className="min-w-0 flex-1 truncate">{u.emoji ? `${u.emoji} ` : ''}{u.title}</Link>
+                    <button type="button" onClick={() => void toggleHabit(u.id, d, u.done)} title={u.done ? 'Done · tap to undo' : 'Tap to tick off'} aria-label={u.done ? `Undo ${u.title}` : `Tick off ${u.title}`} className={`flex size-4 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold leading-none ${u.done ? 'border-emerald-600 bg-emerald-600 text-white' : u.missed ? 'border-red-500 bg-red-500 text-white' : 'border-current opacity-70'}`}>{u.done ? '✓' : u.missed ? '✕' : ''}</button>
+                    <button type="button" onClick={(e) => setMenu({ kind: 'habit', id: u.id, title: u.title, date: d, done: u.done, missed: !!u.missed, href: `/habits#habit-${u.id}`, x: e.clientX, y: e.clientY })} className="min-w-0 flex-1 truncate text-left">{u.emoji ? `${u.emoji} ` : ''}{u.title}</button>
                   </div>
                 ) : (
                   <Link key={`t-${u.id}`} href={u.href ?? '#'} className={`flex items-center gap-1 truncate rounded border px-1.5 py-0.5 text-[12px] ${KIND.task} ${u.done ? 'line-through opacity-60' : ''}`}>
@@ -195,23 +237,24 @@ export function CalendarWeek() {
               <div key={d} data-daycol={d} className="relative cursor-cell border-l border-border" style={{ height: gridH }}
                 onClick={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); setDialog({ mode: 'create', date: d, hour: Math.min(23, startH + Math.floor((ev.clientY - r.top) / ROW)) }); }}>
                 {hours.map((h) => <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: (h - startH) * ROW }} />)}
-                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={Math.max(20, ((Math.max(minutesOf(b.end), minutesOf(b.start) + 20) - minutesOf(b.start)) / 60) * ROW - 2)} detailed={mode === 'day'} row={ROW} days={days} day={d} onMove={(bl, date, sMin, eMin) => void moveBlock(bl, date, sMin, eMin)} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} />)}
+                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={Math.max(20, ((Math.max(minutesOf(b.end), minutesOf(b.start) + 20) - minutesOf(b.start)) / 60) * ROW - 2)} detailed={mode === 'day'} row={ROW} days={days} day={d} onMove={(bl, date, sMin, eMin) => void moveBlock(bl, date, sMin, eMin)} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} onMenu={(m) => setMenu(m)} />)}
                 {d === today && (() => { const m = minutesOf(new Date().toISOString()); return m >= startH * 60 && m < (endH + 1) * 60 ? <div className="absolute inset-x-0 z-10 h-0.5 bg-red-500" style={{ top: topOf(m) }} /> : null; })()}
               </div>
             );
           })}
         </div>
       </div>
+      {menu && <ActionMenu m={menu} onClose={() => setMenu(null)} onAct={(a) => void menuAct(menu, a)} />}
       <EventDialog target={dialog} onClose={() => setDialog(null)} onChanged={() => void load(ws)} />
       <p className="text-[12px] text-muted-foreground">
         <span className="mr-3">■ <span className="text-emerald-600">Google events</span></span><span className="mr-3">■ <span className="text-indigo-600">Tasks (start → end)</span></span><span className="mr-3">■ <span className="text-amber-600">Habits (their time block)</span></span>
-        Click an empty slot to add an event, an event to edit it; tasks, habits, goals and projects open their page (the circle checks a habit in). Give habits a time in Habits → Edit.
+        Click an empty slot to add an event, an event to edit it; tap the circle to tick a habit off; tap a habit or task for a menu (done, missed, open); drag to move. Give habits a time in Habits → Edit.
       </p>
     </div>
   );
 }
 
-function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, onHabit }: { b: WeekBlock; p?: { col: number; cols: number }; top: number; height: number; detailed: boolean; row: number; days: string[]; day: string; onMove: (b: WeekBlock, date: string, startMin: number, endMin: number) => void; onEvent: (e: NonNullable<WeekBlock['event']>) => void; onHabit: (id: string, date: string, done: boolean) => void }) {
+function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, onHabit, onMenu }: { b: WeekBlock; p?: { col: number; cols: number }; top: number; height: number; detailed: boolean; row: number; days: string[]; day: string; onMove: (b: WeekBlock, date: string, startMin: number, endMin: number) => void; onEvent: (e: NonNullable<WeekBlock['event']>) => void; onHabit: (id: string, date: string, done: boolean) => void; onMenu: (m: MenuTarget) => void }) {
   const [drag, setDrag] = useState<{ dx: number; dy: number; mode: 'move' | 'resize' } | null>(null);
   const justDragged = useRef(false);
   const cols = p?.cols ?? 1, col = p?.col ?? 0;
@@ -293,13 +336,13 @@ function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, o
     </>
   );
   const title = `${b.title} · ${range} — drag to move (press and hold on a touch screen), pull the bottom edge to resize`;
-  if (b.href) return <Link href={b.href} draggable={false} onContextMenu={(e) => e.preventDefault()} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag} onClick={(e) => e.stopPropagation()} className={cls} style={style} title={title}>{label}{grip}</Link>;
+  if (b.href) return <button type="button" onContextMenu={(e) => e.preventDefault()} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag} onClick={(e) => { e.stopPropagation(); onMenu({ kind: 'task', id: b.id, title: b.title, date: day, done: !!b.done, missed: false, href: b.href!, x: e.clientX, y: e.clientY }); }} className={cls} style={style} title={title}>{label}{grip}</button>;
   if (b.kind === 'habit' && b.habit) {
     const h = b.habit;
     return (
       <div className={`${cls} flex items-start gap-1`} style={style} title={title} onPointerDown={(e) => down(e, 'move')} onContextMenu={(e) => e.preventDefault()} onClickCapture={noClickAfterDrag}>
-        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onHabit(h.id, h.date, !!b.done); }} title={b.done ? 'Done (click to undo)' : 'Click to check in'} className="shrink-0 font-semibold">{b.done ? '✓' : h.missed ? '✕' : '○'}</button>
-        <Link href={`/habits#habit-${h.id}`} draggable={false} onClick={(e) => e.stopPropagation()} className="min-w-0 flex-1">{label}</Link>
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onHabit(h.id, h.date, !!b.done); }} title={b.done ? 'Done · tap to undo' : 'Tap to tick off'} aria-label={b.done ? `Undo ${b.title}` : `Tick off ${b.title}`} className={`mt-px flex size-5 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold leading-none ${b.done ? 'border-emerald-600 bg-emerald-600 text-white' : h.missed ? 'border-red-500 bg-red-500 text-white' : 'border-current opacity-70 hover:opacity-100'}`}>{b.done ? '✓' : h.missed ? '✕' : ''}</button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onMenu({ kind: 'habit', id: h.id, title: b.title, date: h.date, done: !!b.done, missed: h.missed, href: `/habits#habit-${h.id}`, x: e.clientX, y: e.clientY }); }} className="min-w-0 flex-1 text-left">{label}</button>
         {grip}
       </div>
     );
