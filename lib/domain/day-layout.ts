@@ -4,9 +4,9 @@ export type Placed = { id: string; col: number; cols: number };
 
 /**
  * Greedy column assignment: blocks that overlap in time share a cluster and get the same column count, each in
- * the first free column. `start`/`end` are minutes from midnight; a block must be at least `minLen` long.
+ * the first free column. `start`/`end` are minutes from midnight; a block counts as at least `minLen` minutes long. Blocks that only touch (one ends exactly when the next starts) are in sequence, not side by side.
  */
-export function assignColumns(blocks: TimedBlock[], minLen = 20): Placed[] {
+export function assignColumns(blocks: TimedBlock[], minLen = 5): Placed[] {
   const sorted = [...blocks].map((b) => ({ ...b, end: Math.max(b.end, b.start + minLen) })).sort((a, b) => a.start - b.start || b.end - a.end);
   const placed: Placed[] = [];
   let cluster: { id: string; col: number; end: number }[] = [];
@@ -36,3 +36,20 @@ export function minutesOfTime(t: string | null | undefined): number | null {
 }
 
 export const fmtTime = (minutes: number) => `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+
+/**
+ * Drawn height in pixels for each block at `row` px per hour. A short block is drawn at least `minPx` tall so it can
+ * be seen, but never so tall that it covers the block that follows it in the same column: back-to-back items stay
+ * in sequence instead of overlapping.
+ */
+export function blockHeights(blocks: TimedBlock[], placed: Placed[], row: number, minPx = 16, floorPx = 4): Map<string, number> {
+  const col = new Map(placed.map((p) => [p.id, p.col]));
+  const out = new Map<string, number>();
+  for (const b of blocks) {
+    const real = (Math.max(b.end, b.start + 5) - b.start) / 60 * row - 2;
+    const next = blocks.filter((o) => o.id !== b.id && col.get(o.id) === col.get(b.id) && o.start > b.start).reduce((m, o) => Math.min(m, o.start), Infinity);
+    const gap = Number.isFinite(next) ? ((next - b.start) / 60) * row - 2 : Infinity;
+    out.set(b.id, Math.max(real, floorPx, Math.min(minPx, gap)));
+  }
+  return out;
+}

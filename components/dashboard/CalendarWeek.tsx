@@ -9,7 +9,7 @@ import { completeTaskAction, reopenTaskAction, updateTaskAction } from '@/app/ac
 import { undoEventEditAction, updateEventAction } from '@/app/actions/calevents';
 import { EventDialog, type DialogTarget } from './EventDialog';
 import type { WeekBlock, WeekData } from '@/lib/domain/calweek';
-import { assignColumns, fmtTime } from '@/lib/domain/day-layout';
+import { assignColumns, blockHeights, fmtTime } from '@/lib/domain/day-layout';
 import { addDays, daysBetween, istDate, istInstant, istParts } from '@/lib/time';
 import { draggedRange, scaleStep } from '@/lib/domain/calendar-drag';
 import { weekStart as mondayOf } from '@/lib/domain/lifecal-math';
@@ -350,12 +350,15 @@ export function CalendarWeek() {
           </div>
           {days.map((d) => {
             const dayBlocks = (data?.blocks ?? []).filter((b) => istParts(new Date(b.start)).date === d);
-            const placed = new Map(assignColumns(dayBlocks.map((b) => ({ id: b.id, start: minutesOf(b.start), end: Math.max(minutesOf(b.end), minutesOf(b.start) + 20) }))).map((p) => [p.id, p]));
+            const spans = dayBlocks.map((b) => ({ id: b.id, start: minutesOf(b.start), end: minutesOf(b.end) }));
+            const cols = assignColumns(spans);
+            const placed = new Map(cols.map((p) => [p.id, p]));
+            const heights = blockHeights(spans, cols, row);
             return (
               <div key={d} data-daycol={d} className="relative cursor-cell border-l border-border" style={{ height: gridH }}
                 onClick={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); setDialog({ mode: 'create', date: d, hour: Math.min(23, startH + Math.floor((ev.clientY - r.top) / row)) }); }}>
                 {ticks.map((m) => <div key={m} className={`absolute inset-x-0 border-t ${m % 60 === 0 ? 'border-foreground/20' : m % 30 === 0 ? 'border-foreground/[0.12]' : 'border-foreground/[0.07]'}`} style={{ top: ((m - startH * 60) / 60) * row }} />)}
-                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={Math.max(16, ((Math.max(minutesOf(b.end), minutesOf(b.start) + 5) - minutesOf(b.start)) / 60) * row - 2)} detailed={mode === 'day'} row={row} days={days} day={d} onMove={(bl, date, sMin, eMin) => void moveBlock(bl, date, sMin, eMin)} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} onMenu={(m) => setMenu(m)} onTask={(id, done) => void toggleTask(id, done)} />)}
+                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={heights.get(b.id) ?? 16} detailed={mode === 'day'} row={row} days={days} day={d} onMove={(bl, date, sMin, eMin) => void moveBlock(bl, date, sMin, eMin)} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} onMenu={(m) => setMenu(m)} onTask={(id, done) => void toggleTask(id, done)} />)}
                 {d === today && (() => { const m = minutesOf(new Date().toISOString()); return m >= startH * 60 && m < (endH + 1) * 60 ? <div className="absolute inset-x-0 z-10 h-0.5 bg-red-500" style={{ top: topOf(m) }} /> : null; })()}
               </div>
             );
