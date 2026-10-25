@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Area, AreaChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatINR } from '@/lib/format';
 
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -18,14 +18,14 @@ export function PeriodComparison({ expense, income, net, currentLabel, previousL
   const [tab, setTab] = useState<'expense' | 'income' | 'net'>('expense');
   const data = { expense, income, net }[tab];
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="no-drag mb-2 flex rounded-lg bg-muted p-0.5 text-xs">
         {(['expense', 'income', 'net'] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`flex-1 rounded-md px-2 py-1 font-medium capitalize ${tab === t ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>{t === 'net' ? 'Cash flow' : t}</button>
         ))}
       </div>
-      <div className="h-52 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="relative min-h-48 w-full flex-1">
+        <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
           <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
             {GRID}
             <XAxis dataKey="day" tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -44,8 +44,8 @@ export function PeriodComparison({ expense, income, net, currentLabel, previousL
 export function BalanceTrend({ points }: { points: { date: string; balance: number }[] }) {
   if (points.length === 0) return <p className="text-sm text-muted-foreground">Nothing to show for this month yet.</p>;
   return (
-    <div className="h-52 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="relative min-h-48 w-full flex-1">
+      <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
         <AreaChart data={points} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
           {GRID}
           <XAxis dataKey="date" tickFormatter={dayLabel} tick={axis} tickLine={false} axisLine={false} minTickGap={28} />
@@ -62,8 +62,8 @@ export function BalanceTrend({ points }: { points: { date: string; balance: numb
 export function ForecastChart({ points }: { points: { date: string; committed: number; expected: number }[] }) {
   const lowest = points.reduce((m, p) => (p.expected < m.expected ? p : m), points[0]);
   return (
-    <div className="h-60 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="relative min-h-52 w-full flex-1">
+      <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
         <LineChart data={points} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
           {GRID}
           <XAxis dataKey="date" tickFormatter={dayLabel} tick={axis} tickLine={false} axisLine={false} minTickGap={36} />
@@ -114,6 +114,46 @@ export function CategoryDonut({ rows, previous = [] }: { rows: { category: strin
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** Income against expense for the last six months, with the net as a line. */
+export function MonthlyBars({ rows }: { rows: { month: string; income: number; expense: number; net: number }[] }) {
+  return (
+    <div className="relative min-h-52 w-full flex-1">
+      <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
+        <ComposedChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
+          {GRID}
+          <XAxis dataKey="month" tickFormatter={(m: string) => SHORT[Number(m.slice(5)) - 1]} tick={axis} tickLine={false} axisLine={false} />
+          <YAxis tick={axis} tickLine={false} axisLine={false} width={42} tickFormatter={k} />
+          <Tooltip contentStyle={tip} labelFormatter={(m) => `${SHORT[Number(String(m).slice(5)) - 1]} ${String(m).slice(0, 4)}`} formatter={(v, n) => [formatINR(Number(v)), String(n)]} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <ReferenceLine y={0} stroke="var(--border)" />
+          <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          <Bar dataKey="expense" name="Expense" fill="#ef4444" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          <Line type="monotone" dataKey="net" name="Net" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** What you spent each day of the month, against your daily average. */
+export function DailyBars({ rows }: { rows: { date: string; amount: number }[] }) {
+  const avg = rows.length ? rows.reduce((s, r) => s + r.amount, 0) / rows.length : 0;
+  return (
+    <div className="relative min-h-48 w-full flex-1">
+      <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
+        <BarChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
+          {GRID}
+          <XAxis dataKey="date" tickFormatter={(d: string) => String(Number(d.slice(8)))} tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+          <YAxis tick={axis} tickLine={false} axisLine={false} width={42} tickFormatter={k} />
+          <Tooltip contentStyle={tip} labelFormatter={(d) => dayLabel(String(d))} formatter={(v) => [formatINR(Number(v)), 'Spent']} />
+          <ReferenceLine y={avg} stroke="#f59e0b" strokeDasharray="4 3" label={{ value: `avg ${k(avg)}`, position: 'insideTopRight', fontSize: 10, fill: '#f59e0b' }} />
+          <Bar dataKey="amount" fill="#6366f1" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
