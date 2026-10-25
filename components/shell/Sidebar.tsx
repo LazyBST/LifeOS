@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Wallet,
   Library,
+  ListTodo,
   BookOpen,
   BarChart3,
   Settings,
@@ -21,6 +22,7 @@ export type NavArea = { id: string; name: string; slug: string; color: string };
 
 const STATIC_LINKS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/tasks', label: 'Tasks', icon: ListTodo },
   { href: '/habits', label: 'Habits', icon: CheckCircle2 },
   { href: '/books', label: 'Books', icon: Library },
   { href: '/money', label: 'Money', icon: Wallet },

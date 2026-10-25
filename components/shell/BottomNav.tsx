@@ -2,14 +2,24 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ListTodo, MessageCircle, Wallet, MoreHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import { Home, ListTodo, MessageCircle, Wallet, MoreHorizontal, CheckCircle2, Library, BookOpen, BarChart3, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/?preset=today', label: 'Tasks', icon: ListTodo },
+  { href: '/tasks', label: 'Tasks', icon: ListTodo },
   { href: '/money', label: 'Money', icon: Wallet },
   { href: '/settings', label: 'More', icon: MoreHorizontal },
+] as const;
+
+/** Everything that does not fit in the bar. */
+const MORE = [
+  { href: '/habits', label: 'Habits', icon: CheckCircle2 },
+  { href: '/journal', label: 'Journal', icon: BookOpen },
+  { href: '/books', label: 'Books', icon: Library },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
@@ -20,6 +30,8 @@ function isActive(pathname: string, href: string): boolean {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const [more, setMore] = useState(false);
+  const moreActive = MORE.some((m) => isActive(pathname, m.href));
 
   function toggleChat() {
     // The chat panel (owned by another worker) listens for this event to
@@ -29,6 +41,20 @@ export function BottomNav() {
   }
 
   return (
+    <>
+      {more && (
+        <>
+          <button type="button" aria-label="Close menu" className="fixed inset-0 z-40 md:hidden" onClick={() => setMore(false)} />
+          <div className="fixed inset-x-3 bottom-16 z-50 grid grid-cols-3 gap-1 rounded-2xl border bg-card p-2 shadow-lg md:hidden" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            {MORE.map((m) => (
+              <Link key={m.href} href={m.href} onClick={() => setMore(false)} className={cn('flex flex-col items-center gap-1 rounded-xl py-3 text-xs', isActive(pathname, m.href) ? 'bg-muted font-medium' : 'text-muted-foreground')}>
+                <m.icon className="size-5" />
+                {m.label}
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t bg-background md:hidden">
       <Link
         href={ITEMS[0].href}
@@ -68,17 +94,17 @@ export function BottomNav() {
         <Wallet className="size-5" />
         {ITEMS[2].label}
       </Link>
-      <Link
-        href={ITEMS[3].href}
-        className={cn(
-          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[12px] touch-target',
-          isActive(pathname, ITEMS[3].href) ? 'text-foreground' : 'text-muted-foreground',
-        )}
+      <button
+        type="button"
+        onClick={() => setMore((v) => !v)}
+        aria-expanded={more}
+        className={cn('flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[12px] touch-target', more || moreActive ? 'text-foreground' : 'text-muted-foreground')}
       >
         <MoreHorizontal className="size-5" />
-        {ITEMS[3].label}
-      </Link>
+        More
+      </button>
     </nav>
+    </>
   );
 }
 
