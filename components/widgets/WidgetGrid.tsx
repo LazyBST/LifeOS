@@ -1,6 +1,6 @@
 'use client';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Responsive, useContainerWidth, type Layout, type ResponsiveLayouts } from 'react-grid-layout';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Responsive, useContainerWidth, type Layout } from 'react-grid-layout';
 import { saveUiStateAction } from '@/app/actions/uistate';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -20,51 +20,102 @@ export function packLayout(items: Pick<GridItem, 'id' | 'w' | 'h' | 'minW' | 'mi
   }
   return out;
 }
-const stack = (items: Item[]): Item[] => items.map((it, n) => ({ ...it, x: 0, w: 1, y: n * 100 }));
+
+/** Four screen sizes, each with its own saved arrangement. */
+export const SIZES = ['sm', 'md', 'lg', 'xl'] as const;
+export type Size = (typeof SIZES)[number];
+const BREAKPOINTS: Record<Size, number> = { xl: 1536, lg: 1100, md: 768, sm: 0 };
+const COLS: Record<Size, number> = { xl: 12, lg: 12, md: 8, sm: 1 };
+export const sizeFor = (width: number): Size => (width >= 1536 ? 'xl' : width >= 1100 ? 'lg' : width >= 768 ? 'md' : 'sm');
+
+type SizedLayouts = Record<Size, Item[]>;
+
+/** Medium screens have 8 columns: keep reading order, scale widths down. */
+function mediumFrom(lg: Item[]): Item[] {
+  const ordered = [...lg].sort((a, b) => a.y - b.y || a.x - b.x);
+  return packLayout(ordered.map((it) => ({ id: it.i, w: Math.min(8, Math.max(it.minW ? Math.min(it.minW, 8) : 3, Math.round((it.w * 8) / 12))), h: it.h, minW: it.minW && Math.min(it.minW, 8), minH: it.minH })), 8);
+}
+/** Small screens: one column, in reading order. */
+function smallFrom(lg: Item[]): Item[] {
+  return [...lg].sort((a, b) => a.y - b.y || a.x - b.x).reduce<Item[]>((acc, it) => {
+    const y = acc.length ? acc[acc.length - 1].y + acc[acc.length - 1].h : 0;
+    acc.push({ i: it.i, x: 0, y, w: 1, h: it.h, minH: it.minH });
+    return acc;
+  }, []);
+}
+
+export function defaultsFrom(lg: Item[]): SizedLayouts {
+  return { sm: smallFrom(lg), md: mediumFrom(lg), lg, xl: lg };
+}
+
+/** A saved arrangement is only used if it lists exactly these widgets and fits that size's columns. */
+function valid(layout: unknown, ids: string[], cols: number): layout is Item[] {
+  if (!Array.isArray(layout) || layout.length !== ids.length) return false;
+  const seen = new Set(ids);
+  return layout.every((l) => l && seen.delete(l.i) && Number.isFinite(l.x) && Number.isFinite(l.y) && l.w >= 1 && l.h >= 1 && l.x + l.w <= cols);
+}
+
+export function merge(defaults: SizedLayouts, saved: unknown, ids: string[]): SizedLayouts {
+  const out = { ...defaults };
+  const src = (saved ?? {}) as Partial<Record<Size, unknown>>;
+  for (const size of SIZES) {
+    const candidate = src[size] ?? (size === 'xl' ? src.lg : undefined);
+    if (valid(candidate, ids, COLS[size])) out[size] = candidate as Item[];
+  }
+  return out;
+}
 
 /**
- * A page of draggable, resizable widgets (drag the card header, resize from the corner). The arrangement is saved to
- * the database under `layoutKey`, so it is the same on every device.
+ * A page of draggable, resizable widgets (drag the card header, resize from the corner). There is a separate
+ * arrangement for small, medium, large and extra-large screens, saved to the database under `layoutKey`
+ * (only when you drag or resize), so each device keeps the layout you gave its size.
  */
-export function WidgetGrid({ items, layoutKey, initial }: { items: GridItem[]; layoutKey: string; initial?: ResponsiveLayouts | null }) {
+export function WidgetGrid({ items, layoutKey, initial, lgLayout }: { items: GridItem[]; layoutKey: string; initial?: unknown; /** explicit large-screen positions; otherwise items are packed in order */ lgLayout?: Item[] }) {
   const { width, containerRef, mounted } = useContainerWidth();
-  const defaults = packLayout(items);
-  const [layouts, setLayouts] = useState<ResponsiveLayouts>({ lg: defaults, md: defaults, sm: stack(defaults), xs: stack(defaults), xxs: stack(defaults) });
+  const ids = items.map((i) => i.id);
+  const [layouts, setLayouts] = useState<SizedLayouts>(() => merge(defaultsFrom(lgLayout ?? packLayout(items)), initial, ids));
+  const [ready, setReady] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loaded = useRef(false);
   const lsKey = `lifeos:grid:${layoutKey}`;
+  const size = sizeFor(width);
+
+  // no entrance animation: widgets appear where they belong instead of sliding into place
+  useEffect(() => {
+    if (!mounted) return;
+    const t = setTimeout(() => setReady(true), 150);
+    return () => clearTimeout(t);
+  }, [mounted]);
 
   useEffect(() => {
-    if (initial) setLayouts((cur) => ({ ...cur, ...initial }));
-    else {
-      try {
-        const raw = localStorage.getItem(lsKey);
-        if (raw) { const local = JSON.parse(raw) as ResponsiveLayouts; setLayouts((cur) => ({ ...cur, ...local })); void saveUiStateAction(layoutKey, local); }
-      } catch {}
-    }
-    loaded.current = true;
+    if (initial) return;
+    try { // a layout only in this browser (from before syncing) is uploaded once
+      const raw = localStorage.getItem(lsKey);
+      if (raw) { const local = JSON.parse(raw); setLayouts((cur) => merge(cur, local, ids)); void saveUiStateAction(layoutKey, local); localStorage.removeItem(lsKey); }
+    } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onChange = useCallback((_c: Layout, all: ResponsiveLayouts) => {
-    if (!loaded.current) return;
-    try { localStorage.setItem(lsKey, JSON.stringify(all)); } catch {}
+  function persist(layout: Layout) {
+    const next = { ...layouts, [size]: layout.map(({ i, x, y, w, h, minW, minH }) => ({ i, x, y, w, h, minW, minH })) } as SizedLayouts;
+    if (size === 'lg') next.xl = layouts.xl === layouts.lg ? next.lg : layouts.xl; // xl follows lg until it is arranged on its own
+    setLayouts(next);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => { void saveUiStateAction(layoutKey, all); }, 800);
-  }, [layoutKey, lsKey]);
+    timer.current = setTimeout(() => { void saveUiStateAction(layoutKey, next); }, 600);
+  }
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} className={ready ? '' : '[&_.react-grid-item]:!transition-none'}>
       {mounted && (
         <Responsive
           width={width}
           layouts={layouts}
-          breakpoints={{ lg: 1100, md: 900, sm: 640, xs: 480, xxs: 0 }}
-          cols={{ lg: 12, md: 12, sm: 1, xs: 1, xxs: 1 }}
+          breakpoints={BREAKPOINTS}
+          cols={COLS}
           rowHeight={30}
           margin={[16, 16]}
           dragConfig={{ enabled: true, handle: '.drag-handle', cancel: '.no-drag' }}
-          onLayoutChange={onChange}
+          onDragStop={(l) => persist(l)}
+          onResizeStop={(l) => persist(l)}
         >
           {items.map((it) => <div key={it.id}>{it.node}</div>)}
         </Responsive>

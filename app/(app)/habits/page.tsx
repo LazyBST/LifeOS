@@ -11,6 +11,7 @@ import { StatTiles } from '@/components/analytics/Insights';
 import { getUiState } from '@/lib/domain/uistate';
 import type { ResponsiveLayouts } from 'react-grid-layout';
 
+
 export default async function HabitsPage() {
   const today = istDate();
   const [statuses, areas, allHabits, checkins, savedLayout, { rows }] = await Promise.all([
