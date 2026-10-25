@@ -2,6 +2,7 @@ import { listAreas, areaSlug, areaColor } from '@/lib/domain/areas';
 import { Sidebar, type NavArea } from '@/components/shell/Sidebar';
 import { BottomNav } from '@/components/shell/BottomNav';
 import { ChatPanel } from '@/components/chat/ChatPanel';
+import { PomodoroRoot } from '@/components/pomodoro/PomodoroRoot';
 
 /**
  * Server component: desktop sidebar + mobile bottom nav + page content +
@@ -25,6 +26,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <BottomNav />
       </div>
       <ChatPanel />
+      <PomodoroRoot />
     </div>
   );
 }

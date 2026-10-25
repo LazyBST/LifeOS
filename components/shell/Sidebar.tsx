@@ -10,6 +10,7 @@ import {
   Library,
   ListTodo,
   CalendarDays,
+  Timer,
   BookOpen,
   BarChart3,
   Settings,
@@ -170,6 +171,16 @@ export function Sidebar({ areas }: { areas: NavArea[] }) {
         {STATIC_LINKS.slice(1).map((link) => (
           <NavLink key={link.href} {...link} collapsed={collapsed} active={isActive(pathname, link.href)} />
         ))}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('lifeos:pomodoro', { detail: 'show' }))}
+          title={collapsed ? 'Pomodoro' : undefined}
+          aria-label="Show the Pomodoro timer"
+          className={cn('flex w-full items-center rounded-lg py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground touch-target dark:hover:bg-white/5', collapsed ? 'justify-center px-0' : 'gap-3 px-3')}
+        >
+          <Timer className="size-4 shrink-0" />
+          {!collapsed && <span className="truncate">Pomodoro</span>}
+        </button>
         <NavLink
           href="/settings"
           label="Settings"

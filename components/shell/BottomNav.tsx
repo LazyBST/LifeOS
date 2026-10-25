@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { Home, ListTodo, MessageCircle, Wallet, MoreHorizontal, CalendarDays, CheckCircle2, Library, BookOpen, BarChart3, Settings } from 'lucide-react';
+import { Home, ListTodo, MessageCircle, Wallet, MoreHorizontal, CalendarDays, CheckCircle2, Library, BookOpen, BarChart3, Settings, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
@@ -47,6 +47,10 @@ export function BottomNav() {
         <>
           <button type="button" aria-label="Close menu" className="fixed inset-0 z-40 md:hidden" onClick={() => setMore(false)} />
           <div className="fixed inset-x-3 bottom-16 z-50 grid grid-cols-3 gap-1 rounded-2xl border bg-card p-2 shadow-lg md:hidden" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            <button type="button" onClick={() => { setMore(false); window.dispatchEvent(new CustomEvent('lifeos:pomodoro', { detail: 'show' })); }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-xs text-muted-foreground">
+              <Timer className="size-5" />
+              Pomodoro
+            </button>
             {MORE.map((m) => (
               <Link key={m.href} href={m.href} onClick={() => setMore(false)} className={cn('flex flex-col items-center gap-1 rounded-xl py-3 text-xs', isActive(pathname, m.href) ? 'bg-muted font-medium' : 'text-muted-foreground')}>
                 <m.icon className="size-5" />

@@ -12,6 +12,7 @@ import { HabitConsistency } from '@/components/analytics/HabitConsistency';
 import { SpendByCategoryChart } from '@/components/analytics/SpendByCategoryChart';
 import { MoodChart } from '@/components/analytics/MoodChart';
 import type { HabitConsistencyItem } from '@/app/actions/analytics';
+import { FocusDay } from '@/components/pomodoro/FocusDay';
 import { WidgetGrid, type GridItem } from '@/components/widgets/WidgetGrid';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
 import { getUiState } from '@/lib/domain/uistate';
@@ -86,6 +87,7 @@ export default async function AnalyticsPage() {
 
   const { summary } = ins;
   const items: GridItem[] = [
+    { id: 'focus', w: 6, h: 18, minW: 4, minH: 12, node: <WidgetCard title="Focus (Pomodoro)" sub="Sessions, pauses and focused time against what your calendar planned"><FocusDay /></WidgetCard> },
     { id: 'tiles', w: 4, h: 7, minW: 3, minH: 5, node: (
       <WidgetCard title="This week" sub="Scheduled work: finished vs pushed (−1 each)">
         <StatTiles items={[
