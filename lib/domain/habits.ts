@@ -79,6 +79,14 @@ export async function createHabit(input: HabitInput): Promise<Habit> {
 }
 
 export async function updateHabit(id: UUID, patch: HabitPatch): Promise<Habit> {
+  if (patch.start_time !== undefined || patch.end_time !== undefined) {
+    const { data: before } = await admin().from('habits').select('start_time,end_time').eq('id', id).maybeSingle();
+    const b = before as { start_time: string | null; end_time: string | null } | null;
+    const same = (a: string | null | undefined, c: string | null | undefined) => (a ?? null)?.slice(0, 5) === (c ?? null)?.slice(0, 5);
+    if (b?.start_time && (!same(b.start_time, patch.start_time ?? b.start_time) || (patch.end_time !== undefined && !same(b.end_time, patch.end_time)))) {
+      await freezePastDayTimes(id, b.start_time, b.end_time, istDate()).catch(() => undefined);
+    }
+  }
   const row: Record<string, unknown> = {};
   for (const k of ['name', 'emoji', 'time_of_day', 'kind', 'target_value', 'unit', 'days_of_week', 'reminder_time', 'goal_id', 'archived_at', 'start_time', 'end_time', 'gtask_title'] as const) {
     if (patch[k] !== undefined) row[k] = patch[k];
@@ -237,4 +245,32 @@ export async function setHabitDay(habitId: UUID, date: string, state: DayState):
   if (date > istDate()) throw new Error('You cannot check in a future day.');
   const value = state === 'done' ? Number(habit.target_value) : state === 'missed' ? -1 : 0;
   await checkinHabit(habitId, { date, value, note: state === 'missed' ? 'missed' : date === istDate() ? undefined : 'edited later' });
+}
+
+// ---- a habit's time on one particular day ---------------------------------------
+
+export type HabitDayTime = { habit_id: UUID; day: string; start_time: string; end_time: string | null };
+
+/** Override one day's time without touching the habit's own time or any other day. */
+export async function setHabitDayTime(habitId: UUID, day: string, start: string, end: string | null): Promise<void> {
+  if (end && end <= start) throw new Error('A habit must end after it starts.');
+  const { error } = await admin().from('habit_day_times').upsert({ habit_id: habitId, day, start_time: start, end_time: end }, { onConflict: 'habit_id,day' });
+  if (error) throw new Error(error.message.includes('habit_day_times') ? 'Run supabase/migrations/0018_habit_day_times.sql first.' : error.message);
+}
+
+/** The per-day overrides in a date range. Empty (not an error) until migration 0018 is run. */
+export async function habitDayTimes(from: string, to: string): Promise<HabitDayTime[]> {
+  const { data, error } = await admin().from('habit_day_times').select('*').gte('day', from).lte('day', to);
+  return error ? [] : ((data ?? []) as HabitDayTime[]);
+}
+
+/**
+ * Changing a habit's own time must not rewrite the past: days before today that have no override of their own
+ * keep the time the habit had until now.
+ */
+export async function freezePastDayTimes(habitId: UUID, oldStart: string, oldEnd: string | null, today: string, days = 60): Promise<void> {
+  const from = addDays(today, -days), to = addDays(today, -1);
+  const have = new Set((await habitDayTimes(from, to)).filter((r) => r.habit_id === habitId).map((r) => r.day));
+  const rows = Array.from({ length: days }, (_, i) => addDays(from, i)).filter((d) => !have.has(d)).map((day) => ({ habit_id: habitId, day, start_time: oldStart, end_time: oldEnd }));
+  if (rows.length) await admin().from('habit_day_times').insert(rows);
 }

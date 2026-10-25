@@ -37,3 +37,17 @@ describe('habit time blocks and calendar sync state', () => {
     expect(second).toHaveLength(0); // someone already claimed this window
   });
 });
+
+describe('per-day habit times', () => {
+  test('one override per habit per day, removed with the habit', async () => {
+    const db = await freshDb();
+    const h = await row<{ id: string }>(db, `insert into habits (name, start_time, end_time) values ('Water', '15:00', '15:05') returning id`);
+    await db.query(`insert into habit_day_times (habit_id, day, start_time, end_time) values ($1, '2026-10-26', '16:00', '16:05')`, [h!.id]);
+    await expect(db.query(`insert into habit_day_times (habit_id, day, start_time) values ($1, '2026-10-26', '17:00')`, [h!.id])).rejects.toThrow();
+    await expect(db.query(`insert into habit_day_times (habit_id, day, start_time, end_time) values ($1, '2026-10-27', '17:00', '16:00')`, [h!.id])).rejects.toThrow();
+    const base = await row<{ start_time: string }>(db, `select start_time::text from habits where id=$1`, [h!.id]);
+    expect(base!.start_time).toBe('15:00:00'); // the habit's own time is untouched
+    await db.query(`delete from habits where id=$1`, [h!.id]);
+    expect(await rows(db, `select 1 from habit_day_times`)).toHaveLength(0);
+  });
+});

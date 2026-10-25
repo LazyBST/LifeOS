@@ -2,7 +2,7 @@ import 'server-only';
 import { admin } from '@/lib/supabase/admin';
 import { addDays } from '@/lib/time';
 import { istInstant } from '@/lib/time';
-import { listHabits, habitDueOn } from './habits';
+import { listHabits, habitDueOn, habitDayTimes } from './habits';
 import { minutesOfTime } from './day-layout';
 
 export type EditableEvent = { id: string; summary: string; start: string; end: string; allDay: boolean; description: string | null; location: string | null; canEdit: boolean; recurring: boolean };
@@ -60,10 +60,12 @@ export async function weekData(weekStart: string): Promise<WeekData> {
     untimed.push({ kind: 'task', id: t.id, title: t.title, date: t.due_date, done: t.status === 'done', href: `/tasks/${t.id}` });
   }
   try {
-    const [habits, checks] = await Promise.all([
+    const [habits, checks, dayTimes] = await Promise.all([
       listHabits(),
       admin().from('habit_checkins').select('habit_id,checkin_date,value').gte('checkin_date', weekStart).lte('checkin_date', weekEnd),
+      habitDayTimes(weekStart, weekEnd),
     ]);
+    const override = new Map(dayTimes.map((o) => [`${o.habit_id}|${o.day}`, o]));
     const value = new Map(((checks.data ?? []) as { habit_id: string; checkin_date: string; value: number }[]).map((c) => [`${c.habit_id}|${c.checkin_date}`, Number(c.value)]));
     for (let i = 0; i < 7; i++) {
       const date = addDays(weekStart, i);
@@ -72,9 +74,10 @@ export async function weekData(weekStart: string): Promise<WeekData> {
         const v = value.get(`${h.id}|${date}`);
         const done = (v ?? 0) >= Number(h.target_value);
         const missed = v !== undefined && v < 0;
-        const sMin = minutesOfTime(h.start_time);
+        const o = override.get(`${h.id}|${date}`); // moved on the calendar for this day only
+        const sMin = minutesOfTime(o ? o.start_time : h.start_time);
         if (sMin === null) { untimed.push({ kind: 'habit', id: h.id, title: h.name, date, done, missed, emoji: h.emoji }); continue; }
-        const eMin = minutesOfTime(h.end_time) ?? sMin + 5;
+        const eMin = minutesOfTime(o ? o.end_time : h.end_time) ?? sMin + 5;
         const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
         blocks.push({ id: `habit-${h.id}-${date}`, title: h.name, start: istInstant(date, hhmm(sMin)).toISOString(), end: istInstant(date, hhmm(Math.min(eMin, 24 * 60 - 1))).toISOString(), kind: 'habit', done, habit: { id: h.id, date, emoji: h.emoji, missed } });
       }

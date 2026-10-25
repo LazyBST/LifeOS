@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
-import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, rectSortingStrategy, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
@@ -17,11 +17,13 @@ export function applyOrder<T extends { id: string }>(items: T[], order: string[]
     .map((x) => x.it);
 }
 
-function Row({ id, children, handleClass }: { id: string; children: ReactNode; handleClass?: string }) {
+function Row({ id, children }: { id: string; children: ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  // mouse and keyboard use the grip; a finger presses and holds anywhere on the row
+  const { onTouchStart, ...gripListeners } = (listeners ?? {}) as Record<string, unknown>;
   return (
-    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 20 : undefined }} className={`group/sort flex items-start gap-1 ${isDragging ? 'rounded-lg bg-card opacity-90 shadow-lg' : ''}`}>
-      <button type="button" {...attributes} {...listeners} aria-label="Drag to reorder" title="Drag to reorder" className={`no-drag mt-1 shrink-0 cursor-grab touch-none select-none rounded px-0.5 text-xs leading-none text-muted-foreground opacity-50 hover:bg-muted active:cursor-grabbing sm:opacity-0 sm:group-hover/sort:opacity-100 focus-visible:opacity-100 ${handleClass ?? ''}`}>⋮⋮</button>
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 20 : undefined }} onTouchStart={onTouchStart as React.TouchEventHandler | undefined} onContextMenu={(e) => { if ((e.nativeEvent as PointerEvent).pointerType === 'touch') e.preventDefault(); }} className={`group/sort flex items-start gap-1 [-webkit-touch-callout:none] ${isDragging ? 'rounded-lg bg-card opacity-90 shadow-lg' : ''}`}>
+      <button type="button" {...attributes} {...gripListeners} aria-label="Drag to reorder" title="Drag to reorder (press and hold on a touch screen)" className="no-drag mt-1 shrink-0 cursor-grab select-none rounded px-0.5 text-xs leading-none text-muted-foreground opacity-0 hover:bg-muted active:cursor-grabbing group-hover/sort:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:hidden">⋮⋮</button>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
@@ -37,7 +39,7 @@ export function Reorderable({ orderKey, order = [], items, className = 'flex fle
   const orderSig = order.join('|');
   useEffect(() => { setIds(applyOrder(items, order).map((i) => i.id)); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, orderSig]);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 4 } }), useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const byId = new Map(items.map((i) => [i.id, i.node]));
   const shown = ids.filter((id) => byId.has(id));
 

@@ -79,6 +79,39 @@ export function WidgetGrid({ items, layoutKey, initial, lgLayout }: { items: Gri
   const lsKey = `lifeos:grid:${layoutKey}`;
   const size = sizeFor(width);
 
+  // On a touch screen the widgets stay put (so the page scrolls freely) until you press and hold a widget's title:
+  // that opens arrange mode, where titles drag and the corner resizes, until you tap Done.
+  const [coarse, setCoarse] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const wrap = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(pointer: coarse)');
+    const f = () => setCoarse(mq.matches);
+    f();
+    mq.addEventListener('change', f);
+    return () => mq.removeEventListener('change', f);
+  }, []);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || !coarse || editing) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let x0 = 0, y0 = 0;
+    const clear = () => { if (timer) clearTimeout(timer); timer = null; };
+    const start = (e: TouchEvent) => {
+      if (!(e.target as HTMLElement).closest('.drag-handle')) return;
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+      timer = setTimeout(() => { try { navigator.vibrate?.(20); } catch { /* not supported */ } setEditing(true); }, 450);
+    };
+    const move = (e: TouchEvent) => { if (timer && Math.hypot(e.touches[0].clientX - x0, e.touches[0].clientY - y0) > 8) clear(); };
+    el.addEventListener('touchstart', start, { passive: true });
+    el.addEventListener('touchmove', move, { passive: true });
+    el.addEventListener('touchend', clear);
+    el.addEventListener('touchcancel', clear);
+    return () => { clear(); el.removeEventListener('touchstart', start); el.removeEventListener('touchmove', move); el.removeEventListener('touchend', clear); el.removeEventListener('touchcancel', clear); };
+  }, [coarse, editing, mounted]);
+  const locked = coarse && !editing;
+
   // no entrance animation: widgets appear where they belong instead of sliding into place
   useEffect(() => {
     if (!mounted) return;
@@ -104,7 +137,13 @@ export function WidgetGrid({ items, layoutKey, initial, lgLayout }: { items: Gri
   }
 
   return (
-    <div ref={containerRef} className={ready ? '' : '[&_.react-grid-item]:!transition-none'}>
+    <div ref={(n) => { containerRef.current = n; wrap.current = n; }} className={`${ready ? '' : '[&_.react-grid-item]:!transition-none'} ${editing ? 'lifeos-editing' : ''}`}>
+      {coarse && (editing ? (
+        <div className="sticky top-0 z-30 mb-3 flex items-center justify-between gap-2 rounded-xl border bg-card px-3 py-2 text-sm shadow">
+          <span>Arranging: drag a title to move, pull the corner to resize.</span>
+          <button type="button" onClick={() => setEditing(false)} className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">Done</button>
+        </div>
+      ) : <p className="mb-2 text-center text-[11px] text-muted-foreground">Press and hold a widget title to rearrange</p>)}
       {mounted && (
         <Responsive
           width={width}
@@ -113,7 +152,8 @@ export function WidgetGrid({ items, layoutKey, initial, lgLayout }: { items: Gri
           cols={COLS}
           rowHeight={30}
           margin={[16, 16]}
-          dragConfig={{ enabled: true, handle: '.drag-handle', cancel: '.no-drag' }}
+          dragConfig={{ enabled: !locked, handle: '.drag-handle', cancel: '.no-drag' }}
+          resizeConfig={{ enabled: !locked, handles: ['se'] }}
           onDragStop={(l) => persist(l)}
           onResizeStop={(l) => persist(l)}
         >

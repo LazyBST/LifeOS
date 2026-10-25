@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
 import { syncGoogleNowAction } from '@/app/actions/google';
-import { setHabitDayAction, updateHabitAction } from '@/app/actions/habits';
+import { setHabitDayAction, setHabitDayTimeAction } from '@/app/actions/habits';
 import { updateTaskAction } from '@/app/actions/tasks';
 import { undoEventEditAction, updateEventAction } from '@/app/actions/calevents';
 import { EventDialog, type DialogTarget } from './EventDialog';
@@ -66,6 +66,7 @@ export function CalendarWeek() {
   /** A block was dragged (moved) or its bottom edge pulled (resized): save the new time to wherever it lives. */
   async function moveBlock(b: WeekBlock, date: string, startMin: number, endMin: number) {
     const hhmm = fmtTime(startMin), hhmmEnd = fmtTime(endMin);
+    if (b.kind === 'habit' && b.habit) date = b.habit.date; // a habit block stays on its own day
     const start = istInstant(date, hhmm).toISOString(), end = istInstant(date, hhmmEnd).toISOString();
     setData((d) => d && { ...d, blocks: d.blocks.map((x) => (x.id === b.id ? { ...x, start, end } : x)) });
     if (b.kind === 'event' && b.event) {
@@ -77,9 +78,10 @@ export function CalendarWeek() {
       const r = await updateTaskAction(b.id, { due_date: date, due_at: start, duration_min: endMin - startMin });
       if (!r.ok) toast.error(r.error);
     } else if (b.kind === 'habit' && b.habit) {
-      const r = await updateHabitAction(b.habit.id, { start_time: hhmm, end_time: hhmmEnd });
+      // only this day moves: other days keep the habit's own time, and past days keep what they had
+      const r = await setHabitDayTimeAction(b.habit.id, b.habit.date, hhmm, hhmmEnd);
       if (!r.ok) toast.error(r.error);
-      else toast.success(`${b.title} now runs ${hhmm}–${hhmmEnd} every day it is due.`);
+      else toast.success(`${b.title} moved to ${hhmm}–${hhmmEnd} for ${b.habit.date} only.`);
     }
     await load(ws);
   }

@@ -13,6 +13,7 @@ import {
   createHabit,
   habitStatuses,
   linkHabit,
+  setHabitDayTime,
   setHabitDay,
   type DayState,
   toggleHabitDay,
@@ -108,6 +109,16 @@ export async function setHabitDayAction(habitId: string, date: string, state: Da
   return run(async () => {
     await requireUser();
     await setHabitDay(habitId, date, state);
+    revalidatePath('/', 'layout');
+    return null;
+  });
+}
+
+/** Calendar drag/resize of a habit: changes that day only, never the habit's own time or other days. */
+export async function setHabitDayTimeAction(habitId: string, day: string, start: string, end: string | null): Promise<ActionResult<null>> {
+  return run(async () => {
+    await requireUser();
+    await setHabitDayTime(habitId, day, start, end);
     revalidatePath('/', 'layout');
     return null;
   });
