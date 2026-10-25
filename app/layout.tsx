@@ -29,10 +29,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#e9ecf2' },
-    { media: '(prefers-color-scheme: dark)', color: '#0f1011' },
-  ],
+  // one colour; the script below and the theme toggle keep it in step with the theme actually showing
+  themeColor: '#0f1011',
 };
 
 export default function RootLayout({
@@ -46,7 +44,7 @@ export default function RootLayout({
         {/* Applies the persisted theme before paint to avoid a flash. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('lifeos:theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('lifeos:theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}var f=function(){var d=document.documentElement.classList.contains('dark');var m=document.querySelector('meta[name=theme-color]');if(m){m.setAttribute('content',d?'#0f1011':'#e9ecf2');}};f();document.addEventListener('DOMContentLoaded',f);}catch(e){}})();`,
           }}
         />
       </head>

@@ -21,6 +21,7 @@ export function ThemeToggle() {
     } catch {
       // ignore storage failures (private mode, etc.)
     }
+    document.querySelector('meta[name=theme-color]')?.setAttribute('content', next ? '#0f1011' : '#e9ecf2'); // the phone's bars follow
     setIsDark(next);
   }
 

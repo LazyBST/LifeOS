@@ -22,7 +22,7 @@ export default async function LoginPage({
   const { error, detail } = await searchParams;
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-dvh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">LifeOS</CardTitle>

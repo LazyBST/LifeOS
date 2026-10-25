@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Goals, projects, tasks, habits and money in one place.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#ffffff',
+    background_color: '#0f1011',
+    theme_color: '#0f1011',
     icons: [
       {
         src: '/icons/icon-192.png',

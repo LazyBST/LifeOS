@@ -19,9 +19,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   }));
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-dvh">
       <Sidebar areas={navAreas} />
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
         <main className="min-w-0 flex-1 pb-16 md:pb-0">{children}</main>
         <BottomNav />
       </div>

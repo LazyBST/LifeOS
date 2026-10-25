@@ -140,7 +140,9 @@
     @apply font-sans;
     -webkit-text-size-adjust: 100%;
   }
-  html, body { max-width: 100%; overflow-x: clip; }
+  html { background-color: var(--background); color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  html, body { max-width: 100%; overflow-x: clip; min-height: 100dvh; }
   body {
     @apply bg-background text-foreground text-sm;
     font-feature-settings: 'cv01', 'ss03', 'cv11';
