@@ -9,13 +9,13 @@ import { cn } from '@/lib/utils';
 const ITEMS = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/tasks', label: 'Tasks', icon: ListTodo },
-  { href: '/money', label: 'Money', icon: Wallet },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/settings', label: 'More', icon: MoreHorizontal },
 ] as const;
 
 /** Everything that does not fit in the bar. */
 const MORE = [
-  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { href: '/money', label: 'Money', icon: Wallet },
   { href: '/habits', label: 'Habits', icon: CheckCircle2 },
   { href: '/journal', label: 'Journal', icon: BookOpen },
   { href: '/books', label: 'Books', icon: Library },
@@ -77,6 +77,16 @@ export function BottomNav() {
         <ListTodo className="size-5" />
         {ITEMS[1].label}
       </Link>
+      <Link
+        href={ITEMS[2].href}
+        className={cn(
+          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[12px] touch-target',
+          isActive(pathname, ITEMS[2].href) ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        <CalendarDays className="size-5" />
+        {ITEMS[2].label}
+      </Link>
       <button
         type="button"
         onClick={toggleChat}
@@ -85,16 +95,6 @@ export function BottomNav() {
         <MessageCircle className="size-5" />
         Chat
       </button>
-      <Link
-        href={ITEMS[2].href}
-        className={cn(
-          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[12px] touch-target',
-          isActive(pathname, ITEMS[2].href) ? 'text-foreground' : 'text-muted-foreground',
-        )}
-      >
-        <Wallet className="size-5" />
-        {ITEMS[2].label}
-      </Link>
       <button
         type="button"
         onClick={() => setMore((v) => !v)}
