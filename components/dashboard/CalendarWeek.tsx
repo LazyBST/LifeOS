@@ -219,15 +219,51 @@ function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, o
   const shownH = preview ? Math.max(14, height + ((preview.end - preview.start - (endMin - startMin)) / 60) * row) : height;
   const style = { top: shownTop, height: shownH, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${(1 / cols) * 100}% - 4px)`, ...(drag?.mode === 'move' ? { transform: `translateX(${drag.dx}px)` } : {}), ...(drag ? { zIndex: 30, opacity: 0.85 } : {}) };
   const range = `${fmtTime(preview?.start ?? startMin)}–${fmtTime(preview?.end ?? endMin)}`;
-  const cls = `absolute select-none overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[12px] leading-tight ${KIND[b.kind]} ${b.done ? 'opacity-60 line-through' : ''} ${drag ? 'cursor-grabbing shadow-lg' : 'cursor-grab'}`;
+  const cls = `absolute select-none [-webkit-touch-callout:none] overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[12px] leading-tight ${KIND[b.kind]} ${b.done ? 'opacity-60 line-through' : ''} ${drag ? 'cursor-grabbing shadow-lg' : 'cursor-grab'}`;
 
-  // press and drag the block to move it, or its bottom edge to change how long it lasts
+  // Press and drag a block to move it, or pull its bottom edge to change how long it lasts.
+  // With a mouse (or the edge grip on touch) a drag starts at once; with a finger the block is picked up by
+  // holding it for a moment, so ordinary swipes still scroll the calendar.
   function down(e: React.PointerEvent<HTMLElement>, mode: 'move' | 'resize') {
-    if (e.button !== 0 || (mode === 'move' && e.pointerType === 'touch')) return;
+    if (e.button !== 0) return;
     e.stopPropagation();
     const x0 = e.clientX, y0 = e.clientY;
     const colEl = (e.currentTarget as HTMLElement).closest('[data-daycol]') as HTMLElement | null;
     const colW = colEl?.getBoundingClientRect().width ?? 1;
+    const commit = (x: number, y: number) => {
+      const r = draggedRange(startMin, endMin, ((y - y0) / row) * 60, mode);
+      const shift = mode === 'move' && days.length > 1 ? Math.round((x - x0) / colW) : 0;
+      const date = days[Math.min(days.length - 1, Math.max(0, days.indexOf(day) + shift))] ?? day;
+      justDragged.current = true;
+      setTimeout(() => { justDragged.current = false; }, 400);
+      if (date === day && r.start === startMin && r.end === endMin) return;
+      onMove(b, date, r.start, r.end);
+    };
+
+    if (e.pointerType === 'touch' && mode === 'move') {
+      let armed = false, lx = x0, ly = y0;
+      const timer = setTimeout(() => { armed = true; try { navigator.vibrate?.(15); } catch { /* not supported */ } setDrag({ dx: 0, dy: 0, mode }); }, 350);
+      const stop = () => {
+        clearTimeout(timer);
+        window.removeEventListener('touchmove', onTouchMove);
+        window.removeEventListener('touchend', onTouchEnd);
+        window.removeEventListener('touchcancel', onTouchCancel);
+      };
+      function onTouchMove(ev: TouchEvent) {
+        const t = ev.touches[0];
+        lx = t.clientX; ly = t.clientY;
+        if (!armed) { if (Math.hypot(lx - x0, ly - y0) > 8) stop(); return; } // a swipe: let the page scroll
+        ev.preventDefault(); // picked up: the finger now moves the block, not the page
+        setDrag({ dx: days.length > 1 ? lx - x0 : 0, dy: ly - y0, mode });
+      }
+      function onTouchEnd() { stop(); setDrag(null); if (armed) commit(lx, ly); }
+      function onTouchCancel() { stop(); setDrag(null); }
+      window.addEventListener('touchmove', onTouchMove, { passive: false });
+      window.addEventListener('touchend', onTouchEnd);
+      window.addEventListener('touchcancel', onTouchCancel);
+      return;
+    }
+
     let moved = false;
     const onMoveEv = (ev: PointerEvent) => {
       const dx = ev.clientX - x0, dy = ev.clientY - y0;
@@ -238,18 +274,13 @@ function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, o
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', onMoveEv);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
       setDrag(null);
-      if (!moved) return;
-      justDragged.current = true;
-      setTimeout(() => { justDragged.current = false; }, 0);
-      const r = draggedRange(startMin, endMin, ((ev.clientY - y0) / row) * 60, mode);
-      const shift = mode === 'move' && days.length > 1 ? Math.round((ev.clientX - x0) / colW) : 0;
-      const date = days[Math.min(days.length - 1, Math.max(0, days.indexOf(day) + shift))] ?? day;
-      if (date === day && r.start === startMin && r.end === endMin) return;
-      onMove(b, date, r.start, r.end);
+      if (moved) commit(ev.clientX, ev.clientY);
     };
     window.addEventListener('pointermove', onMoveEv);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   }
   const grip = <span onPointerDown={(e) => down(e, 'resize')} onClick={(e) => e.stopPropagation()} className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize touch-none" aria-label="Drag to change duration" />;
   const noClickAfterDrag = (e: React.MouseEvent) => { if (justDragged.current) { e.preventDefault(); e.stopPropagation(); } };
@@ -259,17 +290,17 @@ function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, o
       {(detailed || shownH >= 40) && <span className="block text-[11px] opacity-70">{range}{b.kind === 'task' ? ' · task' : b.kind === 'habit' ? ' · habit' : ''}</span>}
     </>
   );
-  const title = `${b.title} · ${range} — drag to move, pull the bottom edge to resize`;
-  if (b.href) return <Link href={b.href} draggable={false} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag} onClick={(e) => e.stopPropagation()} className={cls} style={style} title={title}>{label}{grip}</Link>;
+  const title = `${b.title} · ${range} — drag to move (press and hold on a touch screen), pull the bottom edge to resize`;
+  if (b.href) return <Link href={b.href} draggable={false} onContextMenu={(e) => e.preventDefault()} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag} onClick={(e) => e.stopPropagation()} className={cls} style={style} title={title}>{label}{grip}</Link>;
   if (b.kind === 'habit' && b.habit) {
     const h = b.habit;
     return (
-      <div className={`${cls} flex items-start gap-1`} style={style} title={title} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag}>
+      <div className={`${cls} flex items-start gap-1`} style={style} title={title} onPointerDown={(e) => down(e, 'move')} onContextMenu={(e) => e.preventDefault()} onClickCapture={noClickAfterDrag}>
         <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onHabit(h.id, h.date, !!b.done); }} title={b.done ? 'Done (click to undo)' : 'Click to check in'} className="shrink-0 font-semibold">{b.done ? '✓' : h.missed ? '✕' : '○'}</button>
         <Link href={`/habits#habit-${h.id}`} draggable={false} onClick={(e) => e.stopPropagation()} className="min-w-0 flex-1">{label}</Link>
         {grip}
       </div>
     );
   }
-  return <button type="button" onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag} onClick={(e) => { e.stopPropagation(); if (b.event) onEvent(b.event); }} className={cls} style={style} title={title}>{label}{grip}</button>;
+  return <button type="button" onPointerDown={(e) => down(e, 'move')} onContextMenu={(e) => e.preventDefault()} onClickCapture={noClickAfterDrag} onClick={(e) => { e.stopPropagation(); if (b.event) onEvent(b.event); }} className={cls} style={style} title={title}>{label}{grip}</button>;
 }
