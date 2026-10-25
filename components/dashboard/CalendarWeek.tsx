@@ -86,6 +86,7 @@ export function CalendarWeek() {
   const [loading, setLoading] = useState(false);
   const [dialog, setDialog] = useState<DialogTarget>(null);
   const [menu, setMenu] = useState<MenuTarget | null>(null);
+  const [tools, setTools] = useState(false);
 
   // zoom: pixels per hour. Pinch (or ctrl + wheel, or the buttons) changes it; fully zoomed out shows the whole day.
   const [row, setRowState] = useState(DEFAULT_ROW);
@@ -265,15 +266,26 @@ export function CalendarWeek() {
         <button onClick={() => setFocus(addDays(focus, step))} className="rounded-md border px-2 py-1" aria-label={`Next ${mode}`}>›</button>
         <span className="ml-1 font-medium">{title}</span>
         {loading && <span className="text-xs text-muted-foreground">loading…</span>}
-        <span className="ml-auto flex items-center gap-2">
-          <span className="flex overflow-hidden rounded-md border text-xs" role="group" aria-label="Zoom">
-            <button onClick={() => { anchor.current = null; setRow(row / 1.5); }} className="px-2 py-1 hover:bg-muted" aria-label="Zoom out" title="Zoom out (or pinch)">−</button>
-            <button onClick={() => { anchor.current = null; setRow(fitRow); }} className="border-x px-2 py-1 hover:bg-muted" title="Fit the whole day on screen">Fit</button>
-            <button onClick={() => { anchor.current = null; setRow(row * 1.5); }} className="px-2 py-1 hover:bg-muted" aria-label="Zoom in" title="Zoom in down to 5 minutes (or pinch)">+</button>
-          </span>
-          <button onClick={syncTodayNow} className="rounded-md border px-2 py-1 text-xs" title="Sync only today's events with Google Calendar, both ways">Sync today</button>
-          <button onClick={syncNow} className="rounded-md border px-2 py-1 text-xs" title="Fetch what changed in Google Calendar since the last sync">Sync Google</button>
-          <button onClick={() => setDialog({ mode: 'create', date: focus, hour: Math.min(22, Math.max(startH, istParts().hour + 1)) })} className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground">+ Event</button>
+        <span className="relative ml-auto">
+          <button onClick={() => setTools((v) => !v)} aria-expanded={tools} aria-haspopup="menu" className={`rounded-md border px-2.5 py-1 text-xs font-medium ${tools ? 'bg-muted' : ''}`} title="Zoom, sync and new event">{tools ? 'Close ▴' : 'Tools ▾'}</button>
+          {tools && (
+            <>
+              <button type="button" aria-label="Close the tools menu" className="fixed inset-0 z-30 cursor-default" onClick={() => setTools(false)} />
+              <div role="menu" className="absolute right-0 z-40 mt-1.5 w-56 space-y-1 rounded-xl border bg-card p-2 shadow-xl">
+                <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-xs">
+                  <span className="text-muted-foreground">Zoom</span>
+                  <span className="flex overflow-hidden rounded-md border" role="group" aria-label="Zoom">
+                    <button onClick={() => { anchor.current = null; setRow(row / 1.5); }} className="px-2.5 py-1 hover:bg-muted" aria-label="Zoom out" title="Zoom out (or pinch)">−</button>
+                    <button onClick={() => { anchor.current = null; setRow(fitRow); }} className="border-x px-2.5 py-1 hover:bg-muted" title="Fit the whole day on screen">Fit</button>
+                    <button onClick={() => { anchor.current = null; setRow(row * 1.5); }} className="px-2.5 py-1 hover:bg-muted" aria-label="Zoom in" title="Zoom in down to 5 minutes (or pinch)">+</button>
+                  </span>
+                </div>
+                <button role="menuitem" onClick={() => { setTools(false); void syncTodayNow(); }} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" title="Sync only today's events with Google Calendar, both ways">Sync today</button>
+                <button role="menuitem" onClick={() => { setTools(false); void syncNow(); }} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" title="Fetch what changed in Google Calendar since the last sync">Sync Google</button>
+                <button role="menuitem" onClick={() => { setTools(false); setDialog({ mode: 'create', date: focus, hour: Math.min(22, Math.max(startH, istParts().hour + 1)) }); }} className="block w-full rounded-lg bg-primary px-3 py-2 text-left text-sm font-medium text-primary-foreground">+ Event</button>
+              </div>
+            </>
+          )}
         </span>
       </div>
 
