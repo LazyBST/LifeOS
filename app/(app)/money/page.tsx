@@ -59,7 +59,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   const offset = sp.month === 'last' ? -1 : 0;
   const { from, to, label } = monthRange(offset);
 
-  const [w, owed, balances, accounts, categories, spend, transactions, insights, budgets, savedLayout] = await Promise.all([
+  const [w, owed, balances, accounts, categories, spend, transactions, insights, budgets, savedLayout, prevSpend] = await Promise.all([
     wallet(),
     owedByLabel(),
     accountBalances(),
@@ -70,6 +70,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     moneyInsights(from),
     budgetStatus(from, to),
     getUiState<ResponsiveLayouts>('money-layout').catch(() => null),
+    spendByCategory(monthRange(offset - 1).from, monthRange(offset - 1).to),
   ]);
 
   const activeAccountIds = new Set(accounts.map((a) => a.id));
@@ -88,7 +89,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${(n >= 0) === goodWhenUp ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'}`}>{n >= 0 ? '↗' : '↘'} {Math.abs(n)}%</span>
   );
   const net = insights.income - insights.expense;
-  const maxFlow = Math.max(1, insights.income, insights.expense);
+  const maxFlow = Math.max(1, insights.income, insights.expense, insights.prevIncome, insights.prevExpense);
   const f = insights.forecast;
   const at = (n: number) => f[Math.min(n, f.length - 1)];
   const low = f.reduce((m, p) => (p.expected < m.expected ? p : m), f[0]);
@@ -104,8 +105,16 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
           <div><div className="text-xs text-muted-foreground">Net</div><div className={`text-2xl font-bold tracking-tight ${net >= 0 ? pos : neg}`}>{formatINR(net)}</div></div>
         </div>
         <div className="mt-4 space-y-4 text-sm">
-          <div><div className="mb-1 flex items-center justify-between"><span>Income</span><span className="flex items-center gap-2">{pct(insights.incomePct, true)}<b>{formatINR(insights.income)}</b></span></div><div className="h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${(insights.income / maxFlow) * 100}%` }} /></div></div>
-          <div><div className="mb-1 flex items-center justify-between"><span>Expense</span><span className="flex items-center gap-2">{pct(insights.expensePct, false)}<b>{formatINR(insights.expense)}</b></span></div><div className="h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-red-500" style={{ width: `${(insights.expense / maxFlow) * 100}%` }} /></div></div>
+          {([['Income', insights.income, insights.prevIncome, insights.incomePct, true, 'bg-emerald-500'], ['Expense', insights.expense, insights.prevExpense, insights.expensePct, false, 'bg-red-500']] as const).map(([name, now, before, change, up, color]) => (
+            <div key={name}>
+              <div className="mb-1 flex items-center justify-between"><span>{name}</span><span className="flex items-center gap-2">{pct(change, up)}<b>{formatINR(now)}</b></span></div>
+              <div className="relative h-3 rounded-full bg-muted">
+                <div className={`h-full rounded-full ${color}`} style={{ width: `${(now / maxFlow) * 100}%` }} />
+                <div className="absolute -top-1 h-5 w-0.5 rounded bg-foreground/70" style={{ left: `calc(${(before / maxFlow) * 100}% - 1px)` }} title={`Previous period: ${formatINR(before)}`} />
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground">Previous period {formatINR(before)} <span className="text-foreground/70">(the line)</span></div>
+            </div>
+          ))}
         </div>
       </WidgetCard>
     ) },
@@ -119,7 +128,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     { id: 'period', w: 6, h: 12, minW: 4, minH: 9, node: (
       <WidgetCard title="Period to period comparison" sub="Running total by day"><PeriodComparison {...insights.comparison} currentLabel={label} previousLabel={prevLabel} /></WidgetCard>
     ) },
-    { id: 'categories', w: 6, h: 12, minW: 4, minH: 8, node: <WidgetCard title="Spending by category" sub={label}><CategoryDonut rows={spend} /></WidgetCard> },
+    { id: 'categories', w: 6, h: 12, minW: 4, minH: 8, node: <WidgetCard title="Spending by category" sub={label}><CategoryDonut rows={spend} previous={prevSpend} /></WidgetCard> },
     { id: 'forecast', w: 8, h: 15, minW: 5, minH: 11, node: (
       <WidgetCard title="Forecast" sub="Next 90 days, from your scheduled payments and usual spending">
         <StatTiles items={[

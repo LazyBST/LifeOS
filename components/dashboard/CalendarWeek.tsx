@@ -1,14 +1,17 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
 import { syncGoogleNowAction } from '@/app/actions/google';
-import { setHabitDayAction } from '@/app/actions/habits';
+import { setHabitDayAction, updateHabitAction } from '@/app/actions/habits';
+import { updateTaskAction } from '@/app/actions/tasks';
+import { undoEventEditAction, updateEventAction } from '@/app/actions/calevents';
 import { EventDialog, type DialogTarget } from './EventDialog';
 import type { WeekBlock, WeekData } from '@/lib/domain/calweek';
 import { assignColumns, fmtTime } from '@/lib/domain/day-layout';
-import { addDays, daysBetween, istDate, istParts } from '@/lib/time';
+import { addDays, daysBetween, istDate, istInstant, istParts } from '@/lib/time';
+import { draggedRange } from '@/lib/domain/calendar-drag';
 import { weekStart as mondayOf } from '@/lib/domain/lifecal-math';
 
 const ROW = 44; // px per hour
@@ -57,6 +60,27 @@ export function CalendarWeek() {
     if (!r.ok) toast.error(r.error);
     else if (r.data.calendar.errors.length) toast.error(r.data.calendar.errors.join(' · '));
     else toast.success(`Synced: ${r.data.calendar.cached} calendar events stored${r.data.calendar.changed ? `, ${r.data.calendar.changed} changed` : ''}.`);
+    await load(ws);
+  }
+
+  /** A block was dragged (moved) or its bottom edge pulled (resized): save the new time to wherever it lives. */
+  async function moveBlock(b: WeekBlock, date: string, startMin: number, endMin: number) {
+    const hhmm = fmtTime(startMin), hhmmEnd = fmtTime(endMin);
+    const start = istInstant(date, hhmm).toISOString(), end = istInstant(date, hhmmEnd).toISOString();
+    setData((d) => d && { ...d, blocks: d.blocks.map((x) => (x.id === b.id ? { ...x, start, end } : x)) });
+    if (b.kind === 'event' && b.event) {
+      if (!b.event.canEdit) { toast.error('This event is read-only.'); await load(ws); return; }
+      const r = await updateEventAction(b.event.id, { summary: b.event.summary, description: b.event.description, location: b.event.location, allDay: false, start, end });
+      if (!r.ok) toast.error(r.error);
+      else toast.success('Event moved on Google Calendar.', r.data.logId ? { duration: 10000, action: { label: 'Undo', onClick: async () => { const u = await undoEventEditAction(r.data.logId!); if (u.ok) toast.success(u.data); else toast.error(u.error); await load(ws); } } } : undefined);
+    } else if (b.kind === 'task') {
+      const r = await updateTaskAction(b.id, { due_date: date, due_at: start, duration_min: endMin - startMin });
+      if (!r.ok) toast.error(r.error);
+    } else if (b.kind === 'habit' && b.habit) {
+      const r = await updateHabitAction(b.habit.id, { start_time: hhmm, end_time: hhmmEnd });
+      if (!r.ok) toast.error(r.error);
+      else toast.success(`${b.title} now runs ${hhmm}–${hhmmEnd} every day it is due.`);
+    }
     await load(ws);
   }
 
@@ -166,10 +190,10 @@ export function CalendarWeek() {
             const dayBlocks = (data?.blocks ?? []).filter((b) => istParts(new Date(b.start)).date === d);
             const placed = new Map(assignColumns(dayBlocks.map((b) => ({ id: b.id, start: minutesOf(b.start), end: Math.max(minutesOf(b.end), minutesOf(b.start) + 20) }))).map((p) => [p.id, p]));
             return (
-              <div key={d} className="relative cursor-cell border-l border-border" style={{ height: gridH }}
+              <div key={d} data-daycol={d} className="relative cursor-cell border-l border-border" style={{ height: gridH }}
                 onClick={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); setDialog({ mode: 'create', date: d, hour: Math.min(23, startH + Math.floor((ev.clientY - r.top) / ROW)) }); }}>
                 {hours.map((h) => <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: (h - startH) * ROW }} />)}
-                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={Math.max(20, ((Math.max(minutesOf(b.end), minutesOf(b.start) + 20) - minutesOf(b.start)) / 60) * ROW - 2)} detailed={mode === 'day'} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} />)}
+                {dayBlocks.map((b) => <Block key={b.id} b={b} p={placed.get(b.id)} top={topOf(minutesOf(b.start))} height={Math.max(20, ((Math.max(minutesOf(b.end), minutesOf(b.start) + 20) - minutesOf(b.start)) / 60) * ROW - 2)} detailed={mode === 'day'} row={ROW} days={days} day={d} onMove={(bl, date, sMin, eMin) => void moveBlock(bl, date, sMin, eMin)} onEvent={(e) => setDialog({ mode: 'edit', event: e })} onHabit={(h, date, done) => void toggleHabit(h, date, done)} />)}
                 {d === today && (() => { const m = minutesOf(new Date().toISOString()); return m >= startH * 60 && m < (endH + 1) * 60 ? <div className="absolute inset-x-0 z-10 h-0.5 bg-red-500" style={{ top: topOf(m) }} /> : null; })()}
               </div>
             );
@@ -185,26 +209,67 @@ export function CalendarWeek() {
   );
 }
 
-function Block({ b, p, top, height, detailed, onEvent, onHabit }: { b: WeekBlock; p?: { col: number; cols: number }; top: number; height: number; detailed: boolean; onEvent: (e: NonNullable<WeekBlock['event']>) => void; onHabit: (id: string, date: string, done: boolean) => void }) {
+function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, onHabit }: { b: WeekBlock; p?: { col: number; cols: number }; top: number; height: number; detailed: boolean; row: number; days: string[]; day: string; onMove: (b: WeekBlock, date: string, startMin: number, endMin: number) => void; onEvent: (e: NonNullable<WeekBlock['event']>) => void; onHabit: (id: string, date: string, done: boolean) => void }) {
+  const [drag, setDrag] = useState<{ dx: number; dy: number; mode: 'move' | 'resize' } | null>(null);
+  const justDragged = useRef(false);
   const cols = p?.cols ?? 1, col = p?.col ?? 0;
-  const style = { top, height, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${(1 / cols) * 100}% - 4px)` };
-  const range = `${fmtTime(minutesOf(b.start))}–${fmtTime(minutesOf(b.end))}`;
-  const cls = `absolute overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[12px] leading-tight ${KIND[b.kind]} ${b.done ? 'opacity-60 line-through' : ''}`;
+  const startMin = minutesOf(b.start), endMin = Math.max(minutesOf(b.end), startMin + 5);
+  const preview = drag ? draggedRange(startMin, endMin, (drag.dy / row) * 60, drag.mode) : null;
+  const shownTop = preview ? top + ((preview.start - startMin) / 60) * row : top;
+  const shownH = preview ? Math.max(14, height + ((preview.end - preview.start - (endMin - startMin)) / 60) * row) : height;
+  const style = { top: shownTop, height: shownH, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${(1 / cols) * 100}% - 4px)`, ...(drag?.mode === 'move' ? { transform: `translateX(${drag.dx}px)` } : {}), ...(drag ? { zIndex: 30, opacity: 0.85 } : {}) };
+  const range = `${fmtTime(preview?.start ?? startMin)}–${fmtTime(preview?.end ?? endMin)}`;
+  const cls = `absolute select-none overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[12px] leading-tight ${KIND[b.kind]} ${b.done ? 'opacity-60 line-through' : ''} ${drag ? 'cursor-grabbing shadow-lg' : 'cursor-grab'}`;
+
+  // press and drag the block to move it, or its bottom edge to change how long it lasts
+  function down(e: React.PointerEvent<HTMLElement>, mode: 'move' | 'resize') {
+    if (e.button !== 0 || (mode === 'move' && e.pointerType === 'touch')) return;
+    e.stopPropagation();
+    const x0 = e.clientX, y0 = e.clientY;
+    const colEl = (e.currentTarget as HTMLElement).closest('[data-daycol]') as HTMLElement | null;
+    const colW = colEl?.getBoundingClientRect().width ?? 1;
+    let moved = false;
+    const onMoveEv = (ev: PointerEvent) => {
+      const dx = ev.clientX - x0, dy = ev.clientY - y0;
+      if (!moved && Math.hypot(dx, dy) < 4) return;
+      moved = true;
+      setDrag({ dx: days.length > 1 ? dx : 0, dy, mode });
+    };
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', onMoveEv);
+      window.removeEventListener('pointerup', onUp);
+      setDrag(null);
+      if (!moved) return;
+      justDragged.current = true;
+      setTimeout(() => { justDragged.current = false; }, 0);
+      const r = draggedRange(startMin, endMin, ((ev.clientY - y0) / row) * 60, mode);
+      const shift = mode === 'move' && days.length > 1 ? Math.round((ev.clientX - x0) / colW) : 0;
+      const date = days[Math.min(days.length - 1, Math.max(0, days.indexOf(day) + shift))] ?? day;
+      if (date === day && r.start === startMin && r.end === endMin) return;
+      onMove(b, date, r.start, r.end);
+    };
+    window.addEventListener('pointermove', onMoveEv);
+    window.addEventListener('pointerup', onUp);
+  }
+  const grip = <span onPointerDown={(e) => down(e, 'resize')} onClick={(e) => e.stopPropagation()} className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize touch-none" aria-label="Drag to change duration" />;
+  const noClickAfterDrag = (e: React.MouseEvent) => { if (justDragged.current) { e.preventDefault(); e.stopPropagation(); } };
   const label = (
     <>
       <span className="font-semibold">{b.event?.recurring ? '↻ ' : ''}{b.habit?.emoji ? `${b.habit.emoji} ` : ''}{b.title}</span>
-      {(detailed || height >= 40) && <span className="block text-[11px] opacity-70">{range}{b.kind === 'task' ? ' · task' : b.kind === 'habit' ? ' · habit' : ''}</span>}
+      {(detailed || shownH >= 40) && <span className="block text-[11px] opacity-70">{range}{b.kind === 'task' ? ' · task' : b.kind === 'habit' ? ' · habit' : ''}</span>}
     </>
   );
-  if (b.href) return <Link href={b.href} onClick={(e) => e.stopPropagation()} className={cls} style={style} title={`${b.title} · ${range}`}>{label}</Link>;
+  const title = `${b.title} · ${range} — drag to move, pull the bottom edge to resize`;
+  if (b.href) return <Link href={b.href} draggable={false} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag} onClick={(e) => e.stopPropagation()} className={cls} style={style} title={title}>{label}{grip}</Link>;
   if (b.kind === 'habit' && b.habit) {
     const h = b.habit;
     return (
-      <div className={`${cls} flex items-start gap-1`} style={style} title={`${b.title} · ${range}`}>
-        <button type="button" onClick={(e) => { e.stopPropagation(); onHabit(h.id, h.date, !!b.done); }} title={b.done ? 'Done (click to undo)' : 'Click to check in'} className="shrink-0 font-semibold">{b.done ? '✓' : h.missed ? '✕' : '○'}</button>
-        <Link href={`/habits#habit-${h.id}`} onClick={(e) => e.stopPropagation()} className="min-w-0 flex-1">{label}</Link>
+      <div className={`${cls} flex items-start gap-1`} style={style} title={title} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag}>
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onHabit(h.id, h.date, !!b.done); }} title={b.done ? 'Done (click to undo)' : 'Click to check in'} className="shrink-0 font-semibold">{b.done ? '✓' : h.missed ? '✕' : '○'}</button>
+        <Link href={`/habits#habit-${h.id}`} draggable={false} onClick={(e) => e.stopPropagation()} className="min-w-0 flex-1">{label}</Link>
+        {grip}
       </div>
     );
   }
-  return <button type="button" onClick={(e) => { e.stopPropagation(); if (b.event) onEvent(b.event); }} className={cls} style={style} title={`${b.title} · ${range}`}>{label}</button>;
+  return <button type="button" onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag} onClick={(e) => { e.stopPropagation(); if (b.event) onEvent(b.event); }} className={cls} style={style} title={title}>{label}{grip}</button>;
 }

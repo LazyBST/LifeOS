@@ -80,7 +80,8 @@ export function ForecastChart({ points }: { points: { date: string; committed: n
   );
 }
 
-export function CategoryDonut({ rows }: { rows: { category: string; amount: number }[] }) {
+export function CategoryDonut({ rows, previous = [] }: { rows: { category: string; amount: number }[]; /** the same categories in the previous period, for the change column */ previous?: { category: string; amount: number }[] }) {
+  const before = new Map(previous.map((r) => [r.category, r.amount]));
   const total = rows.reduce((s, r) => s + r.amount, 0);
   if (total <= 0) return <p className="text-sm text-muted-foreground">No spending recorded in this period.</p>;
   const top = rows.slice(0, 8);
@@ -109,6 +110,7 @@ export function CategoryDonut({ rows }: { rows: { category: string; amount: numb
             <span className="flex-1 truncate">{r.category}</span>
             <span className="text-xs text-muted-foreground">{Math.round((r.amount / total) * 100)}%</span>
             <span className="w-20 text-right font-medium">{formatINR(r.amount)}</span>
+            {(() => { const b = before.get(r.category); if (!b) return <span className="w-12 text-right text-[11px] text-muted-foreground">new</span>; const d = Math.round(((r.amount - b) / b) * 100); return <span className={`w-12 text-right text-[11px] font-semibold ${d > 0 ? 'text-red-600' : 'text-emerald-600'}`} title={`Last period: ${formatINR(b)}`}>{d > 0 ? '↗' : '↘'} {Math.abs(d)}%</span>; })()}
           </li>
         ))}
       </ul>
