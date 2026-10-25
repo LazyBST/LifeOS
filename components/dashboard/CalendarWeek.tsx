@@ -34,7 +34,7 @@ export function CalendarWeek() {
   const [loading, setLoading] = useState(false);
   const [dialog, setDialog] = useState<DialogTarget>(null);
 
-  useEffect(() => { try { const m = localStorage.getItem('lifeos:cal:mode'); if (m === 'day' || m === 'week') setMode(m); } catch {} }, []);
+  useEffect(() => { try { const m = localStorage.getItem('lifeos:cal:mode'); if (m === 'day' || m === 'week') setMode(m); else if (window.innerWidth < 768) setMode('day'); } catch {} }, []);
   const chooseMode = (m: 'week' | 'day') => { setMode(m); try { localStorage.setItem('lifeos:cal:mode', m); } catch {} };
 
   const load = useCallback(async (w: string) => {

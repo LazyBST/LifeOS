@@ -158,7 +158,7 @@ function Row({ task, onToggleComplete, onDelete }: { task: TaskListItem; onToggl
   const path = [task.goal_title, task.project_title].filter(Boolean).join(' > ');
   return (
     <div
-      className="grid min-h-11 grid-cols-[1.5rem_1fr_5rem_7rem_6rem_4rem_2rem] items-center gap-2 rounded-md border border-border/50 px-2 py-1.5 text-sm"
+      className="grid min-h-11 grid-cols-[1.5rem_minmax(0,1fr)_auto_2rem] items-center gap-2 sm:grid-cols-[1.5rem_minmax(0,1fr)_5rem_7rem_6rem_4rem_2rem] rounded-md border border-border/50 px-2 py-1.5 text-sm"
       style={{ borderLeftColor: task.area_color, borderLeftWidth: 3 }}
     >
       <input
@@ -171,13 +171,14 @@ function Row({ task, onToggleComplete, onDelete }: { task: TaskListItem; onToggl
       <Link href={`/tasks/${task.id}`} className="flex min-w-0 flex-col">
         <span className={`truncate ${st.dim ? 'text-muted-foreground' : ''} ${st.strike_through ? 'line-through' : ''}`}>{task.title}</span>
         {path && <span className="truncate text-xs text-muted-foreground">{path}</span>}
+        <span className={`text-xs sm:hidden ${overdue ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>{task.priority}{due ? ` · ${due}` : ''}</span>
       </Link>
-      <span className="text-xs text-muted-foreground">{task.priority}</span>
+      <span className="hidden text-xs text-muted-foreground sm:block">{task.priority}</span>
       <span><StatusLabel status={task.status} compact /></span>
-      <span className={`text-xs ${overdue ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+      <span className={`hidden text-xs sm:block ${overdue ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
         {due ?? '—'}
       </span>
-      <span className="text-xs text-muted-foreground">{task.estimate_min ? `${task.estimate_min}m` : '—'}</span>
+      <span className="hidden text-xs text-muted-foreground sm:block">{task.estimate_min ? `${task.estimate_min}m` : '—'}</span>
       {onDelete ? (
         <button type="button" aria-label={`Delete ${task.title}`} title="Delete task" onClick={() => onDelete(task.id)} className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/20"><Trash2 className="size-4" /></button>
       ) : <span />}

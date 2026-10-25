@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { Home, ListTodo, MessageCircle, Wallet, MoreHorizontal, CheckCircle2, Library, BookOpen, BarChart3, Settings } from 'lucide-react';
+import { Home, ListTodo, MessageCircle, Wallet, MoreHorizontal, CalendarDays, CheckCircle2, Library, BookOpen, BarChart3, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
@@ -15,6 +15,7 @@ const ITEMS = [
 
 /** Everything that does not fit in the bar. */
 const MORE = [
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/habits', label: 'Habits', icon: CheckCircle2 },
   { href: '/journal', label: 'Journal', icon: BookOpen },
   { href: '/books', label: 'Books', icon: Library },
