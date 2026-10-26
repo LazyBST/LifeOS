@@ -11,6 +11,7 @@ import { weekStart } from '@/lib/domain/lifecal-math';
 import type { WeekBlock } from '@/lib/domain/calweek';
 import { FocusDay } from './FocusDay';
 import { Celebration } from './Celebration';
+import { END_SOUNDS, playEnd, playStart, type SoundId } from '@/lib/pomodoro-sounds';
 
 const LS_TIMER = 'lifeos:pomo:timer', LS_UI = 'lifeos:pomo:ui', LS_CFG = 'lifeos:pomo:cfg', LS_LOGGED = 'lifeos:pomo:logged';
 const MIN = 60_000;
@@ -48,8 +49,8 @@ const THEMES: Record<string, { name: string; work: Look; break: Look }> = {
   bright: { name: 'Bright', work: { bg: 'linear-gradient(135deg,#f43f5e,#f97316,#f59e0b)', accent: '#fff', ink: '#f43f5e' }, break: { bg: 'linear-gradient(135deg,#10b981,#14b8a6,#06b6d4)', accent: '#fff', ink: '#0d9488' } },
 };
 const PAUSED: Look = { bg: 'linear-gradient(135deg,#5b6472,#3a414d)', accent: '#e2e8f0', ink: '#4b5563' };
-type Prefs = { theme: string; cover: string };
-const DEFAULT_PREFS: Prefs = { theme: 'dusk', cover: '' };
+type Prefs = { theme: string; cover: string; sound: SoundId };
+const DEFAULT_PREFS: Prefs = { theme: 'dusk', cover: '', sound: 'marimba' };
 const LS_PREFS = 'lifeos:pomo:prefs';
 /** The card and full-screen background: the theme's gradient, or the chosen cover image under a dark veil. */
 const surface = (look: Look, cover: string): React.CSSProperties =>
@@ -153,7 +154,7 @@ export function PomodoroRoot() {
       const c = JSON.parse(localStorage.getItem(LS_CFG) ?? 'null') as PomoConfig | null;
       if (c && c.workMin > 0) setCfg(c);
       const pr = JSON.parse(localStorage.getItem(LS_PREFS) ?? 'null') as Prefs | null;
-      if (pr && THEMES[pr.theme]) setPrefsState({ theme: pr.theme, cover: typeof pr.cover === 'string' ? pr.cover : '' });
+      if (pr && THEMES[pr.theme]) setPrefsState({ theme: pr.theme, cover: typeof pr.cover === 'string' ? pr.cover : '', sound: END_SOUNDS.some((x) => x.id === pr.sound) ? pr.sound : 'marimba' });
     } catch {}
     setReady(true);
     const onStorage = (e: StorageEvent) => {
@@ -215,29 +216,21 @@ export function PomodoroRoot() {
     void logPomodoroSegmentAction(seg).then((r) => { if (!r.ok) toast.error(r.error); else setStatsKey((k) => k + 1); });
   }, []);
 
-  const beep = useCallback((notes: number[]) => {
-    try {
-      const ctx = audio.current ?? new AudioContext();
-      audio.current = ctx;
-      notes.forEach((f, i) => {
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.frequency.value = f; o.type = 'sine';
-        g.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.22);
-        g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + i * 0.22 + 0.03);
-        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.22 + 0.2);
-        o.connect(g); g.connect(ctx.destination);
-        o.start(ctx.currentTime + i * 0.22); o.stop(ctx.currentTime + i * 0.22 + 0.22);
-      });
-    } catch {}
-    try { navigator.vibrate?.([200, 100, 200]); } catch {}
+  const ctxFor = useCallback((): AudioContext | null => {
+    try { audio.current = audio.current ?? new AudioContext(); void audio.current.resume(); return audio.current; } catch { return null; }
   }, []);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
 
   const announce = useCallback((t: PomoTimer) => {
     const text = t.status === 'done' ? 'All sessions done. Great work!' : t.phase === 'break' ? 'Focus session done. Take a break.' : 'Break over. Back to focus.';
-    beep(t.phase === 'break' && t.status !== 'done' ? [660, 880] : [880, 660, 520]);
+    // a work session or the whole run finished: the chosen finishing sound. A break ending starts focus again: the watch clicks.
+    const c = ctxFor();
+    if (c) { if (t.status === 'done' || t.phase === 'break') playEnd(c, prefsRef.current.sound); else playStart(c); }
+    try { navigator.vibrate?.([200, 100, 200]); } catch {}
     toast(text);
     try { if ('Notification' in window && Notification.permission === 'granted') new Notification('LifeOS Pomodoro', { body: text }); } catch {}
-  }, [beep]);
+  }, [ctxFor]);
 
   // the clock: every tick looks at the timestamps, so a sleeping tab cannot drift
   useEffect(() => {
@@ -291,7 +284,7 @@ export function PomodoroRoot() {
   function start(c: PomoConfig) {
     setCfg(c);
     try { localStorage.setItem(LS_CFG, JSON.stringify(c)); } catch {}
-    try { audio.current = audio.current ?? new AudioContext(); void audio.current.resume(); } catch {}
+    { const c = ctxFor(); if (c) playStart(c); }
     try { if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission(); } catch {}
     commit(startRun(c, tnow(), crypto.randomUUID(), currentRef.current.title));
     setNow(tnow());
@@ -422,14 +415,14 @@ export function PomodoroRoot() {
       <Dialog open={setup} onOpenChange={setSetup}>
         <DialogContent>
           <DialogHeader><DialogTitle>Start a Pomodoro</DialogTitle></DialogHeader>
-          <SetupForm initial={cfg} prefs={prefs} onPrefs={setPrefs} heading={current} onStart={start} onHide={() => { setSetup(false); setHidden(true); }} />
+          <SetupForm initial={cfg} prefs={prefs} onPrefs={setPrefs} onPreview={() => { const c = ctxFor(); if (c) playEnd(c, prefs.sound); }} heading={current} onStart={start} onHide={() => { setSetup(false); setHidden(true); }} />
         </DialogContent>
       </Dialog>
     </>
   );
 }
 
-function SetupForm({ initial, prefs, onPrefs, heading, onStart, onHide }: { initial: PomoConfig; prefs: Prefs; onPrefs: (p: Prefs) => void; heading: Current; onStart: (c: PomoConfig) => void; onHide: () => void }) {
+function SetupForm({ initial, prefs, onPrefs, onPreview, heading, onStart, onHide }: { initial: PomoConfig; prefs: Prefs; onPrefs: (p: Prefs) => void; onPreview: () => void; heading: Current; onStart: (c: PomoConfig) => void; onHide: () => void }) {
   const [work, setWork] = useState(String(initial.workMin));
   const [brk, setBrk] = useState(String(initial.breakMin));
   const [forever, setForever] = useState(initial.repeats === null);
@@ -462,6 +455,15 @@ function SetupForm({ initial, prefs, onPrefs, heading, onStart, onHide }: { init
           {Object.entries(THEMES).map(([id, th]) => (
             <button key={id} type="button" onClick={() => onPrefs({ ...prefs, theme: id })} aria-label={`${th.name} colours`} title={th.name} className={`size-9 rounded-full ring-offset-2 ring-offset-background ${prefs.theme === id ? 'ring-2 ring-primary' : ''}`} style={{ background: `linear-gradient(135deg, ${th.work.accent} 0 50%, ${th.break.accent} 50% 100%)`, boxShadow: 'inset 0 0 0 3px ' + th.work.ink }} />
           ))}
+        </div>
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">Sound when a session ends</span>
+          <div className="flex gap-2">
+            <select value={prefs.sound} onChange={(e) => onPrefs({ ...prefs, sound: e.target.value as SoundId })} className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-transparent px-2 text-sm">
+              {END_SOUNDS.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.note}</option>)}
+            </select>
+            <button type="button" onClick={onPreview} className="rounded-lg border px-3 text-sm hover:bg-muted" aria-label="Play the sound" title="Play the sound">▶</button>
+          </div>
         </div>
         <label className="block space-y-1">
           <span className="text-xs text-muted-foreground">Cover image link (optional)</span>
