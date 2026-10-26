@@ -105,7 +105,7 @@ export function ChatPanel() {
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Close chat' : 'Open chat'}
         className={cn(
-          'fixed right-4 bottom-4 z-40 hidden rounded-full shadow-lg md:flex',
+          'fixed right-4 bottom-4 z-40 hidden size-12 rounded-full shadow-lg md:flex',
           open && 'md:hidden',
         )}
       >

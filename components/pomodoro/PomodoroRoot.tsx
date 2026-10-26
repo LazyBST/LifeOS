@@ -88,6 +88,7 @@ export function PomodoroRoot() {
   const [hidden, setHidden] = useState(false);
   const [setup, setSetup] = useState(false);
   const [cfg, setCfg] = useState<PomoConfig>(DEFAULT_CFG);
+  const [chatOpen, setChatOpen] = useState(false);
   const [prefs, setPrefsState] = useState<Prefs>(DEFAULT_PREFS);
   const [party, setParty] = useState<{ kind: CelebrationKind; key: number; text: string | null } | null>(null);
   const setPrefs = (p: Prefs) => { setPrefsState(p); try { localStorage.setItem(LS_PREFS, JSON.stringify(p)); } catch {} };
@@ -138,6 +139,14 @@ export function PomodoroRoot() {
     };
     window.addEventListener('lifeos:pomodoro', h);
     return () => window.removeEventListener('lifeos:pomodoro', h);
+  }, []);
+
+  // on desktop the chat docks on the right: the timer steps left of it while it is open
+  useEffect(() => {
+    setChatOpen(!!(window as unknown as { __lifeosChatOpen?: boolean }).__lifeosChatOpen);
+    const h = (e: Event) => setChatOpen(!!(e as CustomEvent<{ open: boolean }>).detail?.open);
+    window.addEventListener('lifeos:chat:state', h);
+    return () => window.removeEventListener('lifeos:chat:state', h);
   }, []);
 
   // what the calendar says you should be doing: refreshed while the timer is on screen
@@ -274,7 +283,8 @@ export function PomodoroRoot() {
   const paused = timer?.status === 'paused';
   const heading = timer?.phase === 'break' ? 'Take a breather' : current.title;
   const sessionText = timer ? (timer.phase === 'work' ? `Focus ${timer.cycle}${timer.cfg.repeats ? ` of ${timer.cfg.repeats}` : ''}` : `Break after session ${timer.cycle}`) : '';
-  const fab = 'fixed right-4 bottom-20 z-40 md:right-20 md:bottom-4';
+  // desktop: stacked above the chat icon (same size); with the chat open, left of the chat window
+  const fab = `fixed right-4 bottom-20 z-40 ${chatOpen ? 'md:right-[396px] md:bottom-4' : 'md:right-4 md:bottom-20'}`;
 
   const controls = (big: boolean) => timer && !done && (
     <div className="flex items-center justify-center gap-3">
@@ -288,7 +298,7 @@ export function PomodoroRoot() {
     <>
       {/* nothing running: the clock icon */}
       {!hidden && !timer && (
-        <button type="button" onClick={() => setSetup(true)} aria-label="Start a Pomodoro" title="Pomodoro timer" className={`${fab} flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105`}>{Icon.clock}</button>
+        <button type="button" onClick={() => setSetup(true)} aria-label="Start a Pomodoro" title="Pomodoro timer" className={`${fab} flex size-12 items-center justify-center rounded-full bg-rose-500 text-white shadow-lg transition-transform hover:scale-105 hover:bg-rose-600`}>{Icon.clock}</button>
       )}
 
       {/* running: the small round timer */}
@@ -304,7 +314,7 @@ export function PomodoroRoot() {
 
       {/* running: the card */}
       {!hidden && timer && mem && view === 'card' && (
-        <div className="fixed right-3 bottom-20 left-3 z-[45] overflow-hidden rounded-3xl text-white shadow-2xl sm:left-auto sm:w-80 md:right-4 md:bottom-20" style={surface(mem.c, prefs.cover)}>
+        <div className={`fixed right-3 bottom-20 left-3 z-[45] overflow-hidden rounded-3xl text-white shadow-2xl sm:left-auto sm:w-80 ${chatOpen ? 'md:right-[396px] md:bottom-4' : 'md:right-4 md:bottom-20'}`} style={surface(mem.c, prefs.cover)}>
           <div className="h-1" style={{ background: mem.c.accent }} />
           <div className="flex items-center gap-1 px-4 pt-3 text-[11px] font-semibold uppercase tracking-widest text-white/85">
             <span className="flex-1">{done ? 'Finished' : `${paused ? 'Paused · ' : ''}${sessionText}`}</span>
