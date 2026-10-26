@@ -36,10 +36,9 @@ function toInput(f: Form): EventInput {
 export function EventDialog({ target, onClose, onChanged }: { target: DialogTarget; onClose: () => void; onChanged: () => void }) {
   const [f, setF] = useState<Form | null>(null);
   const [busy, setBusy] = useState(false);
-  const [kind, setKind] = useState<'event' | 'task'>('event'); // a new calendar item is an event or a task
-  useEffect(() => { try { if (localStorage.getItem('lifeos:cal:newkind') === 'task') setKind('task'); } catch {} }, []);
-  const pick = (k: 'event' | 'task') => { setKind(k); try { localStorage.setItem('lifeos:cal:newkind', k); } catch {} };
-  useEffect(() => { setF(target ? initial(target) : null); }, [target]);
+  const [kind, setKind] = useState<'event' | 'task'>('task'); // a new calendar item is a task unless you switch to an event
+  const pick = (k: 'event' | 'task') => setKind(k);
+  useEffect(() => { setF(target ? initial(target) : null); if (target?.mode === 'create') setKind('task'); }, [target]);
   if (!target || !f) return null;
   const readOnly = target.mode === 'edit' && !target.event.canEdit;
   const set = (p: Partial<Form>) => setF({ ...f, ...p });
