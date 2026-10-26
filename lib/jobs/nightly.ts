@@ -63,7 +63,7 @@ export async function runNightlyReview(now: Date, errors: NightlyJobError[]): Pr
   }
 
   const habits = await habitStatuses(date);
-  const missedHabits = habits.filter((h) => h.due && !h.done);
+  const missedHabits = habits.filter((h) => h.due && !h.done && !h.skipped);
 
   const conflicts = await syncConflictsToday(date);
 

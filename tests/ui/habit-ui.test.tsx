@@ -34,21 +34,23 @@ describe('HabitRow', () => {
     fireEvent.click(screen.getByLabelText('Details'));
     expect(screen.getByText(/Longest streak 9/)).toBeTruthy();
   });
-  it('has a missed button that marks today missed (and a second tap clears it)', async () => {
+  it('has one circle for today: done, then missed, then skipped, then clear', async () => {
     render(<HabitRow h={habit} />);
-    await act(async () => { fireEvent.click(screen.getByLabelText('Mark Vitamin D as missed today')); });
-    expect(toggle).toHaveBeenCalledWith('h1', '2026-10-25', 'missed');
-    await act(async () => { fireEvent.click(screen.getByLabelText('Undo missed for Vitamin D')); });
-    expect(toggle).toHaveBeenLastCalledWith('h1', '2026-10-25', 'clear');
+    expect(screen.queryByLabelText(/as missed today/)).toBeNull(); // no separate missed or skip button
+    const circle = () => screen.getByLabelText(/Vitamin D today: .* Click to change/);
+    for (const want of ['done', 'missed', 'skipped', 'clear']) {
+      await act(async () => { fireEvent.click(circle()); });
+      expect(toggle).toHaveBeenLastCalledWith('h1', '2026-10-25', want);
+    }
   });
-  it('tapping a past day corrects it, and the circle checks in today', async () => {
+  it('tapping a past day cycles it the same way', async () => {
     render(<HabitRow h={habit} />);
-    const squares = screen.getAllByRole('button').filter((b) => b.getAttribute('title')?.includes('tap to change'));
+    const squares = screen.getAllByRole('button').filter((b) => b.getAttribute('title')?.includes('tap: done, missed, skipped, clear'));
     expect(squares).toHaveLength(7);
     await act(async () => { fireEvent.click(squares[3]); });
     expect(toggle).toHaveBeenCalledWith('h1', '2026-10-22', 'done');
-    await act(async () => { fireEvent.click(screen.getByLabelText('Check Vitamin D for today')); });
-    expect(toggle).toHaveBeenCalledWith('h1', '2026-10-25', 'done');
+    await act(async () => { fireEvent.click(squares[0]); }); // already done: the next state is missed
+    expect(toggle).toHaveBeenLastCalledWith('h1', '2026-10-19', 'missed');
   });
 });
 

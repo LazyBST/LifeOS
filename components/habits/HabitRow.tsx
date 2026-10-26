@@ -4,8 +4,9 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { checkinHabitAction, setHabitDayAction } from '@/app/actions/habits';
+import { MARK_LABEL, nextMark, type DayMark } from '@/lib/domain/habit-state';
 
-export type WeekDay = { date: string; due: boolean; done: boolean; /** marked missed by hand */ missed: boolean };
+export type WeekDay = { date: string; due: boolean; done: boolean; /** marked missed by hand */ missed: boolean; /** skipped: neither helps nor hurts */ skipped?: boolean };
 export type HabitRowData = {
   id: string; name: string; emoji: string | null; kind: 'boolean' | 'count'; target: number; unit: string | null;
   value: number; done: boolean; streak: number; longest: number; schedule: string; week: WeekDay[]; today: string; start?: string | null; end?: string | null;
@@ -32,25 +33,30 @@ export function HabitRow({ h, onUnlink, onEdit, onArchive }: { h: HabitRowData; 
     if (window.location.hash === `#habit-${h.id}`) { setOpen(true); document.getElementById(`habit-${h.id}`)?.scrollIntoView({ block: 'center' }); }
   }, [h.id]);
 
-  const todayDone = week.find((d) => d.date === h.today)?.done ?? false;
-  const todayMissed = week.find((d) => d.date === h.today)?.missed ?? false;
+  const markOfDay = (d?: WeekDay): DayMark => (d?.done ? 'done' : d?.missed ? 'missed' : d?.skipped ? 'skipped' : 'none');
+  const todayMark = markOfDay(week.find((d) => d.date === h.today));
   const doneCount = week.filter((d) => d.due && d.done).length;
-  const dueCount = week.filter((d) => d.due).length;
+  const dueCount = week.filter((d) => d.due && !d.skipped).length;
 
-  function setDay(date: string, state: 'done' | 'missed' | 'clear') {
-    setWeek((w) => w.map((d) => (d.date === date ? { ...d, done: state === 'done', missed: state === 'missed' } : d)));
+  function setDay(date: string, state: 'done' | 'missed' | 'skipped' | 'clear') {
+    setWeek((w) => w.map((d) => (d.date === date ? { ...d, done: state === 'done', missed: state === 'missed', skipped: state === 'skipped' } : d)));
     start(async () => {
       const r = await setHabitDayAction(h.id, date, state);
       if (!r.ok) { toast.error(r.error); setWeek(h.week); }
       router.refresh();
     });
   }
-  const toggleDay = (date: string) => setDay(date, week.find((d) => d.date === date)?.done ? 'clear' : 'done');
+  /** one click moves a day along: done, missed, skipped, then back to nothing */
+  function cycleDay(date: string) {
+    const next = nextMark(markOfDay(week.find((d) => d.date === date)));
+    if (next === 'done' && h.kind === 'count' && date === h.today) { setCount(h.target); return; }
+    setDay(date, next === 'none' ? 'clear' : next);
+  }
 
   function setCount(n: number) {
     const v = Math.max(0, n);
     setValue(v); setDraft(String(v));
-    setWeek((w) => w.map((d) => (d.date === h.today ? { ...d, done: v >= h.target, missed: false } : d)));
+    setWeek((w) => w.map((d) => (d.date === h.today ? { ...d, done: v >= h.target, missed: false, skipped: false } : d)));
     start(async () => {
       const r = await checkinHabitAction(h.id, { value: v });
       if (!r.ok) toast.error(r.error);
@@ -63,17 +69,15 @@ export function HabitRow({ h, onUnlink, onEdit, onArchive }: { h: HabitRowData; 
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => (h.kind === 'count' ? setCount(todayDone ? 0 : h.target) : toggleDay(h.today))}
-          aria-label={todayDone ? `Uncheck ${h.name} for today` : `Check ${h.name} for today`}
-          className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[12px] font-bold transition-colors ${todayDone ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-input text-transparent hover:border-emerald-500 hover:text-emerald-500'}`}
-        >✓</button>
-        <button
-          type="button"
-          onClick={() => setDay(h.today, todayMissed ? 'clear' : 'missed')}
-          aria-label={todayMissed ? `Undo missed for ${h.name}` : `Mark ${h.name} as missed today`}
-          title={todayMissed ? 'Marked missed: click to undo' : 'Mark as missed today (breaks the streak)'}
-          className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[12px] font-bold transition-colors ${todayMissed ? 'border-red-500 bg-red-500 text-white' : 'border-input text-transparent hover:border-red-500 hover:text-red-500'}`}
-        >✕</button>
+          onClick={() => cycleDay(h.today)}
+          aria-label={`${h.name} today: ${MARK_LABEL[todayMark]}. Click to change`}
+          title={`${MARK_LABEL[todayMark]} · click: done, missed, skipped, then clear`}
+          className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[12px] font-bold transition-colors ${
+            todayMark === 'done' ? 'border-emerald-500 bg-emerald-500 text-white'
+            : todayMark === 'missed' ? 'border-red-500 bg-red-500 text-white'
+            : todayMark === 'skipped' ? 'border-slate-400 bg-slate-400 text-white dark:border-slate-500 dark:bg-slate-500'
+            : 'border-input text-transparent hover:border-emerald-500 hover:text-emerald-500'}`}
+        >{todayMark === 'missed' ? '✕' : todayMark === 'skipped' ? '–' : '✓'}</button>
         <button type="button" onClick={() => setOpen((o) => !o)} className="min-w-0 flex-1 truncate text-left text-sm font-medium" title="Details">
           {h.start && <span className="mr-1.5 text-xs font-normal tabular-nums text-muted-foreground">{h.start}{h.end ? `–${h.end}` : ''}</span>}
           {h.emoji ? `${h.emoji} ` : ''}{h.name}
@@ -84,10 +88,11 @@ export function HabitRow({ h, onUnlink, onEdit, onArchive }: { h: HabitRowData; 
             <button
               key={d.date}
               type="button"
-              onClick={() => toggleDay(d.date)}
-              title={`${d.date}${d.due ? (d.done ? ' · done' : d.missed ? ' · marked missed' : d.date === h.today ? ' · today' : ' · missed') : ' · not due'} (tap to change)`}
+              onClick={() => cycleDay(d.date)}
+              title={`${d.date}${d.skipped ? ' · skipped' : d.due ? (d.done ? ' · done' : d.missed ? ' · marked missed' : d.date === h.today ? ' · today' : ' · missed') : ' · not due'} (tap: done, missed, skipped, clear)`}
               className={`size-[18px] rounded-[5px] text-[9px] font-bold leading-none transition-colors ${
-                !d.due ? 'border border-dashed border-border text-muted-foreground/50'
+                d.skipped ? 'border border-dashed border-slate-400 text-slate-400'
+                : !d.due ? 'border border-dashed border-border text-muted-foreground/50'
                 : d.done ? 'bg-emerald-500 text-white'
                 : d.missed ? 'bg-red-500 text-white'
                 : d.date === h.today ? 'border border-input text-muted-foreground'

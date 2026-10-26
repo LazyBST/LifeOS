@@ -36,7 +36,7 @@ export default async function HabitsPage() {
   }
   const streakByHabit = new Map(statuses.map((s) => [s.id, s]));
 
-  const dueToday = statuses.filter((x) => x.due);
+  const dueToday = statuses.filter((x) => x.due && !x.skipped);
   const doneToday = dueToday.filter((x) => x.done).length;
   const items: GridItem[] = [
     { id: 'overview', w: 4, h: 7, minW: 3, minH: 5, node: (

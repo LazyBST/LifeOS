@@ -363,7 +363,7 @@ const habitStatus: ToolDef<typeof habitStatusSchema> = {
       dateEcho = parsed.text;
     }
     const statuses = await habitStatuses(date);
-    const due = statuses.filter((h) => h.due);
+    const due = statuses.filter((h) => h.due && !h.skipped);
     if (due.length === 0) return { message: `No habits due ${dateEcho}.` };
     const lines = due.map((h) => `${h.name}: ${h.done ? 'done' : 'not yet'} (${h.current_streak}-day streak)`);
     return {

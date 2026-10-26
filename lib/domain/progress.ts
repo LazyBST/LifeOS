@@ -94,13 +94,17 @@ export function habitStreak(args: {
   const due = (date: string) => !daysOfWeek || daysOfWeek.length === 0 || daysOfWeek.includes(isoDow(date));
   const met = (date: string) => (checkins[date] ?? 0) >= target;
 
+  // skipped days (-2) neither extend nor break a streak. A day that was not scheduled but was done anyway (a habit
+  // moved to another day of the week) counts like any other done day; a not-scheduled day left alone is ignored.
   let current = 0;
   for (let i = 0; i < maxDays; i++) {
-    const d = addDays(today, -i);
-    if (!due(d)) continue;
+    const d = addDays(today, i * -1);
+    const v = checkins[d];
+    if (v === -2) continue;
+    if (!due(d)) { if (met(d)) current += 1; continue; }
     if (met(d)) current += 1;
     // today not yet checked in does not break a streak that is otherwise alive
-    else if (i === 0 && checkins[d] === undefined) continue; // an explicit miss (-1) today does break it
+    else if (i === 0 && v === undefined) continue; // an explicit miss (-1) today does break it
     else break;
   }
 
@@ -111,7 +115,8 @@ export function habitStreak(args: {
   const span = Math.min(maxDays, Math.max(0, daysBetween(from, today)));
   for (let i = span; i >= 0; i--) {
     const d = addDays(today, -i);
-    if (!due(d)) continue;
+    if (checkins[d] === -2) continue;
+    if (!due(d)) { if (met(d)) { run += 1; longest = Math.max(longest, run); } continue; }
     if (met(d)) {
       run += 1;
       longest = Math.max(longest, run);

@@ -96,8 +96,10 @@ export async function detailItems(from: string, to: string): Promise<DetailItem[
     const value = new Map(checkins.map((c) => [`${c.habit_id}|${c.checkin_date}`, Number(c.value)]));
     for (let d = from; d <= last; d = addDays(d, 1)) {
       for (const h of habits) {
-        if (h.created_at.slice(0, 10) > d || !habitDueOn(h, d)) continue;
-        const outcome = habitOutcome(value.get(`${h.id}|${d}`), Number(h.target_value), d, today);
+        const v = value.get(`${h.id}|${d}`);
+        // a day it was not scheduled counts only when it was done anyway (a habit moved to another day)
+        if (h.created_at.slice(0, 10) > d || !(habitDueOn(h, d) || (v !== undefined && v >= Number(h.target_value)))) continue;
+        const outcome = habitOutcome(v, Number(h.target_value), d, today);
         if (outcome) out.push(make({ kind: 'habit', id: h.id, title: h.name, area_id: h.area_id, date: d, href: null, outcome }));
       }
     }

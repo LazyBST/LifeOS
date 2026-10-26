@@ -15,6 +15,7 @@ import {
   habitStatuses,
   linkHabit,
   setHabitDayTime,
+  moveHabitOccurrence,
   setHabitDay,
   type DayState,
   toggleHabitDay,
@@ -132,5 +133,15 @@ export async function unarchiveHabitAction(id: string): Promise<ActionResult<Hab
     const habit = await unarchiveHabit(id);
     revalidatePath('/', 'layout');
     return habit;
+  });
+}
+
+/** Move one occurrence of a habit to another day; the old day counts as skipped, the new one as an extra. */
+export async function moveHabitOccurrenceAction(habitId: string, from: string, to: string, start?: string | null, end?: string | null): Promise<ActionResult<null>> {
+  return run(async () => {
+    await requireUser();
+    await moveHabitOccurrence(habitId, from, to, start, end);
+    revalidatePath('/', 'layout');
+    return null;
   });
 }

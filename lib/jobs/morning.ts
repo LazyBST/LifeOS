@@ -151,7 +151,7 @@ export async function runMorningPlan(now: Date, errors: MorningJobError[]): Prom
     goalForecasts(date),
   ]);
 
-  const habits = habitsAll.filter((h) => h.due && !h.done);
+  const habits = habitsAll.filter((h) => h.due && !h.done && !h.skipped);
   const goals = goalsAll.filter((g) => g.target_date && daysBetween(date, g.target_date) >= 0 && daysBetween(date, g.target_date) <= 30);
 
   const candidateIds = new Set<string>();

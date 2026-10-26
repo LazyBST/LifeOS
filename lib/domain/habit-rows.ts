@@ -21,7 +21,8 @@ export function toRow(s: HabitStatus, met: Map<string, number>, today: string): 
     week: Array.from({ length: 7 }, (_, i) => {
       const date = addDays(today, i - 6);
       const v = met.get(`${s.id}|${date}`);
-      return { date, due: habitDueOn(s, date), done: (v ?? 0) >= target, missed: v !== undefined && v < 0 };
+      const done = (v ?? 0) >= target;
+      return { date, due: habitDueOn(s, date) || done, done, missed: v === -1, skipped: v === -2 };
     }),
   };
 }

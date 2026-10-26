@@ -113,7 +113,7 @@ const report: ToolDef<typeof reportSchema> = {
         const todays = daily.filter((d) => d.day === anchor.date);
         const tasksDone = todays.reduce((a, d) => a + d.tasks, 0);
         const effortMin = todays.reduce((a, d) => a + d.effort_min, 0);
-        const due = habits.filter((h) => h.due);
+        const due = habits.filter((h) => h.due && !h.skipped);
         const habitsDone = due.filter((h) => h.done).length;
         const spend = spendRows.reduce((a, r) => a + r.amount, 0);
         return {
@@ -159,7 +159,7 @@ const report: ToolDef<typeof reportSchema> = {
         const anchor = resolveAnchorDate(input.range, ctx.now);
         if ('error' in anchor) return { message: anchor.error };
         const statuses = await habitStatuses(anchor.date);
-        const due = statuses.filter((h) => h.due);
+        const due = statuses.filter((h) => h.due && !h.skipped);
         if (due.length === 0) return { message: `No habits due ${anchor.echo}.`, data: [] };
         const lines = due.map((h) => `${h.name}: ${h.done ? 'done' : 'not yet'} (${h.current_streak}-day streak)`);
         return {

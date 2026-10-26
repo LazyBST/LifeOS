@@ -8,8 +8,8 @@ import { listHabits, habitDueOn, habitDayTimes } from './habits';
 import { minutesOfTime } from './day-layout';
 
 export type EditableEvent = { id: string; summary: string; start: string; end: string; allDay: boolean; description: string | null; location: string | null; canEdit: boolean; recurring: boolean };
-export type WeekBlock = { id: string; title: string; start: string; end: string; kind: 'event' | 'task' | 'habit'; /** the colour of the area it belongs to */ color?: string; /** the Area's name */ area?: string; done?: boolean; href?: string; event?: EditableEvent; habit?: { id: string; date: string; emoji: string | null; missed: boolean } };
-export type UntimedItem = { kind: 'task' | 'habit'; color?: string; id: string; title: string; date: string; done: boolean; missed?: boolean; href?: string; emoji?: string | null };
+export type WeekBlock = { id: string; title: string; start: string; end: string; kind: 'event' | 'task' | 'habit'; /** the colour of the area it belongs to */ color?: string; /** the Area's name */ area?: string; done?: boolean; href?: string; event?: EditableEvent; habit?: { id: string; date: string; emoji: string | null; missed: boolean; skipped: boolean } };
+export type UntimedItem = { kind: 'task' | 'habit'; color?: string; id: string; title: string; date: string; done: boolean; missed?: boolean; href?: string; emoji?: string | null; skipped?: boolean };
 export type WeekBar = { id: string; title: string; from: string; to: string; kind: 'goal' | 'project'; href: string; color?: string };
 export type WeekData = { weekStart: string; blocks: WeekBlock[]; allDay: { id: string; title: string; date: string; event?: EditableEvent }[]; bars: WeekBar[]; untimed: UntimedItem[]; sync: { error: string | null; okAt: string | null; cached: number } | null };
 
@@ -75,16 +75,17 @@ export async function weekData(weekStart: string): Promise<WeekData> {
     for (let i = 0; i < 7; i++) {
       const date = addDays(weekStart, i);
       for (const h of habits) {
-        if (h.created_at.slice(0, 10) > date || !habitDueOn(h, date)) continue;
+        const o = override.get(`${h.id}|${date}`); // moved on the calendar for this day only
+        if (h.created_at.slice(0, 10) > date || !(habitDueOn(h, date) || o?.extra)) continue; // an extra day is a habit moved here from another day
         const v = value.get(`${h.id}|${date}`);
         const done = (v ?? 0) >= Number(h.target_value);
-        const missed = v !== undefined && v < 0;
-        const o = override.get(`${h.id}|${date}`); // moved on the calendar for this day only
+        const missed = v === -1;
+        const skipped = v === -2;
         const sMin = minutesOfTime(o ? o.start_time : h.start_time);
-        if (sMin === null) { untimed.push({ kind: 'habit', color: h.area_id ? areaHex.get(h.area_id) : undefined, id: h.id, title: h.name, date, done, missed, emoji: h.emoji }); continue; }
+        if (sMin === null) { untimed.push({ kind: 'habit', color: h.area_id ? areaHex.get(h.area_id) : undefined, id: h.id, title: h.name, date, done, missed, skipped, emoji: h.emoji }); continue; }
         const eMin = minutesOfTime(o ? o.end_time : h.end_time) ?? sMin + 5;
         const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-        blocks.push({ id: `habit-${h.id}-${date}`, title: h.name, start: istInstant(date, hhmm(sMin)).toISOString(), end: istInstant(date, hhmm(Math.min(eMin, 24 * 60 - 1))).toISOString(), kind: 'habit', color: h.area_id ? areaHex.get(h.area_id) : undefined, area: h.area_id ? areaName.get(h.area_id) : undefined, done, habit: { id: h.id, date, emoji: h.emoji, missed } });
+        blocks.push({ id: `habit-${h.id}-${date}`, title: h.name, start: istInstant(date, hhmm(sMin)).toISOString(), end: istInstant(date, hhmm(Math.min(eMin, 24 * 60 - 1))).toISOString(), kind: 'habit', color: h.area_id ? areaHex.get(h.area_id) : undefined, area: h.area_id ? areaName.get(h.area_id) : undefined, done, habit: { id: h.id, date, emoji: h.emoji, missed, skipped } });
       }
     }
   } catch { /* habits are optional on this view */ }

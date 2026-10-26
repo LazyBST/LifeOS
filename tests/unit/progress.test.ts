@@ -170,3 +170,23 @@ describe('habit streak with an explicit miss today', () => {
     expect(habitStreak({ ...base, checkins: { ...checkins, '2026-10-25': 1 } }).current).toBe(4);
   });
 });
+
+describe('habitStreak with skipped and moved days', () => {
+  const base = { today: '2026-10-25', daysOfWeek: [1, 4, 6], target: 1 }; // Mon, Thu, Sat; today is the Sunday
+  it('a skipped day neither breaks nor extends the streak', () => {
+    // Sat 24 done, Thu 22 skipped, Mon 19 done, Sat 17 done
+    const r = habitStreak({ ...base, checkins: { '2026-10-24': 1, '2026-10-22': -2, '2026-10-19': 1, '2026-10-17': 1 } });
+    expect(r.current).toBe(3);
+    expect(r.longest).toBe(3);
+    // the same days with a miss instead of the skip break it
+    expect(habitStreak({ ...base, checkins: { '2026-10-24': 1, '2026-10-22': -1, '2026-10-19': 1, '2026-10-17': 1 } }).current).toBe(1);
+  });
+  it('a Saturday moved to Sunday keeps the week whole: Sat skipped, Sun done', () => {
+    // Mon 19 done, Thu 22 done, Sat 24 skipped (moved), Sun 25 done
+    const r = habitStreak({ ...base, today: '2026-10-26', checkins: { '2026-10-19': 1, '2026-10-22': 1, '2026-10-24': -2, '2026-10-25': 1 } });
+    expect(r.current).toBe(3);
+  });
+  it('a day that is not scheduled and was left alone does nothing', () => {
+    expect(habitStreak({ ...base, checkins: { '2026-10-24': 1, '2026-10-22': 1 } }).current).toBe(2);
+  });
+});

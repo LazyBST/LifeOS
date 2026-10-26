@@ -33,6 +33,8 @@ export type HabitStatus = Habit & {
   /** today's (or `date`'s) check-in value, 0 when none */
   value: number;
   done: boolean;
+  /** skipped today: not scheduled, neither helps nor hurts */
+  skipped: boolean;
   /** marked missed by hand today */
   missed: boolean;
   current_streak: number;
@@ -175,6 +177,7 @@ export async function streakFor(habit: Habit, today = istDate()): Promise<{ curr
 export async function habitStatuses(date = istDate()): Promise<HabitStatus[]> {
   const habits = await listHabits();
   const rows = await checkinsBetween(addDays(date, -365), date);
+  const extras = new Set((await habitDayTimes(date, date)).filter((o) => o.extra).map((o) => o.habit_id)); // moved here from another day
   const byHabit = new Map<string, Record<string, number>>();
   for (const r of rows) {
     const m = byHabit.get(r.habit_id) ?? {};
@@ -192,10 +195,11 @@ export async function habitStatuses(date = istDate()): Promise<HabitStatus[]> {
     });
     return {
       ...h,
-      due: habitDueOn(h, date),
+      due: habitDueOn(h, date) || extras.has(h.id),
       value: Math.max(0, value),
       done: value >= Number(h.target_value),
-      missed: value < 0,
+      missed: value === -1,
+      skipped: value === -2,
       current_streak: current,
       longest_streak: longest,
     };
@@ -252,20 +256,20 @@ export async function toggleHabitDay(habitId: UUID, date: string): Promise<{ don
   return { done: !met };
 }
 
-export type DayState = 'done' | 'missed' | 'clear';
+export type DayState = 'done' | 'missed' | 'skipped' | 'clear';
 
-/** Set a day by hand: done, marked missed (stored as -1, which breaks the streak straight away), or cleared back to undecided. */
+/** Set a day by hand: done, marked missed (-1, breaks the streak straight away), skipped (-2, neither helps nor hurts), or cleared back to undecided. */
 export async function setHabitDay(habitId: UUID, date: string, state: DayState): Promise<void> {
   const habit = await getHabit(habitId);
   if (!habit) throw new Error(`No habit ${habitId}`);
   if (date > istDate()) throw new Error('You cannot check in a future day.');
-  const value = state === 'done' ? Number(habit.target_value) : state === 'missed' ? -1 : 0;
-  await checkinHabit(habitId, { date, value, note: state === 'missed' ? 'missed' : date === istDate() ? undefined : 'edited later' });
+  const value = state === 'done' ? Number(habit.target_value) : state === 'missed' ? -1 : state === 'skipped' ? -2 : 0;
+  await checkinHabit(habitId, { date, value, note: state === 'missed' ? 'missed' : state === 'skipped' ? 'skipped' : date === istDate() ? undefined : 'edited later' });
 }
 
 // ---- a habit's time on one particular day ---------------------------------------
 
-export type HabitDayTime = { habit_id: UUID; day: string; start_time: string; end_time: string | null };
+export type HabitDayTime = { habit_id: UUID; day: string; start_time: string | null; end_time: string | null; /** an extra occurrence on a day the habit is not normally due */ extra?: boolean };
 
 /** Override one day's time without touching the habit's own time or any other day. */
 export async function setHabitDayTime(habitId: UUID, day: string, start: string, end: string | null): Promise<void> {
@@ -289,4 +293,31 @@ export async function freezePastDayTimes(habitId: UUID, oldStart: string, oldEnd
   const have = new Set((await habitDayTimes(from, to)).filter((r) => r.habit_id === habitId).map((r) => r.day));
   const rows = Array.from({ length: days }, (_, i) => addDays(from, i)).filter((d) => !have.has(d)).map((day) => ({ habit_id: habitId, day, start_time: oldStart, end_time: oldEnd }));
   if (rows.length) await admin().from('habit_day_times').insert(rows);
+}
+
+/**
+ * Move one occurrence of a habit to another day: the old day is skipped (so it does not break the streak) and the
+ * new day becomes an extra occurrence. A habit meant 3 times a week still counts 3 when one of them slides a day.
+ */
+export async function moveHabitOccurrence(habitId: UUID, from: string, to: string, start?: string | null, end?: string | null): Promise<void> {
+  const habit = await getHabit(habitId);
+  if (!habit) throw new Error(`No habit ${habitId}`);
+  if (from === to) return;
+  const { data: here } = await admin().from('habit_checkins').select('value').eq('habit_id', habitId).eq('checkin_date', from).maybeSingle();
+  if (Number(here?.value ?? 0) >= Number(habit.target_value)) throw new Error('That one is already done. Undo it first to move it.');
+  const { data: there } = await admin().from('habit_checkins').select('value').eq('habit_id', habitId).eq('checkin_date', to).maybeSingle();
+  const [fromTimes] = await habitDayTimes(from, from).then((r) => r.filter((x) => x.habit_id === habitId));
+  const toTimes = (await habitDayTimes(to, to)).find((x) => x.habit_id === habitId);
+  if (habitDueOn(habit, to) || toTimes?.extra) throw new Error('That day already has this habit.');
+  if (there && Number(there.value) >= Number(habit.target_value)) throw new Error('That day already has this habit.');
+  const t0 = start ?? fromTimes?.start_time ?? habit.start_time ?? null;
+  const t1 = end ?? fromTimes?.end_time ?? habit.end_time ?? null;
+  const { error } = await admin().from('habit_day_times').upsert({ habit_id: habitId, day: to, start_time: t0, end_time: t0 && t1 && t1 > t0 ? t1 : null, extra: true }, { onConflict: 'habit_id,day' });
+  if (error) throw new Error(error.message.includes('extra') ? 'Run supabase/migrations/0022_habit_extra_days.sql first.' : error.message);
+  if (fromTimes?.extra) {
+    await admin().from('habit_day_times').delete().eq('habit_id', habitId).eq('day', from); // moving an extra one on: nothing to skip
+  } else {
+    const { error: e2 } = await admin().from('habit_checkins').upsert({ habit_id: habitId, checkin_date: from, value: -2, note: 'moved to ' + to }, { onConflict: 'habit_id,checkin_date' });
+    if (e2) throw new Error(e2.message);
+  }
 }

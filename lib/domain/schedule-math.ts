@@ -42,9 +42,10 @@ export function taskOutcomes(t: TaskTimeline, today: string): { date: string; ou
   return out;
 }
 
-/** value: the day's check-in; -1 means you marked it missed. */
+/** value: the day's check-in; -1 means you marked it missed, -2 that you skipped it. */
 export function habitOutcome(value: number | undefined, target: number, date: string, today: string): Outcome | null {
   if (date > today) return null;
+  if (value === -2) return null; // skipped: not scheduled, so it neither helps nor hurts the day
   if ((value ?? 0) >= target) return 'done';
   if (value !== undefined && value < 0) return 'pushed';
   return date === today ? 'pending' : 'pushed';

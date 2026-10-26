@@ -15,7 +15,7 @@ const GROUPS: { key: TimeOfDay; label: string }[] = [
 /** Today's habits as compact rows grouped by time of day. Tap the circle to check in, a square to fix a day. */
 export async function HabitsCard() {
   const [data, orders] = await Promise.all([loadHabitRows().catch(() => null), Promise.all(GROUPS.map((g) => getOrder(`habits-${g.key}`)))]);
-  const due = data?.statuses.filter((s) => s.due) ?? [];
+  const due = data?.statuses.filter((s) => s.due && !s.skipped) ?? []; // skipped today: out of the list and the count
   const done = due.filter((s) => s.done).length;
   return (
     <WidgetCard title="Habits" sub={due.length ? `${done} of ${due.length} done today · tap a square to correct a day` : 'Nothing due today'}>

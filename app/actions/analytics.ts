@@ -52,9 +52,11 @@ export async function habitConsistencyAction(days = 90): Promise<ActionResult<Ha
       const cells: HabitConsistencyDay[] = [];
       for (let i = 0; i < days; i++) {
         const date = addDays(from, i);
-        const due = habitDueOn(h, date);
-        const met = due && (checkinMap[date] ?? 0) >= Number(h.target_value);
-        cells.push({ date, due, met });
+        const v = checkinMap[date] ?? 0;
+        const met = v >= Number(h.target_value);
+        if (v === -2) { cells.push({ date, due: false, met: false }); continue; } // skipped: not counted
+        const due = habitDueOn(h, date) || met; // a done day that was not scheduled counts too
+        cells.push({ date, due, met: due && met });
       }
       const { current, longest } = habitStreak({
         today,
