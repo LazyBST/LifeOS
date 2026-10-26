@@ -45,10 +45,11 @@ function Tick({ done, missed, onClick, label, title }: { done: boolean; missed?:
 }
 
 /** What a tap on a habit or task opens a menu for. */
-type MenuTarget = { kind: 'habit' | 'task'; id: string; title: string; date: string; done: boolean; missed: boolean; href: string; x: number; y: number };
+type MenuTarget = { kind: 'habit' | 'task'; id: string; title: string; date: string; done: boolean; missed: boolean; href: string; x: number; y: number; /** a timed task's start (ISO), for "move to tomorrow" */ start?: string };
+type MenuAction = 'done' | 'missed' | 'clear' | 'toggle-task' | 'tomorrow';
 
 /** Small action menu at the tap point: tick, mark missed, undo, open. Closes on any outside tap or Escape. */
-function ActionMenu({ m, onClose, onAct }: { m: MenuTarget; onClose: () => void; onAct: (a: 'done' | 'missed' | 'clear' | 'toggle-task') => void }) {
+function ActionMenu({ m, onClose, onAct }: { m: MenuTarget; onClose: () => void; onAct: (a: MenuAction) => void }) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', k);
@@ -68,7 +69,10 @@ function ActionMenu({ m, onClose, onAct }: { m: MenuTarget; onClose: () => void;
             {m.missed ? <button role="menuitem" className={item} onClick={() => onAct('clear')}>↺ Undo missed</button> : !m.done && <button role="menuitem" className={item} onClick={() => onAct('missed')}>✕ Mark missed</button>}
           </>
         ) : (
-          <button role="menuitem" className={item} onClick={() => onAct('toggle-task')}>{m.done ? '↺ Reopen' : '✓ Mark done'}</button>
+          <>
+            <button role="menuitem" className={item} onClick={() => onAct('toggle-task')}>{m.done ? '↺ Reopen' : '✓ Mark done'}</button>
+            {m.start && <button role="menuitem" className={item} onClick={() => onAct('tomorrow')}>→ Move to tomorrow</button>}
+          </>
         )}
         <Link role="menuitem" href={m.href} className={item} onClick={onClose}>↗ Open {m.kind}</Link>
       </div>
@@ -173,10 +177,20 @@ export function CalendarWeek() {
     await load(ws);
   }
 
-  async function menuAct(m: MenuTarget, a: 'done' | 'missed' | 'clear' | 'toggle-task') {
+  async function menuAct(m: MenuTarget, a: MenuAction) {
     setMenu(null);
+    if (a === 'tomorrow' && m.start) {
+      // the same time tomorrow: IST has no daylight saving, so a day is always 24 hours
+      const from = { due_date: m.date, due_at: m.start };
+      const to = { due_date: addDays(m.date, 1), due_at: new Date(Date.parse(m.start) + 86_400_000).toISOString() };
+      const r = await updateTaskAction(m.id, to);
+      if (!r.ok) toast.error(r.error);
+      else toast.success(`Moved ${m.title} to tomorrow, same time.`, { duration: 8000, action: { label: 'Undo', onClick: async () => { const u = await updateTaskAction(m.id, from); if (!u.ok) toast.error(u.error); await load(ws); } } });
+      await load(ws);
+      return;
+    }
     const r = m.kind === 'habit'
-      ? await setHabitDayAction(m.id, m.date, a === 'toggle-task' ? 'clear' : a)
+      ? await setHabitDayAction(m.id, m.date, a === 'toggle-task' || a === 'tomorrow' ? 'clear' : a)
       : m.done ? await reopenTaskAction(m.id) : await completeTaskAction(m.id);
     if (!r.ok) toast.error(r.error);
     await load(ws);
@@ -468,7 +482,7 @@ function Block({ b, p, top, height, detailed, row, days, day, onMove, onEvent, o
   if (b.href) return (
     <div className={`${cls} flex items-start gap-1`} style={style} title={title} onContextMenu={(e) => e.preventDefault()} onPointerDown={(e) => down(e, 'move')} onClickCapture={noClickAfterDrag}>
       <Tick done={!!b.done} label={b.done ? `Reopen ${b.title}` : `Complete ${b.title}`} title={b.done ? 'Done · tap to reopen' : 'Mark done'} onClick={(e) => { e.stopPropagation(); onTask(b.id, !!b.done); }} />
-      <button type="button" onClick={(e) => { e.stopPropagation(); onMenu({ kind: 'task', id: b.id, title: b.title, date: day, done: !!b.done, missed: false, href: b.href!, x: e.clientX, y: e.clientY }); }} className="min-w-0 flex-1 text-left">{label}</button>
+      <button type="button" onClick={(e) => { e.stopPropagation(); onMenu({ kind: 'task', id: b.id, title: b.title, date: day, done: !!b.done, missed: false, href: b.href!, start: b.start, x: e.clientX, y: e.clientY }); }} className="min-w-0 flex-1 text-left">{label}</button>
       {grip}
     </div>
   );
