@@ -67,7 +67,7 @@ export function EventDialog({ target, onClose, onChanged }: { target: DialogTarg
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader><DialogTitle>{target.mode === 'create' ? (kind === 'task' ? 'New task' : 'New event') : readOnly ? 'Event (read only)' : 'Edit event'}</DialogTitle></DialogHeader>
         {target.mode === 'create' && (
           <div className="flex rounded-lg bg-muted p-0.5 text-xs" role="tablist" aria-label="What to add">
