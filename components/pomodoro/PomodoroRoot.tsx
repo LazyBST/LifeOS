@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
-import { logPomodoroSegmentAction } from '@/app/actions/pomodoro';
+import { logPomodoroSegmentAction, pomodoroGetRunAction, pomodoroSaveRunAction } from '@/app/actions/pomodoro';
 import { advance, celebrationFor, clock, elapsedMs, endInstant, pause, phaseMs, remainingMs, resume, segmentOf, startRun, type Celebration as CelebrationKind, type PomoConfig, type PomoTimer, type Segment } from '@/lib/domain/pomodoro-math';
 import { istDate, istParts } from '@/lib/time';
 import { weekStart } from '@/lib/domain/lifecal-math';
@@ -97,22 +97,56 @@ export function PomodoroRoot() {
   const [statsKey, setStatsKey] = useState(0);
   const [ready, setReady] = useState(false);
   const timerRef = useRef<PomoTimer | null>(null);
+  const revRef = useRef(0); // when this view of the timer was last changed; the newest view wins across devices
+  const skew = useRef(0); // server time minus this device's clock, so two devices agree on the time
+  const tnow = useCallback(() => Date.now() + skew.current, []);
   const currentRef = useRef(current);
   const audio = useRef<AudioContext | null>(null);
   const baseTitle = useRef<string | null>(null);
   currentRef.current = current;
 
-  const commit = useCallback((t: PomoTimer | null) => {
+  const pushRun = useCallback(async (t: PomoTimer | null, rev: number) => {
+    const r = await pomodoroSaveRunAction(t as unknown as Record<string, unknown> | null, rev);
+    if (r.ok && r.data.rev > revRef.current) adoptRef.current?.(r.data.timer as unknown as PomoTimer | null, r.data.rev);
+  }, []);
+  const adoptRef = useRef<((t: PomoTimer | null, rev: number) => void) | null>(null);
+
+  const commit = useCallback((t: PomoTimer | null, opts: { rev?: number; push?: boolean } = {}) => {
+    const rev = opts.rev ?? Date.now() + skew.current;
+    revRef.current = rev;
     timerRef.current = t;
     setTimer(t);
-    try { if (t) localStorage.setItem(LS_TIMER, JSON.stringify(t)); else localStorage.removeItem(LS_TIMER); } catch {}
-  }, []);
+    try { if (t) localStorage.setItem(LS_TIMER, JSON.stringify({ timer: t, rev })); else localStorage.setItem(LS_TIMER, JSON.stringify({ timer: null, rev })); } catch {}
+    if (opts.push !== false) void pushRun(t, rev);
+  }, [pushRun]);
+
+  // another device changed the timer: follow it
+  adoptRef.current = (t, rev) => {
+    const prev = timerRef.current;
+    commit(t, { rev, push: false });
+    if (t && (!prev || prev.runId !== t.runId)) setHidden(false); // a timer started elsewhere shows up here too
+    setNow(Date.now() + skew.current);
+  };
+
+  const syncFromServer = useCallback(async () => {
+    const t0 = Date.now();
+    const r = await pomodoroGetRunAction();
+    if (!r.ok) return;
+    skew.current = r.data.now - (t0 + Date.now()) / 2;
+    if (r.data.rev > revRef.current) adoptRef.current?.(r.data.timer as unknown as PomoTimer | null, r.data.rev);
+    else if (revRef.current > r.data.rev) void pushRun(timerRef.current, revRef.current); // this device is ahead (it was offline)
+  }, [pushRun]);
 
   // restore from this browser; other tabs keep this one in step
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_TIMER);
-      if (raw) { const t = JSON.parse(raw) as PomoTimer; timerRef.current = t; setTimer(t); }
+      if (raw) {
+        const v = JSON.parse(raw) as { timer?: PomoTimer | null; rev?: number } & Partial<PomoTimer>;
+        const t = ('cfg' in v ? (v as PomoTimer) : v.timer ?? null);
+        revRef.current = typeof v.rev === 'number' ? v.rev : 0;
+        timerRef.current = t; setTimer(t);
+      }
       const ui = JSON.parse(localStorage.getItem(LS_UI) ?? '{}') as { hidden?: boolean; view?: View };
       if (ui.hidden) setHidden(true);
       if (ui.view) setView(ui.view);
@@ -123,11 +157,21 @@ export function PomodoroRoot() {
     } catch {}
     setReady(true);
     const onStorage = (e: StorageEvent) => {
-      if (e.key === LS_TIMER) { const t = e.newValue ? (JSON.parse(e.newValue) as PomoTimer) : null; timerRef.current = t; setTimer(t); }
+      if (e.key === LS_TIMER && e.newValue) { const v = JSON.parse(e.newValue) as { timer: PomoTimer | null; rev: number }; revRef.current = v.rev; timerRef.current = v.timer; setTimer(v.timer); }
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+  // stay in step with the other devices
+  useEffect(() => {
+    if (!ready) return;
+    void syncFromServer();
+    const id = setInterval(() => { if (document.visibilityState === 'visible') void syncFromServer(); }, 5000);
+    const wake = () => { if (document.visibilityState === 'visible') void syncFromServer(); };
+    window.addEventListener('focus', wake);
+    document.addEventListener('visibilitychange', wake);
+    return () => { clearInterval(id); window.removeEventListener('focus', wake); document.removeEventListener('visibilitychange', wake); };
+  }, [ready, syncFromServer]);
   useEffect(() => { if (ready) try { localStorage.setItem(LS_UI, JSON.stringify({ hidden, view })); } catch {} }, [hidden, view, ready]);
 
   // other parts of the app (menu entries) can show, hide or open the timer
@@ -199,19 +243,19 @@ export function PomodoroRoot() {
   useEffect(() => {
     if (!timer || timer.status !== 'running') return;
     const id = setInterval(() => {
-      const t = timerRef.current, n = Date.now();
+      const t = timerRef.current, n = Date.now() + skew.current;
       setNow(n);
       if (!t || t.status !== 'running' || remainingMs(t, n) > 0) return;
       const end = endInstant(t);
       if (n - end > 5 * MIN) { // the app was closed or asleep through the end: close the run rather than invent sessions
         log(segmentOf(t, end, true));
-        commit({ ...t, status: 'done' });
+        commit({ ...t, status: 'done' }, { rev: end });
         toast('The timer finished while you were away.');
         return;
       }
       const r = advance(t, end, t.phase === 'work' ? 'Break' : currentRef.current.title, true);
       log(r.segment);
-      commit({ ...r.next, label: r.next.phase === 'work' ? currentRef.current.title : 'Break' });
+      commit({ ...r.next, label: r.next.phase === 'work' ? currentRef.current.title : 'Break' }, { rev: end });
       announce(r.next);
       const kind = celebrationFor(t, r.next);
       if (kind) {
@@ -249,15 +293,15 @@ export function PomodoroRoot() {
     try { localStorage.setItem(LS_CFG, JSON.stringify(c)); } catch {}
     try { audio.current = audio.current ?? new AudioContext(); void audio.current.resume(); } catch {}
     try { if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission(); } catch {}
-    commit(startRun(c, Date.now(), crypto.randomUUID(), currentRef.current.title));
-    setNow(Date.now());
+    commit(startRun(c, tnow(), crypto.randomUUID(), currentRef.current.title));
+    setNow(tnow());
     setSetup(false);
     setView('card');
     setHidden(false);
   }
-  const togglePause = () => { const t = timerRef.current, n = Date.now(); if (t) { commit(t.status === 'running' ? pause(t, n) : resume(t, n)); setNow(n); } };
+  const togglePause = () => { const t = timerRef.current, n = tnow(); if (t) { commit(t.status === 'running' ? pause(t, n) : resume(t, n)); setNow(n); } };
   const skip = () => {
-    const t = timerRef.current, n = Date.now();
+    const t = timerRef.current, n = tnow();
     if (!t || t.status === 'done') return;
     const r = advance(t, n, t.phase === 'work' ? 'Break' : currentRef.current.title, false);
     log(r.segment);
@@ -266,7 +310,7 @@ export function PomodoroRoot() {
   };
   const stop = () => {
     const t = timerRef.current;
-    if (t && t.status !== 'done') log(segmentOf(t, Date.now(), false));
+    if (t && t.status !== 'done') log(segmentOf(t, tnow(), false));
     commit(null);
     setView('mini');
   };

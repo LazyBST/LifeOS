@@ -28,6 +28,7 @@ const MIGRATION_FILES = [
   '0017_editable_agreed_and_completed.sql',
   '0018_habit_day_times.sql',
   '0019_pomodoro.sql',
+  '0020_pomodoro_unique_segments.sql',
 ];
 
 // Supabase provides these for free; PGlite does not, so we stub the minimum
