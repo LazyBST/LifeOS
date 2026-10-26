@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { END_SOUNDS, playEnd, playStart } from '@/lib/pomodoro-sounds';
+import { END_SOUNDS, playBreak, playEnd, playStart } from '@/lib/pomodoro-sounds';
 
 /** A stand-in for AudioContext that only counts what is scheduled. */
 function fakeCtx() {
@@ -25,6 +25,17 @@ describe('pomodoro sounds', () => {
     playEnd(ctx, id);
     expect(started.length).toBeGreaterThan(0);
     expect(Math.min(...started)).toBeGreaterThan(10);
+  });
+  it('a break starts with two soft notes stepping down', () => {
+    const { ctx, started } = fakeCtx();
+    playBreak(ctx);
+    expect(started).toHaveLength(2);
+  });
+  it('the default finishing sound is a simple two-note nudge', () => {
+    expect(END_SOUNDS[0].id).toBe('nudge');
+    const { ctx, started } = fakeCtx();
+    playEnd(ctx, 'nudge');
+    expect(started).toHaveLength(2);
   });
   it('the alarm is five beeps twice, and silent plays nothing', () => {
     const a = fakeCtx(); playEnd(a.ctx, 'alarm'); expect(a.started).toHaveLength(10);

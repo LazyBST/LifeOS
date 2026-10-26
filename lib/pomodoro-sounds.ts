@@ -1,8 +1,9 @@
 // The Pomodoro sounds, synthesised with the Web Audio API so there is nothing to download or license.
 // A session starts with a pair of tiny watch clicks and ends with one of a few finishing sounds.
 
-export type SoundId = 'marimba' | 'gong' | 'bowl' | 'bell' | 'alarm' | 'off';
+export type SoundId = 'nudge' | 'marimba' | 'gong' | 'bowl' | 'bell' | 'alarm' | 'off';
 export const END_SOUNDS: { id: SoundId; name: string; note: string }[] = [
+  { id: 'nudge', name: 'Gentle nudge', note: 'two soft notes: done, well played' },
   { id: 'marimba', name: 'Marimba', note: 'a bright, happy run up the scale' },
   { id: 'gong', name: 'Gong', note: 'one deep, satisfying stroke' },
   { id: 'bowl', name: 'Singing bowl', note: 'a long, calm ring' },
@@ -37,16 +38,25 @@ function click(ctx: Ctx, at: number, freq: number, peak = 0.35) {
   src.start(at);
 }
 
-/** Start: tick, then a slightly lower tock. */
+/** Start of a work session (and the end of a break): tick, then a slightly lower tock. */
 export function playStart(ctx: Ctx) {
   const t = ctx.currentTime + 0.02;
   click(ctx, t, 2600);
   click(ctx, t + 0.16, 1700);
 }
 
+/** Start of a break: two soft notes stepping down, like letting out a breath. */
+export function playBreak(ctx: Ctx) {
+  const t = ctx.currentTime + 0.02;
+  tone(ctx, 659.25, t, 0.7, 0.18, 'sine', 0.02);
+  tone(ctx, 523.25, t + 0.28, 1.1, 0.18, 'sine', 0.02);
+}
+
+/** After the last session: the sound you picked. */
 export function playEnd(ctx: Ctx, id: SoundId) {
   const t = ctx.currentTime + 0.02;
   if (id === 'off') return;
+  if (id === 'nudge') { tone(ctx, 784, t, 0.5, 0.2, 'sine', 0.01); tone(ctx, 1046.5, t + 0.2, 0.9, 0.2, 'sine', 0.01); return; }
   if (id === 'marimba') {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => { tone(ctx, f, t + i * 0.13, 0.55, 0.22, 'triangle', 0.005); tone(ctx, f * 4, t + i * 0.13, 0.12, 0.05, 'sine', 0.002); });
     tone(ctx, 1046.5, t + 0.6, 1.1, 0.2, 'triangle', 0.005); tone(ctx, 1318.5, t + 0.6, 1.1, 0.14, 'triangle', 0.005);

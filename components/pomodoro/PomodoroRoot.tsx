@@ -11,7 +11,7 @@ import { weekStart } from '@/lib/domain/lifecal-math';
 import type { WeekBlock } from '@/lib/domain/calweek';
 import { FocusDay } from './FocusDay';
 import { Celebration } from './Celebration';
-import { END_SOUNDS, playEnd, playStart, type SoundId } from '@/lib/pomodoro-sounds';
+import { END_SOUNDS, playBreak, playEnd, playStart, type SoundId } from '@/lib/pomodoro-sounds';
 
 const LS_TIMER = 'lifeos:pomo:timer', LS_UI = 'lifeos:pomo:ui', LS_CFG = 'lifeos:pomo:cfg', LS_LOGGED = 'lifeos:pomo:logged';
 const MIN = 60_000;
@@ -50,7 +50,7 @@ const THEMES: Record<string, { name: string; work: Look; break: Look }> = {
 };
 const PAUSED: Look = { bg: 'linear-gradient(135deg,#5b6472,#3a414d)', accent: '#e2e8f0', ink: '#4b5563' };
 type Prefs = { theme: string; cover: string; sound: SoundId; celebrate: CelebrationMode };
-const DEFAULT_PREFS: Prefs = { theme: 'dusk', cover: '', sound: 'marimba', celebrate: 'random' };
+const DEFAULT_PREFS: Prefs = { theme: 'dusk', cover: '', sound: 'nudge', celebrate: 'random' };
 
 /** The line shown over a celebration. */
 const LINES: Record<'funny' | 'productive' | 'motivate' | 'rocket', string[]> = {
@@ -164,7 +164,7 @@ export function PomodoroRoot() {
       const c = JSON.parse(localStorage.getItem(LS_CFG) ?? 'null') as PomoConfig | null;
       if (c && c.workMin > 0) setCfg(c);
       const pr = JSON.parse(localStorage.getItem(LS_PREFS) ?? 'null') as Prefs | null;
-      if (pr && THEMES[pr.theme]) setPrefsState({ theme: pr.theme, cover: typeof pr.cover === 'string' ? pr.cover : '', sound: END_SOUNDS.some((x) => x.id === pr.sound) ? pr.sound : 'marimba', celebrate: pr.celebrate === 'sparkle' || pr.celebrate === 'off' ? pr.celebrate : 'random' });
+      if (pr && THEMES[pr.theme]) setPrefsState({ theme: pr.theme, cover: typeof pr.cover === 'string' ? pr.cover : '', sound: END_SOUNDS.some((x) => x.id === pr.sound) ? pr.sound   : 'nudge', celebrate: pr.celebrate === 'sparkle' || pr.celebrate === 'off' ? pr.celebrate : 'random' });
     } catch {}
     setReady(true);
     const onStorage = (e: StorageEvent) => {
@@ -232,15 +232,22 @@ export function PomodoroRoot() {
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
 
+  /** A sound for whatever just began: the last session's end, a break starting, or focus starting again. */
+  const cue = useCallback((next: PomoTimer) => {
+    const c = ctxFor();
+    if (!c) return;
+    if (next.status === 'done') playEnd(c, prefsRef.current.sound);
+    else if (next.phase === 'break') playBreak(c);
+    else playStart(c);
+  }, [ctxFor]);
+
   const announce = useCallback((t: PomoTimer) => {
     const text = t.status === 'done' ? 'All sessions done. Great work!' : t.phase === 'break' ? 'Focus session done. Take a break.' : 'Break over. Back to focus.';
-    // a work session or the whole run finished: the chosen finishing sound. A break ending starts focus again: the watch clicks.
-    const c = ctxFor();
-    if (c) { if (t.status === 'done' || t.phase === 'break') playEnd(c, prefsRef.current.sound); else playStart(c); }
+    cue(t);
     try { navigator.vibrate?.([200, 100, 200]); } catch {}
     toast(text);
     try { if ('Notification' in window && Notification.permission === 'granted') new Notification('LifeOS Pomodoro', { body: text }); } catch {}
-  }, [ctxFor]);
+  }, [cue]);
 
   // the clock: every tick looks at the timestamps, so a sleeping tab cannot drift
   useEffect(() => {
@@ -312,6 +319,7 @@ export function PomodoroRoot() {
     const r = advance(t, n, t.phase === 'work' ? 'Break' : currentRef.current.title, false);
     log(r.segment);
     commit({ ...r.next, label: r.next.phase === 'work' ? currentRef.current.title : 'Break' });
+    cue(r.next);
     setNow(n);
   };
   const stop = () => {
