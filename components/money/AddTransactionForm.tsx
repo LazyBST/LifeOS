@@ -192,7 +192,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
             <Field label="Category" className="flex-1">
               <Select value={exCategory} onValueChange={(v) => setExCategory(v ?? NONE)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Auto" />
+                  <SelectValue placeholder="Auto">{(v: string) => (v === NONE ? 'Auto-detect' : categories.find((c) => c.id === v)?.name ?? 'Auto-detect')}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Auto-detect</SelectItem>
@@ -207,7 +207,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
             <Field label="Account" className="flex-1">
               <Select value={exAccount} onValueChange={(v) => setExAccount(v ?? NONE)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Default" />
+                  <SelectValue placeholder="Default">{(v: string) => (v === NONE ? 'Default' : accounts.find((a) => a.id === v)?.name ?? 'Default')}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Default</SelectItem>
@@ -241,7 +241,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
             <Field label="Category" className="flex-1">
               <Select value={inCategory} onValueChange={(v) => setInCategory(v ?? NONE)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Auto" />
+                  <SelectValue placeholder="Auto">{(v: string) => (v === NONE ? 'Auto-detect' : categories.find((c) => c.id === v)?.name ?? 'Auto-detect')}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Auto-detect</SelectItem>
@@ -256,7 +256,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
             <Field label="Account" className="flex-1">
               <Select value={inAccount} onValueChange={(v) => setInAccount(v ?? NONE)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Default" />
+                  <SelectValue placeholder="Default">{(v: string) => (v === NONE ? 'Default' : accounts.find((a) => a.id === v)?.name ?? 'Default')}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Default</SelectItem>
@@ -279,7 +279,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
             <Field label="Direction" className="flex-1">
               <Select value={stDirection} onValueChange={(v) => setStDirection(v as 'received' | 'paid')}>
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>{(v: string) => (v === 'paid' ? 'I paid them' : 'They paid me')}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="received">They paid me</SelectItem>
@@ -298,7 +298,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
             <Field label="Account" className="flex-1">
               <Select value={stAccount} onValueChange={(v) => setStAccount(v ?? NONE)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Default" />
+                  <SelectValue placeholder="Default">{(v: string) => (v === NONE ? 'Default' : accounts.find((a) => a.id === v)?.name ?? 'Default')}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Default</SelectItem>

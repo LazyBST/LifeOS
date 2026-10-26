@@ -135,7 +135,7 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
 
         <div className="space-y-3">
           <div className="flex gap-2">
-            <div className="w-16 space-y-1">
+            <div className="w-16 shrink-0 space-y-1">
               <Label>Emoji</Label>
               <Input
                 value={state.emoji}
@@ -144,7 +144,7 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
                 className="text-center"
               />
             </div>
-            <div className="flex-1 space-y-1">
+            <div className="min-w-0 flex-1 space-y-1">
               <Label>Name</Label>
               <Input
                 autoFocus
@@ -156,14 +156,14 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
           </div>
 
           <div className="flex gap-2">
-            <div className="flex-1 space-y-1">
+            <div className="min-w-0 flex-1 space-y-1">
               <Label>Time of day</Label>
               <Select
                 value={state.time_of_day}
                 onValueChange={(v) => setState((s) => ({ ...s, time_of_day: v as TimeOfDay }))}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>{(v: string) => TIME_OF_DAY_OPTIONS.find((o) => o.value === v)?.label ?? v}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {TIME_OF_DAY_OPTIONS.map((o) => (
@@ -174,14 +174,14 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex-1 space-y-1">
+            <div className="min-w-0 flex-1 space-y-1">
               <Label>Kind</Label>
               <Select
                 value={state.kind}
                 onValueChange={(v) => setState((s) => ({ ...s, kind: v as 'boolean' | 'count' }))}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>{(v: string) => (v === 'count' ? 'Count' : 'Tick (yes/no)')}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="boolean">Tick (yes/no)</SelectItem>
@@ -193,7 +193,7 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
 
           {state.kind === 'count' && (
             <div className="flex gap-2">
-              <div className="flex-1 space-y-1">
+              <div className="min-w-0 flex-1 space-y-1">
                 <Label>Target</Label>
                 <Input
                   type="number"
@@ -202,7 +202,7 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
                   placeholder="20"
                 />
               </div>
-              <div className="flex-1 space-y-1">
+              <div className="min-w-0 flex-1 space-y-1">
                 <Label>Unit</Label>
                 <Input
                   value={state.unit}
@@ -237,11 +237,11 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
+            <div className="min-w-0 space-y-1">
               <Label>Starts</Label>
               <ClearableInput wrapperClassName="w-full" type="time" value={state.start_time} onChange={(e) => setState((s) => ({ ...s, start_time: e.target.value }))} onClear={() => setState((s) => ({ ...s, start_time: '', end_time: '' }))} clearLabel="Remove the start time" />
             </div>
-            <div className="space-y-1">
+            <div className="min-w-0 space-y-1">
               <Label>Ends</Label>
               <ClearableInput wrapperClassName="w-full" type="time" value={state.end_time} onChange={(e) => setState((s) => ({ ...s, end_time: e.target.value }))} onClear={() => setState((s) => ({ ...s, end_time: '' }))} clearLabel="Remove the end time" />
             </div>
@@ -255,7 +255,7 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
           </div>
 
           <div className="flex gap-2">
-            <div className="flex-1 space-y-1">
+            <div className="min-w-0 flex-1 space-y-1">
               <Label>Reminder time</Label>
               <ClearableInput
                 wrapperClassName="w-full"
@@ -266,14 +266,14 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
                 clearLabel="Remove the reminder time"
               />
             </div>
-            <div className="flex-1 space-y-1">
+            <div className="min-w-0 flex-1 space-y-1">
               <Label>Area</Label>
               <Select
                 value={state.area_id ?? '__none__'}
                 onValueChange={(v) => setState((s) => ({ ...s, area_id: v === '__none__' ? null : v }))}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="None" />
+                  <SelectValue placeholder="None">{(v: string) => (v === '__none__' ? 'None' : areas.find((a) => a.id === v)?.name ?? 'None')}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None</SelectItem>
