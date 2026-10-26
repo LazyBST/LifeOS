@@ -8,6 +8,7 @@ import { createEventAction, deleteEventAction, undoEventEditAction, updateEventA
 import type { EditableEvent } from '@/lib/domain/calweek';
 import type { EventInput } from '@/lib/google/events-math';
 import { addDays, istInstant, istParts } from '@/lib/time';
+import { TaskCreateForm } from './TaskCreateForm';
 
 export type DialogTarget = { mode: 'create'; date: string; hour: number } | { mode: 'edit'; event: EditableEvent } | null;
 
@@ -35,6 +36,9 @@ function toInput(f: Form): EventInput {
 export function EventDialog({ target, onClose, onChanged }: { target: DialogTarget; onClose: () => void; onChanged: () => void }) {
   const [f, setF] = useState<Form | null>(null);
   const [busy, setBusy] = useState(false);
+  const [kind, setKind] = useState<'event' | 'task'>('event'); // a new calendar item is an event or a task
+  useEffect(() => { try { if (localStorage.getItem('lifeos:cal:newkind') === 'task') setKind('task'); } catch {} }, []);
+  const pick = (k: 'event' | 'task') => { setKind(k); try { localStorage.setItem('lifeos:cal:newkind', k); } catch {} };
   useEffect(() => { setF(target ? initial(target) : null); }, [target]);
   if (!target || !f) return null;
   const readOnly = target.mode === 'edit' && !target.event.canEdit;
@@ -64,7 +68,15 @@ export function EventDialog({ target, onClose, onChanged }: { target: DialogTarg
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
-        <DialogHeader><DialogTitle>{target.mode === 'create' ? 'New event' : readOnly ? 'Event (read only)' : 'Edit event'}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{target.mode === 'create' ? (kind === 'task' ? 'New task' : 'New event') : readOnly ? 'Event (read only)' : 'Edit event'}</DialogTitle></DialogHeader>
+        {target.mode === 'create' && (
+          <div className="flex rounded-lg bg-muted p-0.5 text-xs" role="tablist" aria-label="What to add">
+            {(['event', 'task'] as const).map((k) => <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => pick(k)} className={`flex-1 rounded-md px-3 py-1.5 font-medium capitalize ${kind === k ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>{k}</button>)}
+          </div>
+        )}
+        {target.mode === 'create' && kind === 'task' ? (
+          <TaskCreateForm date={target.date} hour={target.hour} onCreated={() => { onChanged(); onClose(); }} onCancel={onClose} />
+        ) : (<>
         <div className="flex flex-col gap-3 text-sm">
           <Input placeholder="Title" value={f.summary} disabled={readOnly} onChange={(e) => set({ summary: e.target.value })} autoFocus />
           <label className="flex items-center gap-2"><input type="checkbox" checked={f.allDay} disabled={readOnly} onChange={(e) => set({ allDay: e.target.checked })} /> All day</label>
@@ -85,6 +97,7 @@ export function EventDialog({ target, onClose, onChanged }: { target: DialogTarg
           <Button variant="outline" onClick={onClose}>{readOnly ? 'Close' : 'Cancel'}</Button>
           {!readOnly && <Button onClick={save} disabled={busy || !f.summary.trim()}>{busy ? 'Saving…' : 'Save'}</Button>}
         </DialogFooter>
+        </>)}
       </DialogContent>
     </Dialog>
   );

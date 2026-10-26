@@ -304,7 +304,7 @@ export function CalendarWeek() {
         <span className="ml-1 font-medium">{title}</span>
         {loading && <span className="text-xs text-muted-foreground">loading…</span>}
         <span className="relative ml-auto">
-          <button onClick={() => setTools((v) => !v)} aria-expanded={tools} aria-haspopup="menu" className={`rounded-md border px-2.5 py-1 text-xs font-medium ${tools ? 'bg-muted' : ''}`} title="Zoom, sync and new event">{tools ? 'Close ▴' : 'Tools ▾'}</button>
+          <button onClick={() => setTools((v) => !v)} aria-expanded={tools} aria-haspopup="menu" className={`rounded-md border px-2.5 py-1 text-xs font-medium ${tools ? 'bg-muted' : ''}`} title="Zoom, sync and add something new">{tools ? 'Close ▴' : 'Tools ▾'}</button>
           {tools && (
             <>
               <button type="button" aria-label="Close the tools menu" className="fixed inset-0 z-30 cursor-default" onClick={() => setTools(false)} />
@@ -319,7 +319,7 @@ export function CalendarWeek() {
                 </div>
                 <button role="menuitem" onClick={() => { setTools(false); void syncTodayNow(); }} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" title="Sync only today's events with Google Calendar, both ways">Sync today</button>
                 <button role="menuitem" onClick={() => { setTools(false); void syncNow(); }} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" title="Fetch what changed in Google Calendar since the last sync">Sync Google</button>
-                <button role="menuitem" onClick={() => { setTools(false); setDialog({ mode: 'create', date: focus, hour: Math.min(22, Math.max(startH, istParts().hour + 1)) }); }} className="block w-full rounded-lg bg-primary px-3 py-2 text-left text-sm font-medium text-primary-foreground">+ Event</button>
+                <button role="menuitem" onClick={() => { setTools(false); setDialog({ mode: 'create', date: focus, hour: Math.min(22, Math.max(startH, istParts().hour + 1)) }); }} className="block w-full rounded-lg bg-primary px-3 py-2 text-left text-sm font-medium text-primary-foreground">+ New</button>
               </div>
             </>
           )}
