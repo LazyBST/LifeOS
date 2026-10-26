@@ -2,6 +2,7 @@
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
+import { ClearableInput } from '@/components/ui/clearable-input';
 import { createScheduledAction, deleteScheduledAction, payScheduledAction, skipScheduledAction } from '@/app/actions/budgeting';
 import { FREQUENCIES, type Frequency } from '@/lib/domain/money-forecast-math';
 import { formatINR } from '@/lib/format';
@@ -61,7 +62,7 @@ export function ScheduledCard({ items, categories, accounts, ready }: { items: U
             <label className="flex items-center gap-2 text-xs text-muted-foreground">Next due <Input type="date" value={f.next_due} onChange={(e) => set({ next_due: e.target.value })} className="h-8" /></label>
             <select value={f.category_id} onChange={(e) => set({ category_id: e.target.value })} className={sel}><option value="">Category (auto)</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
             <select value={f.account_id} onChange={(e) => set({ account_id: e.target.value })} className={sel}><option value="">Default account</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground sm:col-span-2">Ends (optional) <Input type="date" value={f.end_date} onChange={(e) => set({ end_date: e.target.value })} className="h-8 w-auto" /></label>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground sm:col-span-2">Ends (optional) <ClearableInput type="date" value={f.end_date} onChange={(e) => set({ end_date: e.target.value })} onClear={() => set({ end_date: '' })} clearLabel="Remove the end date" className="h-8 w-auto" /></label>
             <div className="flex gap-2 sm:col-span-2">
               <button disabled={pending} onClick={add} className="h-8 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50">Save</button>
               <button onClick={() => setOpen(false)} className="h-8 rounded-lg border px-3 text-sm">Cancel</button>

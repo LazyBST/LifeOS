@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ClearableInput } from '@/components/ui/clearable-input';
 import { Badge } from '@/components/ui/badge';
 import { PRIORITIES, type Area, type Goal, type Priority, type Project, type TaskStatus } from '@/lib/types/db';
 import { statusesFor } from '@/lib/types/statuses';
@@ -110,9 +111,9 @@ export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) 
         {filters.due === 'custom' && (
           <Field label="Between">
             <div className="flex items-center gap-1.5">
-              <Input type="date" className="h-9" value={filters.due_from ?? ''} onChange={(e) => patch({ due_from: e.target.value || undefined })} />
+              <ClearableInput type="date" className="h-9" value={filters.due_from ?? ''} onChange={(e) => patch({ due_from: e.target.value || undefined })} onClear={() => patch({ due_from: undefined })} />
               <span className="text-xs text-muted-foreground">to</span>
-              <Input type="date" className="h-9" value={filters.due_to ?? ''} onChange={(e) => patch({ due_to: e.target.value || undefined })} />
+              <ClearableInput type="date" className="h-9" value={filters.due_to ?? ''} onChange={(e) => patch({ due_to: e.target.value || undefined })} onClear={() => patch({ due_to: undefined })} />
             </div>
           </Field>
         )}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
+import { ClearableInput } from '@/components/ui/clearable-input';
 import type { ActionResult } from '@/app/actions/_result';
 import { saveField, type FieldSave } from './save';
 
@@ -46,13 +46,15 @@ export function InlineDate({ value, onSave: onSaveProp, save, type = 'date', cla
   }
 
   return (
-    <Input
+    <ClearableInput
       type={type}
       value={draft}
       placeholder={placeholder}
       disabled={saving}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={(e) => commit(e.target.value)}
+      onClear={() => { setDraft(''); void commit(''); }}
+      clearLabel="Remove"
       className={cn('h-7 w-auto text-sm', className)}
     />
   );

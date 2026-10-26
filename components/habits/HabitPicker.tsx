@@ -56,11 +56,14 @@ export function HabitPicker({ entityType, entityId, areaId, options }: { entityT
           else if (e.key === 'Escape') setQ('');
         }}
         placeholder="Add a habit: type to find one or create it"
-        className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus:border-ring"
+        className="h-9 w-full rounded-lg border border-input bg-transparent pr-8 pl-3 text-sm outline-none focus:border-ring"
         role="combobox"
         aria-expanded={focus && rows.length > 0}
         aria-controls="habit-picker-list"
       />
+      {q && (
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setQ(''); setI(0); ref.current?.focus(); }} aria-label="Clear the search" title="Clear" className="absolute top-2.5 right-2 flex size-4 items-center justify-center rounded-full bg-muted-foreground/25 text-[11px] leading-none text-foreground/70 hover:bg-muted-foreground/45">×</button>
+      )}
       {focus && rows.length > 0 && (
         <ul id="habit-picker-list" role="listbox" className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-popover p-1 text-sm shadow-lg">
           {rows.map((r, n) => (

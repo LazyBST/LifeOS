@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ClearableInput } from '@/components/ui/clearable-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createHabitAction, updateHabitAction } from '@/app/actions/habits';
@@ -238,11 +239,11 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label>Starts</Label>
-              <Input type="time" value={state.start_time} onChange={(e) => setState((s) => ({ ...s, start_time: e.target.value }))} />
+              <ClearableInput wrapperClassName="w-full" type="time" value={state.start_time} onChange={(e) => setState((s) => ({ ...s, start_time: e.target.value }))} onClear={() => setState((s) => ({ ...s, start_time: '', end_time: '' }))} clearLabel="Remove the start time" />
             </div>
             <div className="space-y-1">
               <Label>Ends</Label>
-              <Input type="time" value={state.end_time} onChange={(e) => setState((s) => ({ ...s, end_time: e.target.value }))} />
+              <ClearableInput wrapperClassName="w-full" type="time" value={state.end_time} onChange={(e) => setState((s) => ({ ...s, end_time: e.target.value }))} onClear={() => setState((s) => ({ ...s, end_time: '' }))} clearLabel="Remove the end time" />
             </div>
             <p className="col-span-2 -mt-1 text-xs text-muted-foreground">Gives the habit a block on the day view. Leave empty for “any time”.</p>
           </div>
@@ -256,10 +257,13 @@ export function HabitForm({ open, onOpenChange, mode, habit, areas, onSaved }: H
           <div className="flex gap-2">
             <div className="flex-1 space-y-1">
               <Label>Reminder time</Label>
-              <Input
+              <ClearableInput
+                wrapperClassName="w-full"
                 type="time"
                 value={state.reminder_time}
                 onChange={(e) => setState((s) => ({ ...s, reminder_time: e.target.value }))}
+                onClear={() => setState((s) => ({ ...s, reminder_time: '' }))}
+                clearLabel="Remove the reminder time"
               />
             </div>
             <div className="flex-1 space-y-1">

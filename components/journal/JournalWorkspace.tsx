@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ClearableInput } from '@/components/ui/clearable-input';
 import { JournalEditor } from '@/components/journal/JournalEditor';
 import { summariseJournalsAction } from '@/app/actions/journal';
 import { moodStats, moodTrend } from '@/lib/domain/journal-math';
@@ -142,7 +143,7 @@ export function JournalWorkspace({ entries, today }: { entries: JournalEntry[]; 
       </Card>
 
       <Card title="History" className="lg:col-span-2">
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search entries…" className="mb-3 h-8 max-w-sm" />
+        <ClearableInput value={query} onChange={(e) => setQuery(e.target.value)} onClear={() => setQuery('')} clearLabel="Clear the search" placeholder="Search entries…" className="mb-3 h-8 max-w-sm" />
         {shown.length === 0 ? (
           <p className="text-sm text-muted-foreground">No entries found.</p>
         ) : (

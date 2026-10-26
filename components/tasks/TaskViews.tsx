@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { ClearableInput } from '@/components/ui/clearable-input';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GroupByKey, TaskFilters, TaskViewState } from '@/lib/types/filters';
 import { useTaskViewState, type TaskCreateInput } from './useTaskViewState';
@@ -105,7 +105,7 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <Input value={search} onChange={(e) => onSearch(e.target.value)} placeholder="Search tasks…" aria-label="Search tasks" className="h-8 w-36 sm:w-48" />
+          <ClearableInput value={search} onChange={(e) => onSearch(e.target.value)} onClear={() => { if (searchTimer.current) clearTimeout(searchTimer.current); setSearch(''); setFilters({ ...state.filters, q: undefined }); }} clearLabel="Clear the search" placeholder="Search tasks…" aria-label="Search tasks" className="h-8 w-36 sm:w-48" />
           {state.view === 'list' && <GroupBySelect value={state.group} onChange={setGroup} />}
           <Button size="sm" variant={showFilters || activeFilters ? 'secondary' : 'outline'} onClick={toggleFilters} aria-expanded={showFilters} aria-controls="task-filters">
             <Filter className="size-3.5" />

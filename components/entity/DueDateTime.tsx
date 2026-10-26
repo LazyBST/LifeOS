@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { istInstant, istParts } from '@/lib/time';
-import { Input } from '@/components/ui/input';
+import { ClearableInput } from '@/components/ui/clearable-input';
 import { updateTaskAction } from '@/app/actions/tasks';
 
 type DueDateTimeProps = {
@@ -55,31 +55,45 @@ export function DueDateTime({ taskId, dueDate, dueAt, durationMin }: DueDateTime
     }
   }
 
+  /** No end time: the task keeps its start but loses its set length. */
+  async function clearLength() {
+    setSaving(true);
+    const res = await updateTaskAction(taskId, { duration_min: null });
+    setSaving(false);
+    if (!res.ok) { toast.error(res.error || 'Could not remove the end time'); setEnd(endFrom(time, durationMin)); }
+  }
+
   return (
     <span className="flex flex-wrap items-center gap-1.5">
-      <Input
+      <ClearableInput
         type="date"
         value={date}
         disabled={saving}
         onChange={(e) => setDate(e.target.value)}
         onBlur={() => commit(date, time)}
+        onClear={() => { setDate(''); setTime(''); setEnd(''); void commit('', ''); }}
+        clearLabel="Remove the due date"
         className="h-7 w-auto text-sm"
       />
-      <Input
+      <ClearableInput
         type="time"
         value={time}
         disabled={saving || !date}
         onChange={(e) => { setTime(e.target.value); setEnd(endFrom(e.target.value, durationMin)); }}
         onBlur={() => commit(date, time, endFrom(time, durationMin))}
+        onClear={() => { setTime(''); setEnd(''); void commit(date, ''); }}
+        clearLabel="Remove the start time"
         className="h-7 w-auto text-sm"
       />
       <span className="text-xs text-muted-foreground">to</span>
-      <Input
+      <ClearableInput
         type="time"
         value={end}
         disabled={saving || !date || !time}
         onChange={(e) => setEnd(e.target.value)}
         onBlur={() => commit(date, time, end)}
+        onClear={() => { setEnd(''); void clearLength(); }}
+        clearLabel="Remove the end time"
         className="h-7 w-auto text-sm"
         aria-label="End time"
       />
