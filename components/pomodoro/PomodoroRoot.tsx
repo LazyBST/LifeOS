@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
 import { logPomodoroSegmentAction, pomodoroGetRunAction, pomodoroSaveRunAction } from '@/app/actions/pomodoro';
-import { advance, celebrationFor, clock, elapsedMs, endInstant, pause, phaseMs, remainingMs, resume, segmentOf, startRun, type Celebration as CelebrationKind, type PomoConfig, type PomoTimer, type Segment } from '@/lib/domain/pomodoro-math';
+import { advance, celebrationFor, clock, elapsedMs, endInstant, pause, phaseMs, remainingMs, resume, segmentOf, startRun, type Celebration as CelebrationKind, type CelebrationMode, type PomoConfig, type PomoTimer, type Segment } from '@/lib/domain/pomodoro-math';
 import { istDate, istParts } from '@/lib/time';
 import { weekStart } from '@/lib/domain/lifecal-math';
 import type { WeekBlock } from '@/lib/domain/calweek';
@@ -49,9 +49,18 @@ const THEMES: Record<string, { name: string; work: Look; break: Look }> = {
   bright: { name: 'Bright', work: { bg: 'linear-gradient(135deg,#f43f5e,#f97316,#f59e0b)', accent: '#fff', ink: '#f43f5e' }, break: { bg: 'linear-gradient(135deg,#10b981,#14b8a6,#06b6d4)', accent: '#fff', ink: '#0d9488' } },
 };
 const PAUSED: Look = { bg: 'linear-gradient(135deg,#5b6472,#3a414d)', accent: '#e2e8f0', ink: '#4b5563' };
-type Prefs = { theme: string; cover: string; sound: SoundId };
-const DEFAULT_PREFS: Prefs = { theme: 'dusk', cover: '', sound: 'marimba' };
+type Prefs = { theme: string; cover: string; sound: SoundId; celebrate: CelebrationMode };
+const DEFAULT_PREFS: Prefs = { theme: 'dusk', cover: '', sound: 'marimba', celebrate: 'random' };
+
+/** The line shown over a celebration. */
+const LINES: Record<'funny' | 'productive' | 'motivate' | 'rocket', string[]> = {
+  funny: ['Brain 1, procrastination 0 🧠', 'You absolute legend 😎', 'Even your coffee is impressed ☕', 'Look at you, being all productive 🕺'],
+  productive: ['Session logged. Future you says thanks ✅', 'One more off the list 🎯', 'Deep work: done 🏆', 'That is how things get finished 📈'],
+  motivate: ['Small steps, big results.', 'Discipline beats motivation.', 'You showed up. That is the win.', 'Keep going, you are on a roll 🔥'],
+  rocket: ['To the moon! 🚀', 'Houston, we have focus 🚀', 'Focus levels: lunar 🌙'],
+};
 const LS_PREFS = 'lifeos:pomo:prefs';
+const pick = <T,>(xs: T[]): T => xs[Math.floor(Math.random() * xs.length)];
 /** The card and full-screen background: the theme's gradient, or the chosen cover image under a dark veil. */
 const surface = (look: Look, cover: string): React.CSSProperties =>
   cover ? { background: `linear-gradient(180deg, rgba(0,0,0,0.30), rgba(0,0,0,0.68)), url("${cover.replace(/"/g, '')}") center / cover` } : { background: look.bg };
@@ -92,6 +101,7 @@ export function PomodoroRoot() {
   const [chatOpen, setChatOpen] = useState(false);
   const [prefs, setPrefsState] = useState<Prefs>(DEFAULT_PREFS);
   const [party, setParty] = useState<{ kind: CelebrationKind; key: number; text: string | null } | null>(null);
+  const clearParty = useCallback(() => setParty(null), []);
   const setPrefs = (p: Prefs) => { setPrefsState(p); try { localStorage.setItem(LS_PREFS, JSON.stringify(p)); } catch {} };
   const [now, setNow] = useState(() => Date.now());
   const [current, setCurrent] = useState<Current>({ title: 'Focus time', sub: null });
@@ -154,7 +164,7 @@ export function PomodoroRoot() {
       const c = JSON.parse(localStorage.getItem(LS_CFG) ?? 'null') as PomoConfig | null;
       if (c && c.workMin > 0) setCfg(c);
       const pr = JSON.parse(localStorage.getItem(LS_PREFS) ?? 'null') as Prefs | null;
-      if (pr && THEMES[pr.theme]) setPrefsState({ theme: pr.theme, cover: typeof pr.cover === 'string' ? pr.cover : '', sound: END_SOUNDS.some((x) => x.id === pr.sound) ? pr.sound : 'marimba' });
+      if (pr && THEMES[pr.theme]) setPrefsState({ theme: pr.theme, cover: typeof pr.cover === 'string' ? pr.cover : '', sound: END_SOUNDS.some((x) => x.id === pr.sound) ? pr.sound : 'marimba', celebrate: pr.celebrate === 'sparkle' || pr.celebrate === 'off' ? pr.celebrate : 'random' });
     } catch {}
     setReady(true);
     const onStorage = (e: StorageEvent) => {
@@ -250,9 +260,12 @@ export function PomodoroRoot() {
       log(r.segment);
       commit({ ...r.next, label: r.next.phase === 'work' ? currentRef.current.title : 'Break' }, { rev: end });
       announce(r.next);
-      const kind = celebrationFor(t, r.next);
+      const kind = celebrationFor(t, r.next, Math.random, prefsRef.current.celebrate);
       if (kind) {
-        const text = kind === 'sparkle' ? null : r.next.status === 'done' ? 'All sessions done!' : `${(t.doneWork ?? 0) + 1} sessions in a row!`;
+        const sessions = (t.doneWork ?? 0) + 1;
+        const text = kind === 'sparkle' ? null
+          : kind === 'mega' ? (t.cfg.repeats ? `All ${t.cfg.repeats} sessions done! 🎉` : `${sessions} sessions in a row! 🎉`)
+          : pick(LINES[kind]);
         setParty({ kind, key: Date.now(), text });
       }
     }, 250);
@@ -406,7 +419,7 @@ export function PomodoroRoot() {
 
       {party && (
         <>
-          <Celebration key={party.key} kind={party.kind} onDone={() => setParty(null)} />
+          <Celebration key={party.key} kind={party.kind} onDone={clearParty} />
           {party.text && <div className="pointer-events-none fixed inset-x-0 top-1/3 z-[81] text-center text-4xl font-black text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] sm:text-6xl">{party.text}</div>}
         </>
       )}
@@ -465,6 +478,15 @@ function SetupForm({ initial, prefs, onPrefs, onPreview, heading, onStart, onHid
             <button type="button" onClick={onPreview} className="rounded-lg border px-3 text-sm hover:bg-muted" aria-label="Play the sound" title="Play the sound">▶</button>
           </div>
         </div>
+        <label className="block space-y-1">
+          <span className="text-xs text-muted-foreground">After each session</span>
+          <select value={prefs.celebrate} onChange={(e) => onPrefs({ ...prefs, celebrate: e.target.value as CelebrationMode })} className="h-9 w-full rounded-lg border border-input bg-transparent px-2 text-sm">
+            <option value="random">Surprise me: a rocket, something funny, productive or motivating</option>
+            <option value="sparkle">Just sparkles</option>
+            <option value="off">Nothing</option>
+          </select>
+          <span className="block text-[11px] text-muted-foreground">Finishing all your sessions always gets the big celebration (unless nothing is chosen).</span>
+        </label>
         <label className="block space-y-1">
           <span className="text-xs text-muted-foreground">Cover image link (optional)</span>
           <Input type="url" inputMode="url" placeholder="https://…/photo.jpg" value={prefs.cover} onChange={(e) => onPrefs({ ...prefs, cover: e.target.value.trim() })} />

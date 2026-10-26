@@ -55,7 +55,7 @@ describe('day summary', () => {
 
 describe('celebrations', () => {
   const run = { workMin: 25, breakMin: 5, repeats: null };
-  it('sparkles after an ordinary session and goes big on the 4th in a row (100 focused minutes: a rocket)', () => {
+  it('gives a short surprise after a session and the big one on the 4th in a row of an open-ended run', () => {
     let t = startRun(run, 0, 'r', 'a');
     const seen: (string | null)[] = [];
     for (let i = 0; i < 4; i++) {
@@ -65,13 +65,29 @@ describe('celebrations', () => {
       seen.push(celebrationFor(w.next, b.next, () => 0)); // a break never celebrates
       t = b.next;
     }
-    expect(seen).toEqual(['sparkle', null, 'sparkle', null, 'sparkle', null, 'rocket', null]);
+    expect(seen).toEqual(['sparkle', null, 'sparkle', null, 'sparkle', null, 'mega', null]);
   });
-  it('goes big when a set number of sessions is finished, and scales with focused time', () => {
-    let t = startRun({ workMin: 90, breakMin: 5, repeats: 2 }, 0, 'r', 'a');
-    t = advance(advance(t, endInstant(t), 'a').next, 0, 'a', true).next; // first work + break
-    const last = advance(t, endInstant(t), 'a');
-    expect(last.next.status).toBe('done');
-    expect(['diwali', 'rocket']).toContain(celebrationFor(t, last.next, () => 0.9));
+  it('picks the other surprises too', () => {
+    const t = startRun(run, 0, 'r', 'a');
+    const next = advance(t, endInstant(t), 'a').next;
+    const got = new Set([0, 0.25, 0.45, 0.65, 0.85].map((r) => celebrationFor(t, next, () => r)));
+    expect([...got].sort()).toEqual(['funny', 'motivate', 'productive', 'rocket', 'sparkle']);
+  });
+  it('is big exactly when the set you chose is finished, and not before', () => {
+    let t = startRun({ workMin: 25, breakMin: 5, repeats: 4 }, 0, 'r', 'a');
+    const seen: (string | null)[] = [];
+    for (let i = 0; i < 4; i++) {
+      const w = advance(t, endInstant(t), 'a');
+      seen.push(celebrationFor(t, w.next, () => 0));
+      if (w.next.status === 'done') break;
+      t = advance(w.next, endInstant(w.next), 'a').next;
+    }
+    expect(seen).toEqual(['sparkle', 'sparkle', 'sparkle', 'mega']);
+  });
+  it('can be limited to sparkles or turned off', () => {
+    const t = startRun({ workMin: 25, breakMin: 5, repeats: 1 }, 0, 'r', 'a');
+    const done = advance(t, endInstant(t), 'a').next;
+    expect(celebrationFor(t, done, () => 0.9, 'sparkle')).toBe('sparkle');
+    expect(celebrationFor(t, done, () => 0.9, 'off')).toBeNull();
   });
 });

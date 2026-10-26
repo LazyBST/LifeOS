@@ -93,18 +93,20 @@ export function summariseDay(segments: Pick<Segment, 'kind' | 'planned_sec' | 'a
   };
 }
 
-export type Celebration = 'sparkle' | 'confetti' | 'lanterns' | 'rocket' | 'diwali';
+export type Celebration = 'sparkle' | 'funny' | 'productive' | 'motivate' | 'rocket' | 'mega';
+export type CelebrationMode = 'random' | 'sparkle' | 'off';
 
 /**
- * What to show when a phase finishes. Every finished work session sparkles. Finishing the set you decided on, or
- * every 4th session in a row, is a big win: the longer you focused in the run, the bigger the show.
+ * What to show when a phase finishes. After an ordinary work session: a short surprise (sparkles, something funny,
+ * productive or motivational, or a rocket to the moon). After the whole set you chose is finished, or every 4th
+ * session of a run that has no end: the big one.
  */
-export function celebrationFor(finished: PomoTimer, next: PomoTimer, rand: () => number = Math.random): Celebration | null {
-  if (finished.phase !== 'work') return null;
+export function celebrationFor(finished: PomoTimer, next: PomoTimer, rand: () => number = Math.random, mode: CelebrationMode = 'random'): Celebration | null {
+  if (finished.phase !== 'work' || mode === 'off') return null;
+  if (mode === 'sparkle') return 'sparkle';
   const sessions = (finished.doneWork ?? 0) + 1;
-  const big = next.status === 'done' || sessions % 4 === 0;
-  if (!big) return 'sparkle';
-  const minutes = ((next.focusedSec ?? 0) || 0) / 60;
-  const pool: Celebration[] = minutes < 60 ? ['confetti', 'lanterns'] : minutes < 120 ? ['rocket', 'confetti', 'lanterns'] : ['diwali', 'rocket'];
+  const setDone = next.status === 'done' || (finished.cfg.repeats === null && sessions % 4 === 0);
+  if (setDone) return 'mega';
+  const pool: Celebration[] = ['sparkle', 'funny', 'productive', 'motivate', 'rocket'];
   return pool[Math.floor(rand() * pool.length)];
 }
