@@ -196,7 +196,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
       </WidgetCard>
     ) },
     { id: 'add', w: 4, h: 12, minW: 3, minH: 8, node: <WidgetCard title="Add a record"><AddTransactionForm categories={categories} accounts={accounts} /></WidgetCard> },
-    { id: 'records', w: 12, h: 13, minW: 4, minH: 6, node: <WidgetCard title={`Transactions — ${label}`}><TransactionList transactions={rows} /></WidgetCard> },
+    { id: 'records', w: 12, h: 13, minW: 4, minH: 6, node: <WidgetCard title={`Transactions — ${label}`} sub="Click anything to edit it right here" right={<Link href="/money/transactions" className="rounded-md border px-2 py-1 text-xs hover:bg-muted" title="Open all transactions with filters">Expand ⤢</Link>}><TransactionList transactions={rows} categories={categories.map((c) => ({ id: c.id, name: c.name }))} accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} /></WidgetCard> },
   ];
 
   return (
@@ -204,9 +204,12 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
       <SetPageContext ctx={{ route: '/money', entity_type: 'none' }} />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Money</h1>
+        <div className="flex items-center gap-2">
+        <Link href="/money/transactions" className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">All transactions →</Link>
         <div className="flex gap-1 rounded-lg bg-muted p-0.5 text-sm">
           <Link href="/money?month=this" className={`rounded-md px-3 py-1.5 ${offset === 0 ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground'}`}>This month</Link>
           <Link href="/money?month=last" className={`rounded-md px-3 py-1.5 ${offset === -1 ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground'}`}>Last month</Link>
+        </div>
         </div>
       </div>
       <WidgetGrid items={items} layoutKey="money-layout" initial={savedLayout} />

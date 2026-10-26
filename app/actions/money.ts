@@ -13,12 +13,18 @@ import {
   owedByLabel,
   settle,
   spendByCategory,
+  searchTransactions,
+  transactionTotals,
+  counterpartyLabels,
+  updateTransaction,
+  type TxRow,
   wallet,
   type ExpenseInput,
   type IncomeInput,
   type RecordedTransaction,
   type SettleInput,
 } from '@/lib/domain/money';
+import type { TxFilters, TxPatch } from '@/lib/domain/money-filters';
 import type { Account, AccountBalance, Category, DateStr, OwedByLabel, Transaction, UUID, Wallet } from '@/lib/types/db';
 import { type ActionResult, run } from './_result';
 
@@ -112,5 +118,26 @@ export async function spendByCategoryAction(
   return run(async () => {
     await requireUser();
     return spendByCategory(from, to);
+  });
+}
+
+export async function updateTransactionAction(id: UUID, patch: TxPatch): Promise<ActionResult<Transaction>> {
+  return run(async () => {
+    await requireUser();
+    const t = await updateTransaction(id, patch);
+    revalidatePath('/', 'layout');
+    return t;
+  });
+}
+
+export async function searchTransactionsAction(filters: TxFilters, page = 0): Promise<ActionResult<{ rows: TxRow[]; total: number; owedFilter: boolean; totals: { count: number; spent: number; income: number; owed: number } | null; counterparties: string[] }>> {
+  return run(async () => {
+    await requireUser();
+    const [r, totals, counterparties] = await Promise.all([
+      searchTransactions(filters, page),
+      page === 0 ? transactionTotals(filters).catch(() => null) : Promise.resolve(null),
+      page === 0 ? counterpartyLabels().catch(() => []) : Promise.resolve([] as string[]),
+    ]);
+    return { ...r, totals, counterparties };
   });
 }

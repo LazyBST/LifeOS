@@ -298,3 +298,114 @@ export async function spendByCategory(from: DateStr, to: DateStr): Promise<{ cat
   }
   return [...out].map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount);
 }
+
+// ---- editing and searching transactions -------------------------------------------------------------------
+
+import { cleanQuery, shareAfterAmountEdit, type TxFilters, type TxPatch } from './money-filters';
+
+/** Edit one transaction in place. Keeps the rules the database checks: shares only on expenses, signed settlements. */
+export async function updateTransaction(id: UUID, patch: TxPatch): Promise<Transaction> {
+  const { data: cur, error: e0 } = await admin().from('transactions').select('*').eq('id', id).is('deleted_at', null).single();
+  if (e0 || !cur) throw new Error('That transaction no longer exists.');
+  const t = cur as Transaction;
+  const row: Record<string, unknown> = {};
+  if (patch.occurred_on !== undefined) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(patch.occurred_on)) throw new Error('Pick a valid date.');
+    row.occurred_on = patch.occurred_on;
+  }
+  if (patch.description !== undefined) row.description = patch.description?.trim() || null;
+  if (patch.note !== undefined) row.note = patch.note?.trim() || null;
+  if (patch.counterparty !== undefined) row.counterparty = patch.counterparty?.trim() || null;
+  if (patch.account_id !== undefined) row.account_id = patch.account_id;
+  if (patch.category_id !== undefined) row.category_id = t.kind === 'settlement' ? null : patch.category_id;
+
+  if (patch.amount !== undefined) {
+    if (!Number.isFinite(patch.amount)) throw new Error('Enter a valid amount.');
+    if (t.kind === 'settlement') {
+      if (patch.amount === 0) throw new Error('A settlement cannot be zero.');
+      row.amount = patch.amount;
+    } else {
+      if (patch.amount < 0) throw new Error('The amount cannot be negative.');
+      row.amount = patch.amount;
+      if (t.kind === 'expense' && patch.my_share === undefined) row.my_share = shareAfterAmountEdit('expense', Number(t.amount), t.my_share == null ? null : Number(t.my_share), patch.amount);
+    }
+  }
+  if (patch.my_share !== undefined) {
+    if (t.kind !== 'expense') throw new Error('Only expenses have a share.');
+    const amount = Number(row.amount ?? t.amount);
+    if (patch.my_share === null || !(patch.my_share >= 0)) throw new Error('Enter your share.');
+    if (patch.my_share > amount) throw new Error('Your share cannot be more than the amount.');
+    row.my_share = patch.my_share;
+  }
+  if (Object.keys(row).length === 0) return t;
+  const { data, error } = await admin().from('transactions').update(row).eq('id', id).select('*').single();
+  if (error) throw new Error(`transaction_update: ${error.message}`);
+  return data as Transaction;
+}
+
+/** The filters as a query on the owed view (or the table when migration 0021 has not been run). */
+function applyFilters(q: any, f: TxFilters, view: boolean) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (f.kinds?.length) q = q.in('kind', f.kinds);
+  if (f.accountIds?.length) q = q.in('account_id', f.accountIds);
+  if (f.categoryIds?.length) {
+    const ids = f.categoryIds.filter((c) => c !== 'none');
+    q = f.categoryIds.includes('none') ? q.or(`category_id.is.null${ids.length ? `,category_id.in.(${ids.join(',')})` : ''}`) : q.in('category_id', ids);
+  }
+  if (f.from) q = q.gte('occurred_on', f.from);
+  if (f.to) q = q.lte('occurred_on', f.to);
+  if (f.counterparty) q = q.eq('counterparty', f.counterparty);
+  const text = f.q ? cleanQuery(f.q) : '';
+  if (text) q = q.or(`description.ilike.%${text}%,note.ilike.%${text}%,counterparty.ilike.%${text}%`);
+  // the size of the amount, whichever way a settlement points
+  const lo = f.minAmount, hi = f.maxAmount;
+  if (lo !== undefined && hi !== undefined) q = q.or(`and(amount.gte.${lo},amount.lte.${hi}),and(amount.lte.${-lo},amount.gte.${-hi})`);
+  else if (lo !== undefined) q = q.or(`amount.gte.${lo},amount.lte.${-lo}`);
+  else if (hi !== undefined) q = q.lte('amount', hi).gte('amount', -hi);
+  if (view && f.owed === 'to_me') q = q.gt('owed', 0);
+  if (view && f.owed === 'i_owe') q = q.lt('owed', 0);
+  const sort = f.sort ?? 'date_desc';
+  q = sort === 'date_asc' ? q.order('occurred_on', { ascending: true }).order('created_at', { ascending: true })
+    : sort === 'amount_desc' ? q.order('amount', { ascending: false })
+    : sort === 'amount_asc' ? q.order('amount', { ascending: true })
+    : q.order('occurred_on', { ascending: false }).order('created_at', { ascending: false });
+  return q;
+}
+
+export type TxRow = Transaction & { owed: number };
+
+export async function searchTransactions(f: TxFilters, page = 0, size = 100): Promise<{ rows: TxRow[]; total: number; owedFilter: boolean }> {
+  const run = async (view: boolean) => {
+    const base = admin().from(view ? 'v_transactions_owed' : 'transactions').select('*', { count: 'exact' });
+    const q = applyFilters(view ? base : base.is('deleted_at', null), f, view);
+    return q.range(page * size, page * size + size - 1);
+  };
+  let view = true;
+  let res = await run(true);
+  if (res.error) { view = false; res = await run(false); }
+  if (res.error) throw new Error(`transactions: ${res.error.message}`);
+  const rows = ((res.data ?? []) as (Transaction & { owed?: number })[]).map((t) => ({
+    ...t, owed: t.owed != null ? Number(t.owed) : t.kind === 'expense' ? Number(t.amount) - Number(t.my_share ?? t.amount) : t.kind === 'settlement' ? -Number(t.amount) : 0,
+  }));
+  return { rows, total: res.count ?? rows.length, owedFilter: view };
+}
+
+/** What the filtered set adds up to: spending (my share), income, and what is owed overall. Reads up to 5000 rows. */
+export async function transactionTotals(f: TxFilters): Promise<{ count: number; spent: number; income: number; owed: number }> {
+  let spent = 0, income = 0, owed = 0, count = 0;
+  for (let page = 0; page < 5; page++) {
+    const { rows, total } = await searchTransactions(f, page, 1000);
+    for (const t of rows) {
+      if (t.kind === 'expense') spent += Number(t.my_share ?? t.amount);
+      else if (t.kind === 'income') income += Number(t.amount);
+      owed += t.owed;
+    }
+    count = total;
+    if ((page + 1) * 1000 >= total) break;
+  }
+  return { count, spent, income, owed };
+}
+
+export async function counterpartyLabels(): Promise<string[]> {
+  const { data } = await admin().from('transactions').select('counterparty').is('deleted_at', null).not('counterparty', 'is', null).limit(1000);
+  return [...new Set(((data ?? []) as { counterparty: string }[]).map((r) => r.counterparty))].sort();
+}
