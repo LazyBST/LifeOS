@@ -12,6 +12,7 @@ import { HabitConsistency } from '@/components/analytics/HabitConsistency';
 import { SpendByCategoryChart } from '@/components/analytics/SpendByCategoryChart';
 import { MoodChart } from '@/components/analytics/MoodChart';
 import type { HabitConsistencyItem } from '@/app/actions/analytics';
+import { TimeUse } from '@/components/analytics/TimeUse';
 import { FocusDay } from '@/components/pomodoro/FocusDay';
 import { WidgetGrid, type GridItem } from '@/components/widgets/WidgetGrid';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
@@ -87,6 +88,7 @@ export default async function AnalyticsPage() {
 
   const { summary } = ins;
   const items: GridItem[] = [
+    { id: 'timeuse', w: 12, h: 20, minW: 6, minH: 14, node: <WidgetCard title="How I spent my day" sub="Every event, task and habit with a time claims its minutes; gaps are time not used; overlaps count for all of them"><TimeUse /></WidgetCard> },
     { id: 'focus', w: 6, h: 18, minW: 4, minH: 12, node: <WidgetCard title="Focus (Pomodoro)" sub="Sessions, pauses and focused time against what your calendar planned"><FocusDay /></WidgetCard> },
     { id: 'tiles', w: 4, h: 7, minW: 3, minH: 5, node: (
       <WidgetCard title="This week" sub="Scheduled work: finished vs pushed (−1 each)">

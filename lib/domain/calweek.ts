@@ -8,7 +8,7 @@ import { listHabits, habitDueOn, habitDayTimes } from './habits';
 import { minutesOfTime } from './day-layout';
 
 export type EditableEvent = { id: string; summary: string; start: string; end: string; allDay: boolean; description: string | null; location: string | null; canEdit: boolean; recurring: boolean };
-export type WeekBlock = { id: string; title: string; start: string; end: string; kind: 'event' | 'task' | 'habit'; /** the colour of the area it belongs to */ color?: string; done?: boolean; href?: string; event?: EditableEvent; habit?: { id: string; date: string; emoji: string | null; missed: boolean } };
+export type WeekBlock = { id: string; title: string; start: string; end: string; kind: 'event' | 'task' | 'habit'; /** the colour of the area it belongs to */ color?: string; /** the Area's name */ area?: string; done?: boolean; href?: string; event?: EditableEvent; habit?: { id: string; date: string; emoji: string | null; missed: boolean } };
 export type UntimedItem = { kind: 'task' | 'habit'; color?: string; id: string; title: string; date: string; done: boolean; missed?: boolean; href?: string; emoji?: string | null };
 export type WeekBar = { id: string; title: string; from: string; to: string; kind: 'goal' | 'project'; href: string; color?: string };
 export type WeekData = { weekStart: string; blocks: WeekBlock[]; allDay: { id: string; title: string; date: string; event?: EditableEvent }[]; bars: WeekBar[]; untimed: UntimedItem[]; sync: { error: string | null; okAt: string | null; cached: number } | null };
@@ -23,7 +23,9 @@ export async function weekData(weekStart: string): Promise<WeekData> {
     const full = await q('google_event_id,summary,starts_at,ends_at,all_day,description,location,recurring,can_edit');
     return full.error ? await q('google_event_id,summary,starts_at,ends_at,all_day') : full; // migration 0011 not run yet
   };
-  const areaHex = new Map((await listAreas().catch(() => [])).map((a) => [a.id, areaColor(a)]));
+  const areaList = await listAreas().catch(() => []);
+  const areaHex = new Map(areaList.map((a) => [a.id, areaColor(a)]));
+  const areaName = new Map(areaList.map((a) => [a.id, a.name]));
   const [ev, tasks, goals, projects] = await Promise.all([
     loadEvents(),
     admin().from('tasks').select('id,title,due_at,duration_min,status,area_id').is('deleted_at', null).gte('due_at', from).lt('due_at', to).limit(300),
@@ -43,7 +45,7 @@ export async function weekData(weekStart: string): Promise<WeekData> {
   }
   for (const t of (tasks.data ?? []) as { id: string; title: string; due_at: string; duration_min: number | null; status: string; area_id: string | null }[]) {
     const end = new Date(new Date(t.due_at).getTime() + (t.duration_min ?? 30) * 60_000).toISOString();
-    blocks.push({ id: t.id, title: t.title, start: t.due_at, end, kind: 'task', color: t.area_id ? areaHex.get(t.area_id) : undefined, done: t.status === 'done', href: `/tasks/${t.id}` });
+    blocks.push({ id: t.id, title: t.title, start: t.due_at, end, kind: 'task', color: t.area_id ? areaHex.get(t.area_id) : undefined, area: t.area_id ? areaName.get(t.area_id) : undefined, done: t.status === 'done', href: `/tasks/${t.id}` });
   }
   // a goal or project without a start date still shows, as a one-day marker on its target date
   type Span = { id: string; title: string; emoji: string | null; start_date: string | null; target_date: string };
@@ -82,7 +84,7 @@ export async function weekData(weekStart: string): Promise<WeekData> {
         if (sMin === null) { untimed.push({ kind: 'habit', color: h.area_id ? areaHex.get(h.area_id) : undefined, id: h.id, title: h.name, date, done, missed, emoji: h.emoji }); continue; }
         const eMin = minutesOfTime(o ? o.end_time : h.end_time) ?? sMin + 5;
         const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-        blocks.push({ id: `habit-${h.id}-${date}`, title: h.name, start: istInstant(date, hhmm(sMin)).toISOString(), end: istInstant(date, hhmm(Math.min(eMin, 24 * 60 - 1))).toISOString(), kind: 'habit', color: h.area_id ? areaHex.get(h.area_id) : undefined, done, habit: { id: h.id, date, emoji: h.emoji, missed } });
+        blocks.push({ id: `habit-${h.id}-${date}`, title: h.name, start: istInstant(date, hhmm(sMin)).toISOString(), end: istInstant(date, hhmm(Math.min(eMin, 24 * 60 - 1))).toISOString(), kind: 'habit', color: h.area_id ? areaHex.get(h.area_id) : undefined, area: h.area_id ? areaName.get(h.area_id) : undefined, done, habit: { id: h.id, date, emoji: h.emoji, missed } });
       }
     }
   } catch { /* habits are optional on this view */ }
