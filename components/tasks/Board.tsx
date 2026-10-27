@@ -24,6 +24,7 @@ import { boardColumns, isDone, type StatusDef } from '@/lib/types/statuses';
 import type { TaskStatus } from '@/lib/types/db';
 import type { TaskListItem } from '@/app/actions/tasks';
 import { TaskCard } from './TaskCard';
+import type { QuickUpdate } from './QuickEdit';
 import { InlineAddTask } from './InlineAddTask';
 import type { TaskCreateInput } from './useTaskViewState';
 
@@ -33,10 +34,12 @@ export type BoardProps = {
   onComplete: (id: string) => void;
   onDelete?: (id: string) => void;
   onCreate: (input: TaskCreateInput) => void;
+  onUpdate?: QuickUpdate;
+  onSubtasksChanged?: () => void;
   createDefaults?: TaskCreateInput;
 };
 
-export function Board({ tasks, onMove, onComplete, onDelete, onCreate, createDefaults }: BoardProps) {
+export function Board({ tasks, onMove, onComplete, onDelete, onCreate, onUpdate, onSubtasksChanged, createDefaults }: BoardProps) {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     // on a touch screen a card is picked up by pressing and holding, so swiping still scrolls the board
@@ -110,6 +113,8 @@ export function Board({ tasks, onMove, onComplete, onDelete, onCreate, createDef
             tasks={columns[def.key] ?? []}
             onCreate={onCreate}
             onDelete={onDelete}
+            onUpdate={onUpdate}
+            onSubtasksChanged={onSubtasksChanged}
             createDefaults={createDefaults}
           />
         ))}
@@ -124,12 +129,16 @@ function Column({
   tasks,
   onCreate,
   onDelete,
+  onUpdate,
+  onSubtasksChanged,
   createDefaults,
 }: {
   def: StatusDef;
   tasks: TaskListItem[];
   onCreate: (input: TaskCreateInput) => void;
   onDelete?: (id: string) => void;
+  onUpdate?: QuickUpdate;
+  onSubtasksChanged?: () => void;
   createDefaults?: TaskCreateInput;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: def.key, data: { status: def.key } });
@@ -151,7 +160,7 @@ function Column({
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col gap-2">
           {tasks.map((t) => (
-            <SortableCard key={t.id} task={t} onDelete={onDelete} />
+            <SortableCard key={t.id} task={t} onDelete={onDelete} onUpdate={onUpdate} onSubtasksChanged={onSubtasksChanged} />
           ))}
         </div>
       </SortableContext>
@@ -163,7 +172,7 @@ function Column({
   );
 }
 
-function SortableCard({ task, onDelete }: { task: TaskListItem; onDelete?: (id: string) => void }) {
+function SortableCard({ task, onDelete, onUpdate, onSubtasksChanged }: { task: TaskListItem; onDelete?: (id: string) => void; onUpdate?: QuickUpdate; onSubtasksChanged?: () => void }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { status: task.status },
@@ -175,7 +184,7 @@ function SortableCard({ task, onDelete }: { task: TaskListItem; onDelete?: (id: 
   };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCard task={task} onDelete={onDelete} />
+      <TaskCard task={task} onDelete={onDelete} onUpdate={onUpdate} onSubtasksChanged={onSubtasksChanged} />
     </div>
   );
 }

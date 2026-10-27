@@ -121,6 +121,13 @@ export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) 
             </div>
           </Field>
         )}
+        <Field label="Subtasks">
+          <select className={sel} value={filters.subtasks ?? 'nested'} onChange={(e) => patch({ subtasks: e.target.value === 'nested' ? undefined : (e.target.value as 'all' | 'only') })} aria-label="Subtasks">
+            <option value="nested">Inside their parent task</option>
+            <option value="all">As separate tasks</option>
+            <option value="only">Only subtasks (hide parents)</option>
+          </select>
+        </Field>
         <Field label="Tag">
           <Input placeholder="e.g. urgent" className="h-9" value={filters.tag ?? ''} onChange={(e) => patch({ tag: e.target.value || undefined })} />
         </Field>

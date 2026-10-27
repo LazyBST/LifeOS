@@ -26,6 +26,8 @@ export type TaskListItem = Task & {
   area_color: string;
   goal_title: string | null;
   project_title: string | null;
+  /** the parent task's title, for a subtask */
+  parent_title: string | null;
   subtask_total: number;
   subtask_done: number;
 };
@@ -61,6 +63,12 @@ export async function listTasksAction(filters: TaskFilters): Promise<ActionResul
       admin().from('projects').select('id,title').is('deleted_at', null),
       allSubtaskCounts(),
     ]);
+    const parentIds = [...new Set(tasks.flatMap((t) => (t.parent_task_id ? [t.parent_task_id] : [])))];
+    const parentTitle = new Map<string, string>();
+    for (let i = 0; i < parentIds.length; i += 80) {
+      const { data } = await admin().from('tasks').select('id,title').in('id', parentIds.slice(i, i + 80));
+      for (const r of (data ?? []) as { id: string; title: string }[]) parentTitle.set(r.id, r.title);
+    }
     const areaMap = new Map(areas.map((a) => [a.id, a]));
     const goalMap = new Map(((goals.data ?? []) as { id: string; title: string }[]).map((g) => [g.id, g.title]));
     const projectMap = new Map(((projects.data ?? []) as { id: string; title: string }[]).map((p) => [p.id, p.title]));
@@ -73,6 +81,7 @@ export async function listTasksAction(filters: TaskFilters): Promise<ActionResul
         area_color: areaColor(area),
         goal_title: t.goal_id ? goalMap.get(t.goal_id) ?? null : null,
         project_title: t.project_id ? projectMap.get(t.project_id) ?? null : null,
+        parent_title: t.parent_task_id ? parentTitle.get(t.parent_task_id) ?? null : null,
         subtask_total: c?.total ?? 0,
         subtask_done: c?.done ?? 0,
       };

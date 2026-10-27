@@ -53,6 +53,8 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
     fetching,
     error,
     createTask,
+    updateTask,
+    refetch,
     completeTask,
     reopenTask,
     deleteTask,
@@ -144,6 +146,8 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
           onComplete={completeTask}
           onDelete={(id) => void deleteTask(id)}
           onCreate={createTask}
+          onUpdate={(id, patch) => void updateTask(id, patch)}
+          onSubtasksChanged={refetch}
           createDefaults={effectiveCreateDefaults}
         />
       ) : (
@@ -156,6 +160,8 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
           onToggleComplete={(t) => (t.status === 'done' ? reopenTask(t.id) : completeTask(t.id))}
           onDelete={(id) => void deleteTask(id)}
           onCreate={createTask}
+          onUpdate={(id, patch) => void updateTask(id, patch)}
+          onSubtasksChanged={refetch}
           createDefaults={effectiveCreateDefaults}
         />
       )}

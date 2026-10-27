@@ -11,6 +11,8 @@ export type TaskFilters = {
   parent_task_id?: UUID | null;
   /** only direct children of parent_task_id; otherwise subtasks are included */
   top_level_only?: boolean;
+  /** nested: parent tasks only (subtasks open under them) · all: subtasks listed as tasks of their own · only: subtasks, no parents */
+  subtasks?: 'nested' | 'all' | 'only';
   priority?: Priority[];
   status?: TaskStatus[];
   due?: DuePreset | null;
@@ -87,6 +89,7 @@ export function viewStateToParams(s: TaskViewState): URLSearchParams {
   if (f.due_to) p.set('to', f.due_to);
   if (f.tag) p.set('tag', f.tag);
   if (f.q) p.set('q', f.q);
+  if (f.subtasks && f.subtasks !== 'nested') p.set('subtasks', f.subtasks);
   return p;
 }
 
@@ -122,6 +125,8 @@ export function paramsToViewState(
   if (p.get('to')) f.due_to = p.get('to');
   if (p.get('tag')) f.tag = p.get('tag');
   if (p.get('q')) f.q = p.get('q');
+  const sub = p.get('subtasks');
+  if (sub === 'all' || sub === 'only') f.subtasks = sub;
   return s;
 }
 

@@ -91,8 +91,10 @@ export async function listTasks(f: TaskFilters = {}): Promise<Task[]> {
   if (f.project_id) q = q.eq('project_id', f.project_id);
   if (f.parent_task_id !== undefined) {
     q = f.parent_task_id === null ? q.is('parent_task_id', null) : q.eq('parent_task_id', f.parent_task_id);
-  } else if (f.top_level_only) {
+  } else if (f.top_level_only || f.subtasks === 'nested') {
     q = q.is('parent_task_id', null);
+  } else if (f.subtasks === 'only') {
+    q = q.not('parent_task_id', 'is', null);
   }
   if (f.priority?.length) q = q.in('priority', f.priority);
   if (f.status?.length) q = q.in('status', f.status);

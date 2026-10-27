@@ -53,6 +53,8 @@ export type TaskPatchLite = Partial<{
   estimate_min: number | null;
   tags: string[];
   sort_order: number;
+  due_at: string | null;
+  duration_min: number | null;
 }>;
 
 function storageKey(scope: string): string {
@@ -115,7 +117,8 @@ export function useTaskViewState(opts: {
   // Effective filters actually sent to the server: preset defaults, then the
   // user's own filter picks, then the page's locked base (base always wins).
   const effectiveFilters = useMemo<TaskFilters>(
-    () => ({ ...presetFilters(state.preset), ...state.filters, ...base }),
+    // parents with their subtasks nested under them, unless the filter bar says otherwise
+    () => ({ subtasks: 'nested' as const, ...presetFilters(state.preset), ...state.filters, ...base }),
     [state.preset, state.filters, base],
   );
 
@@ -200,6 +203,7 @@ export function useTaskViewState(opts: {
         area_color: '#94a3b8',
         goal_title: null,
         project_title: null,
+        parent_title: null,
         subtask_total: 0,
         subtask_done: 0,
       };
