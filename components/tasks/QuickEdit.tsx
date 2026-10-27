@@ -39,7 +39,7 @@ function useProjects() {
 
 // a chip sits inside a draggable card: taps on it must not start a drag or follow the card's link
 const stop = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation(), onClick: (e: React.MouseEvent) => e.stopPropagation(), onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation() };
-const chipBase = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-px text-[12px] font-semibold transition-colors hover:ring-2 hover:ring-ring/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60';
+const chipBase = 'inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[12px] font-semibold transition-colors hover:ring-2 hover:ring-ring/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60';
 const pill = 'rounded-md px-2 py-1 text-xs hover:bg-muted';
 
 export function PriorityChip({ task, onUpdate }: { task: TaskListItem; onUpdate: QuickUpdate }) {
@@ -63,8 +63,8 @@ export function AreaChip({ task, onUpdate, children }: { task: TaskListItem; onU
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger {...stop} aria-label="Change area" title="Change area" className={`${chipBase} max-w-full shrink ${task.area_name ? '' : 'border border-dashed text-muted-foreground'}`} style={task.area_name ? { backgroundColor: `${task.area_color}29`, color: task.area_color } : undefined}>
-        {children ?? <span className="truncate">{task.area_name ?? '+ area'}</span>}
+      <PopoverTrigger {...stop} aria-label="Change area" title="Change area" className={`${chipBase} h-auto max-w-full shrink rounded-xl text-left leading-4 ${task.area_name ? '' : 'border border-dashed text-muted-foreground'}`} style={task.area_name ? { backgroundColor: `${task.area_color}29`, color: task.area_color } : undefined}>
+        {children ?? <span className="min-w-0 whitespace-normal break-words">{task.area_name ?? '+ area'}</span>}
       </PopoverTrigger>
       <PopoverContent align="start" className="max-h-64 w-48 gap-0.5 overflow-y-auto p-1" {...stop}>
         {areas.map((a) => (
@@ -115,7 +115,7 @@ export function DueChip({ task, overdue, onUpdate }: { task: TaskListItem; overd
   const tone = overdue ? 'bg-[#ffebe6] text-[#bf2600] dark:bg-red-500/20 dark:text-red-400' : 'bg-[#dfe1e6] text-[#42526e] dark:bg-muted dark:text-muted-foreground';
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger {...stop} aria-label="Change due date and time" title="Change due date and time" className={`${chipBase} ${text ? tone : 'border border-dashed text-muted-foreground'}`}>{text ?? '+ date'}</PopoverTrigger>
+      <PopoverTrigger {...stop} aria-label="Change due date and time" title="Change due date and time" className={`${chipBase} whitespace-nowrap ${text ? tone : 'border border-dashed text-muted-foreground'}`}>{text ?? '+ date'}</PopoverTrigger>
       <PopoverContent align="end" className="w-64 gap-2" {...stop}>
         <div className="flex flex-wrap gap-1">
           {[['Today', today], ['Tomorrow', addDays(today, 1)], ['Next week', addDays(today, 7)]].map(([l, d]) => (
@@ -149,8 +149,8 @@ export function ProjectChip({ task, onUpdate }: { task: TaskListItem; onUpdate: 
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQ(''); }}>
       <PopoverTrigger {...stop} aria-label="Change project" title={task.goal_title && task.project_title ? `${task.goal_title} › ${task.project_title}` : 'Link to a project'}
-        className={`${chipBase} max-w-full shrink ${label ? 'bg-muted font-medium text-muted-foreground' : 'border border-dashed text-muted-foreground'}`}>
-        <span className="truncate">{label ?? '+ project'}</span>
+        className={`${chipBase} h-auto max-w-full shrink rounded-xl text-left leading-4 ${label ? 'bg-muted font-medium text-muted-foreground' : 'border border-dashed text-muted-foreground'}`}>
+        <span className="min-w-0 whitespace-normal break-words">{label ?? '+ project'}</span>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 gap-1.5 p-1.5" {...stop}>
         <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a project…" aria-label="Find a project" className="h-8 rounded-md border bg-background px-2 text-sm outline-none focus:border-ring" />

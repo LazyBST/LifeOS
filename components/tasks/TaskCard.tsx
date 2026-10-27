@@ -61,15 +61,15 @@ export function TaskCard({ task, dragging = false, onDelete, onUpdate, onSubtask
         </span>
       </Link>
 
-      <span className="flex flex-wrap items-center gap-1">
+      <span className="flex min-w-0 flex-wrap items-center gap-1">
         {canEdit ? (
-          <span className={task.area_name ? '' : ghost}><AreaChip task={task} onUpdate={onUpdate} /></span>
+          <span className={`min-w-0 max-w-full ${task.area_name ? '' : ghost}`}><AreaChip task={task} onUpdate={onUpdate} /></span>
         ) : task.area_name ? (
           <span className="max-w-full truncate rounded-full px-1.5 py-px text-[12px] font-semibold" style={{ backgroundColor: `${task.area_color}29`, color: task.area_color }}>{task.area_name}</span>
         ) : null}
         {canEdit && task.parent_task_id == null ? (
-          <span className={label ? '' : ghost}><ProjectChip task={task} onUpdate={onUpdate} /></span>
-        ) : label ? <span className="max-w-full truncate rounded-[3px] bg-muted px-1.5 py-px text-[12px] font-medium text-muted-foreground">{label}</span> : null}
+          <span className={`min-w-0 max-w-full ${label ? '' : ghost}`}><ProjectChip task={task} onUpdate={onUpdate} /></span>
+        ) : label ? <span className="max-w-full break-words rounded-[3px] bg-muted px-1.5 py-px text-[12px] font-medium text-muted-foreground">{label}</span> : null}
         {task.tags.map((t) => (
           <span key={t} className="rounded-[3px] bg-muted px-1.5 py-px text-[12px] font-medium text-muted-foreground">{t}</span>
         ))}

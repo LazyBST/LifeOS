@@ -165,7 +165,7 @@ function Row({ task, onToggleComplete, onDelete, onUpdate, onSubtasksChanged }: 
   const canNest = !!onUpdate && task.parent_task_id == null;
   const ghost = 'opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100';
   const area = onUpdate
-    ? <span className={task.area_name ? '' : ghost}><AreaChip task={task} onUpdate={onUpdate} /></span>
+    ? <span className={`min-w-0 max-w-full ${task.area_name ? '' : ghost}`}><AreaChip task={task} onUpdate={onUpdate} /></span>
     : task.area_name ? <span className="text-xs" style={{ color: task.area_color }}>{task.area_name}</span> : null;
   const prio = onUpdate ? <PriorityChip task={task} onUpdate={onUpdate} /> : <span className="text-xs text-muted-foreground">{task.priority}</span>;
   const dueChip = onUpdate
@@ -198,7 +198,7 @@ function Row({ task, onToggleComplete, onDelete, onUpdate, onSubtasksChanged }: 
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           {task.parent_title && <span className="truncate">↳ {task.parent_title}</span>}
           {canNest ? (
-            <>{task.project_title && task.goal_title && <span className="truncate">{task.goal_title} ›</span>}<span className={task.project_title ? '' : ghost}><ProjectChip task={task} onUpdate={onUpdate!} /></span></>
+            <>{task.project_title && task.goal_title && <span className="truncate">{task.goal_title} ›</span>}<span className={`min-w-0 max-w-full ${task.project_title ? '' : ghost}`}><ProjectChip task={task} onUpdate={onUpdate!} /></span></>
           ) : path && <span className="truncate">{path}</span>}
           {area}
         </span>
