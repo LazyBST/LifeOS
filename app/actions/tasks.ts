@@ -72,7 +72,10 @@ export async function listTasksAction(filters: TaskFilters): Promise<ActionResul
     const areaMap = new Map(areas.map((a) => [a.id, a]));
     const goalMap = new Map(((goals.data ?? []) as { id: string; title: string }[]).map((g) => [g.id, g.title]));
     const projectMap = new Map(((projects.data ?? []) as { id: string; title: string }[]).map((p) => [p.id, p.title]));
-    return tasks.map((t) => {
+    // "hide parents": a task drops out only when it has subtasks of its own (open ones, when done tasks are hidden)
+    const hasKids = (id: string) => { const c = counts[id]; return !!c && (filters.include_done === false ? c.total - c.done : c.total) > 0; };
+    const shown = filters.subtasks === 'only' ? tasks.filter((t) => !hasKids(t.id)) : tasks;
+    return shown.map((t) => {
       const area = t.area_id ? areaMap.get(t.area_id) ?? null : null;
       const c = counts[t.id];
       return {

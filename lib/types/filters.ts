@@ -11,7 +11,7 @@ export type TaskFilters = {
   parent_task_id?: UUID | null;
   /** only direct children of parent_task_id; otherwise subtasks are included */
   top_level_only?: boolean;
-  /** nested: parent tasks only (subtasks open under them) · all: subtasks listed as tasks of their own · only: subtasks, no parents */
+  /** nested: parent tasks only (subtasks open under them) · all: subtasks listed as tasks of their own · only: hide a task that has subtasks, show the subtasks and the tasks that have none */
   subtasks?: 'nested' | 'all' | 'only';
   priority?: Priority[];
   status?: TaskStatus[];
