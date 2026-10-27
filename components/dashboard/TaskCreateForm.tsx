@@ -69,11 +69,12 @@ export function TaskCreateForm({ date, hour, onCreated, onCancel }: { date: stri
         <Input placeholder="Task title" value={f.title} onChange={(e) => set({ title: e.target.value })} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') void save(); }} />
         <div className="rounded-xl border bg-muted/30 p-3">
           <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">When</div>
-          <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto_minmax(0,1fr)]">
-            <Field label="Date" className="col-span-2 sm:col-span-1"><ClearableInput wrapperClassName="w-full" type="date" value={f.date} onChange={(e) => set({ date: e.target.value })} onClear={() => set({ date: '', start: '', end: '' })} clearLabel="Remove the date" /></Field>
+          <div className="flex flex-col gap-3">
+            <Field label="Date"><ClearableInput wrapperClassName="w-full" type="date" value={f.date} onChange={(e) => set({ date: e.target.value })} onClear={() => set({ date: '', start: '', end: '' })} clearLabel="Remove the date" /></Field>
+            <div className="grid grid-cols-2 gap-2">
             <Field label="Starts"><ClearableInput wrapperClassName="w-full" type="time" value={f.start} disabled={!f.date} onChange={(e) => set({ start: e.target.value })} onClear={() => set({ start: '', end: '' })} clearLabel="Remove the start time" /></Field>
-            <span className="hidden pb-1.5 text-muted-foreground sm:block" aria-hidden>→</span>
             <Field label="Ends"><ClearableInput wrapperClassName="w-full" type="time" value={f.end} disabled={!f.date || !f.start} onChange={(e) => set({ end: e.target.value })} onClear={() => set({ end: '' })} clearLabel="Remove the end time" /></Field>
+            </div>
           </div>
           <p className="mt-2 text-[11px] leading-snug text-muted-foreground">With a start time it shows as a block on the calendar and on Google Calendar. Without one it sits in the “anytime” row.</p>
         </div>
