@@ -25,7 +25,7 @@ export function TaskCard({ task, dragging = false, onDelete }: { task: TaskListI
   const overdue = isOverdue(task.due_date) && !done;
   const label = task.project_title ?? task.goal_title;
   return (
-    <div className="group/card relative">
+    <div className="group/card relative isolate">
     {onDelete && (
       <button
         type="button"

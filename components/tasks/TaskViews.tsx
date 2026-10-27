@@ -86,7 +86,7 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
   return (
     <div className="flex flex-col gap-3">
       {/* the controls stay put; only the cards below scroll */}
-      <div className="sticky top-0 z-10 -mx-1 flex flex-col gap-3 bg-[var(--sticky-bg,var(--background))] px-1 pb-2">
+      <div className="sticky top-0 z-20 -mx-1 flex flex-col gap-3 bg-[var(--sticky-bg,var(--background))] px-1 pb-2">
       {title && <div className="text-sm font-medium">{title}</div>}
       {!hidePresets && (
         <div className="flex flex-wrap gap-1">

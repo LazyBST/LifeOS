@@ -33,6 +33,7 @@ const MIGRATION_FILES = [
   '0022_habit_extra_days.sql',
   '0023_review_status_task_indexes.sql',
   '0024_transaction_labels.sql',
+  '0025_task_hierarchy_links.sql',
 ];
 
 // Supabase provides these for free; PGlite does not, so we stub the minimum

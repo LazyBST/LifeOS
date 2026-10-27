@@ -10,6 +10,9 @@ import { SetPageContext } from '@/components/chat/page-context';
 import { PropertiesHeader } from '@/components/entity/PropertiesHeader';
 import { InlineText } from '@/components/entity/InlineText';
 import { InlineSelect } from '@/components/entity/InlineSelect';
+import { TaskLinks } from '@/components/entity/TaskLinks';
+import { listGoals } from '@/lib/domain/goals';
+import { listProjects } from '@/lib/domain/projects';
 import { DueDateTime } from '@/components/entity/DueDateTime';
 import { TaskViews } from '@/components/tasks/TaskViews';
 import { NotesEditor } from '@/components/notes/NotesEditor';
@@ -26,7 +29,7 @@ import { formatDate } from '@/lib/time';
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const statusOptions = statusesFor(await listStatuses(), 'task').map((s) => ({ value: s.key, label: s.label }));
   const { id } = await params;
-  const [task, areas] = await Promise.all([getTask(id), listAreas()]);
+  const [task, areas, goals, projects] = await Promise.all([getTask(id), listAreas(), listGoals(), listProjects()]);
   if (!task) notFound();
 
   const [breadcrumb, notes, ledger, slips] = await Promise.all([
@@ -106,6 +109,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               options={areas.map((a) => ({ value: a.id, label: a.name }))}
               save={{ entity: 'task', id: task.id, field: 'area_id', mode: 'nullable' }}
             />
+            <TaskLinks taskId={task.id} projectId={task.project_id} goalId={task.goal_id} inherited={!!task.parent_task_id} goals={goals.map((g) => ({ id: g.id, title: g.title }))} projects={projects.map((p) => ({ id: p.id, title: p.title, goal_id: p.goal_id }))} />
             <span className="field col-span-full">
               Due
               <DueDateTime taskId={task.id} dueDate={task.due_date} dueAt={task.due_at} durationMin={task.duration_min} />

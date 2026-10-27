@@ -89,7 +89,7 @@ export function TaskCreateForm({ date, hour, onCreated, onCancel }: { date: stri
             <select className={sel} value={f.goal_id} onChange={(e) => { const g = goals.find((x) => x.id === e.target.value); set({ goal_id: e.target.value, project_id: '', area_id: f.area_id || g?.area_id || '' }); }}><option value="">No goal</option>{goalsShown.map((g) => <option key={g.id} value={g.id}>{g.emoji ? `${g.emoji} ` : ''}{g.title}</option>)}</select>
           </Field>
           <Field label="Project">
-            <select className={sel} value={f.project_id} onChange={(e) => set({ project_id: e.target.value })}><option value="">No project</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.emoji ? `${p.emoji} ` : ''}{p.title}</option>)}</select>
+            <select className={sel} value={f.project_id} onChange={(e) => { const pr = projects.find((x) => x.id === e.target.value); set(pr ? { project_id: pr.id, goal_id: pr.goal_id ?? f.goal_id, area_id: f.area_id || pr.area_id || goals.find((g) => g.id === pr.goal_id)?.area_id || '' } : { project_id: '' }); }}><option value="">No project</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.emoji ? `${p.emoji} ` : ''}{p.title}</option>)}</select>
           </Field>
           <Field label="Status">
             <select className={sel} value={f.status} onChange={(e) => set({ status: e.target.value })}><option value="">Default</option>{statuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select>

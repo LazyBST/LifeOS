@@ -18,6 +18,7 @@ type InlineSelectProps = {
   className?: string;
   /** Allow clearing back to no value (renders a "None" option). */
   clearable?: boolean;
+  disabled?: boolean;
 };
 
 /**
@@ -32,6 +33,7 @@ export function InlineSelect({
   placeholder = 'Select…',
   className,
   clearable = false,
+  disabled = false,
 }: InlineSelectProps) {
   const onSave = onSaveProp ?? ((next: string) => saveField(save!, next));
   const [current, setCurrent] = useState<string | null>(value);
@@ -56,7 +58,7 @@ export function InlineSelect({
     <Select
       value={current ?? undefined}
       onValueChange={(v) => handleChange(v as string)}
-      disabled={saving}
+      disabled={saving || disabled}
     >
       <SelectTrigger size="sm" className={cn('h-7 text-sm', className)}>
         <SelectValue placeholder={placeholder}>
