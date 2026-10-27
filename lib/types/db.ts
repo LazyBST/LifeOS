@@ -228,6 +228,9 @@ export type Account = {
 
 export type Category = { id: UUID; name: string };
 
+/** A tag you put on transactions next to the category, e.g. Necessity or Luxury. */
+export type TxLabel = { id: UUID; name: string; color: string };
+
 export type Transaction = {
   id: UUID;
   occurred_on: DateStr;
@@ -240,6 +243,8 @@ export type Transaction = {
   counterparty: string | null;
   note: string | null;
   raw_text: string | null;
+  /** label names (migration 0024) */
+  labels?: string[];
   created_at: Instant;
   deleted_at: Instant | null;
 };

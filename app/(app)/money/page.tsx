@@ -8,6 +8,8 @@ import {
   accountBalances,
   listAccounts,
   listCategories,
+  listLabels,
+  spendByLabel,
   listTransactions,
   owedByLabel,
   spendByCategory,
@@ -17,6 +19,8 @@ import { istDate, formatDate } from '@/lib/time';
 import { formatINR } from '@/lib/format';
 import { WidgetGrid, type GridItem } from '@/components/widgets/WidgetGrid';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
+import { CategoriesDialog } from '@/components/money/CategoriesDialog';
+import { LabelSplit } from '@/components/money/LabelSplit';
 import { Gauge } from '@/components/money/Gauge';
 import { BalanceTrend, CategoryDonut, DailyBars, ForecastChart, MonthlyBars, PeriodComparison } from '@/components/money/MoneyCharts';
 import { BudgetsCard } from '@/components/money/BudgetsCard';
@@ -61,7 +65,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   const { from, to, label } = monthRange(offset);
 
   const budgetOrder = await getOrder('money-budgets');
-  const [w, owed, balances, accounts, categories, spend, transactions, insights, budgets, savedLayout, prevSpend] = await Promise.all([
+  const [w, owed, balances, accounts, categories, spend, transactions, insights, budgets, savedLayout, prevSpend, labels, labelSpend] = await Promise.all([
     wallet(),
     owedByLabel(),
     accountBalances(),
@@ -73,6 +77,8 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     budgetStatus(from, to),
     getUiState<ResponsiveLayouts>('money-layout').catch(() => null),
     spendByCategory(monthRange(offset - 1).from, monthRange(offset - 1).to),
+    listLabels(),
+    spendByLabel(from, to),
   ]);
 
   const activeAccountIds = new Set(accounts.map((a) => a.id));
@@ -153,6 +159,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
       <WidgetCard bodyClassName={chartBody} title="Last 6 months" sub="Income, expense and net"><MonthlyBars rows={insights.monthly} /></WidgetCard>
     ) },
     { id: 'categories', w: 6, h: 10, minW: 4, minH: 7, node: <WidgetCard title="Spending by category" sub={`${label} · change vs previous period`}><CategoryDonut rows={spend} previous={prevSpend} /></WidgetCard> },
+    { id: 'labels', w: 6, h: 10, minW: 3, minH: 6, node: <WidgetCard title="Spending by label" sub={`${label} · my share, e.g. necessity vs luxury`}><LabelSplit rows={labelSpend} labels={labels} /></WidgetCard> },
     { id: 'period', w: 6, h: 10, minW: 4, minH: 8, node: (
       <WidgetCard bodyClassName={chartBody} title="Period to period comparison" sub="Running total by day"><PeriodComparison {...insights.comparison} currentLabel={label} previousLabel={prevLabel} /></WidgetCard>
     ) },
@@ -195,8 +202,8 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
         )}
       </WidgetCard>
     ) },
-    { id: 'add', w: 4, h: 12, minW: 3, minH: 8, node: <WidgetCard title="Add a record"><AddTransactionForm categories={categories} accounts={accounts} /></WidgetCard> },
-    { id: 'records', w: 12, h: 13, minW: 4, minH: 6, node: <WidgetCard title={`Transactions — ${label}`} sub="Click anything to edit it right here" right={<Link href="/money/transactions" className="rounded-md border px-2 py-1 text-xs hover:bg-muted" title="Open all transactions with filters">Expand ⤢</Link>}><TransactionList transactions={rows} categories={categories.map((c) => ({ id: c.id, name: c.name }))} accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} /></WidgetCard> },
+    { id: 'add', w: 4, h: 12, minW: 3, minH: 8, node: <WidgetCard title="Add a record"><AddTransactionForm categories={categories} accounts={accounts} labels={labels} /></WidgetCard> },
+    { id: 'records', w: 12, h: 13, minW: 4, minH: 6, node: <WidgetCard title={`Transactions — ${label}`} sub="Click anything to edit it right here" right={<Link href="/money/transactions" className="rounded-md border px-2 py-1 text-xs hover:bg-muted" title="Open all transactions with filters">Expand ⤢</Link>}><TransactionList transactions={rows} categories={categories.map((c) => ({ id: c.id, name: c.name }))} accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} labels={labels} /></WidgetCard> },
   ];
 
   return (
@@ -204,7 +211,8 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
       <SetPageContext ctx={{ route: '/money', entity_type: 'none' }} />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Money</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+        <CategoriesDialog categories={categories} labels={labels} />
         <Link href="/money/transactions" className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">All transactions →</Link>
         <div className="flex gap-1 rounded-lg bg-muted p-0.5 text-sm">
           <Link href="/money?month=this" className={`rounded-md px-3 py-1.5 ${offset === 0 ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground'}`}>This month</Link>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanQuery, shareAfterAmountEdit } from '@/lib/domain/money-filters';
+import { cleanLabels, cleanQuery, shareAfterAmountEdit } from '@/lib/domain/money-filters';
 
 describe('transaction edit rules', () => {
   it('a solo expense keeps following its amount', () => expect(shareAfterAmountEdit('expense', 500, 500, 650)).toBe(650));
@@ -9,4 +9,10 @@ describe('transaction edit rules', () => {
   });
   it('income and settlements have no share', () => { expect(shareAfterAmountEdit('income', 10, null, 20)).toBeNull(); expect(shareAfterAmountEdit('settlement', -10, null, -20)).toBeNull(); });
   it('search text cannot break the filter syntax', () => expect(cleanQuery(' a,b(c)*d%e ')).toBe('a b c  d e'));
+});
+
+describe('cleanLabels', () => {
+  it('trims, drops blanks and repeats ignoring case', () => {
+    expect(cleanLabels([' Luxury ', 'luxury', '', 'Necessity'])).toEqual(['Luxury', 'Necessity']);
+  });
 });

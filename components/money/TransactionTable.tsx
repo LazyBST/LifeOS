@@ -8,7 +8,8 @@ import { deleteTransactionAction, updateTransactionAction } from '@/app/actions/
 import type { TxPatch } from '@/lib/domain/money-filters';
 import { formatDate } from '@/lib/time';
 import { formatINR } from '@/lib/format';
-import type { Transaction } from '@/lib/types/db';
+import type { Transaction, TxLabel } from '@/lib/types/db';
+import { LabelPicker } from './LabelChips';
 
 export type TableTx = Transaction & { category_name?: string | null; account_name?: string | null };
 type Named = { id: string; name: string };
@@ -20,7 +21,7 @@ const NONE = '__none__';
  * Transactions as a table where every cell is editable in place: click the description, category, account, amount,
  * share, date or person and it turns into a box or drop-down right there. Used by the Money page and the full page.
  */
-export function TransactionTable({ transactions, categories, accounts, onDeleted, emptyText = 'No transactions.' }: { transactions: TableTx[]; categories: Named[]; accounts: Named[]; onDeleted?: (id: string) => void; emptyText?: string }) {
+export function TransactionTable({ transactions, categories, accounts, labels = [], onDeleted, emptyText = 'No transactions.' }: { transactions: TableTx[]; categories: Named[]; accounts: Named[]; labels?: TxLabel[]; onDeleted?: (id: string) => void; emptyText?: string }) {
   const router = useRouter();
   const [rows, setRows] = useState(transactions);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -52,10 +53,10 @@ export function TransactionTable({ transactions, categories, accounts, onDeleted
   const th = 'px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground';
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px] text-sm">
+      <table className="w-full min-w-[980px] text-sm">
         <thead>
           <tr className="border-b">
-            <th className={th}>Date</th><th className={th}>Description</th><th className={th}>Category</th><th className={th}>Account</th>
+            <th className={th}>Date</th><th className={th}>Description</th><th className={th}>Category</th><th className={th}>Labels</th><th className={th}>Account</th>
             <th className={`${th} text-right`}>Amount</th><th className={`${th} text-right`}>My share</th><th className={th}>Person</th><th className={`${th} text-right`}>Owed</th><th />
           </tr>
         </thead>
@@ -78,6 +79,9 @@ export function TransactionTable({ transactions, categories, accounts, onDeleted
                   {t.kind === 'settlement' ? '—' : (
                     <Editable label="category" value={t.category_id ?? NONE} display={cat.get(t.category_id ?? '') ?? t.category_name ?? '—'} options={[{ value: NONE, label: '— none' }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} onCommit={(v) => save(t.id, { category_id: v === NONE ? null : v })} />
                   )}
+                </td>
+                <td className="px-2 py-1.5">
+                  {t.kind === 'settlement' ? <span className="text-muted-foreground">—</span> : <LabelPicker labels={labels} value={t.labels ?? []} onChange={(next) => void save(t.id, { labels: next })} />}
                 </td>
                 <td className="px-2 py-1.5 text-muted-foreground">
                   <Editable label="account" value={t.account_id ?? NONE} display={acc.get(t.account_id ?? '') ?? t.account_name ?? '—'} options={[{ value: NONE, label: '— none' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]} onCommit={(v) => save(t.id, { account_id: v === NONE ? null : v })} />

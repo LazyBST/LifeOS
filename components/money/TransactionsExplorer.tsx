@@ -4,7 +4,7 @@ import { ClearableInput } from '@/components/ui/clearable-input';
 import { TransactionTable, type TableTx } from './TransactionTable';
 import { searchTransactionsAction } from '@/app/actions/money';
 import type { TxFilters } from '@/lib/domain/money-filters';
-import type { TxKind } from '@/lib/types/db';
+import type { TxKind, TxLabel } from '@/lib/types/db';
 import { addDays, istDate } from '@/lib/time';
 import { formatINR } from '@/lib/format';
 
@@ -19,7 +19,7 @@ const chip = (on: boolean) => `rounded-full border px-3 py-1 text-xs ${on ? 'bor
 const toggle = <T,>(xs: T[] | undefined, x: T): T[] | undefined => { const cur = xs ?? []; const n = cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x]; return n.length ? n : undefined; };
 
 /** Every transaction with filters: text, dates, kind, category, account, amount range, person, who owes whom. */
-export function TransactionsExplorer({ categories, accounts }: { categories: Named[]; accounts: Named[] }) {
+export function TransactionsExplorer({ categories, accounts, labels }: { categories: Named[]; accounts: Named[]; labels: TxLabel[] }) {
   const [f, setF] = useState<TxFilters>({ sort: 'date_desc' });
   const [rows, setRows] = useState<TableTx[]>([]);
   const [total, setTotal] = useState(0);
@@ -64,7 +64,7 @@ export function TransactionsExplorer({ categories, accounts }: { categories: Nam
     { label: 'All time' },
   ];
   const num = (s: string) => (s.trim() === '' || Number.isNaN(Number(s)) ? undefined : Number(s));
-  const active = !!(f.q || f.kinds || f.categoryIds || f.accountIds || f.from || f.to || f.minAmount !== undefined || f.maxAmount !== undefined || f.counterparty || f.owed);
+  const active = !!(f.q || f.kinds || f.categoryIds || f.accountIds || f.labels || f.from || f.to || f.minAmount !== undefined || f.maxAmount !== undefined || f.counterparty || f.owed);
   const sel = 'h-8 rounded-lg border border-input bg-transparent px-2 text-sm';
 
   return (
@@ -98,6 +98,13 @@ export function TransactionsExplorer({ categories, accounts }: { categories: Nam
           <button type="button" onClick={() => set({ categoryIds: toggle(f.categoryIds, 'none') })} className={chip(!!f.categoryIds?.includes('none'))}>No category</button>
         </div>
 
+        {labels.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Label</span>
+            {labels.map((l) => <button key={l.id} type="button" onClick={() => set({ labels: toggle(f.labels, l.name) })} className={chip(!!f.labels?.includes(l.name))} style={f.labels?.includes(l.name) ? { borderColor: l.color, background: `${l.color}26`, color: l.color } : undefined}>{l.name}</button>)}
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground">Account</span>
           {accounts.map((a) => <button key={a.id} type="button" onClick={() => set({ accountIds: toggle(f.accountIds, a.id) })} className={chip(!!f.accountIds?.includes(a.id))}>{a.name}</button>)}
@@ -119,7 +126,7 @@ export function TransactionsExplorer({ categories, accounts }: { categories: Nam
 
       <div className="rounded-2xl border bg-card p-4">
         {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
-        <TransactionTable transactions={rows} categories={categories} accounts={accounts} emptyText={loading ? 'Loading…' : 'No transactions match these filters.'} />
+        <TransactionTable transactions={rows} categories={categories} accounts={accounts} labels={labels} emptyText={loading ? 'Loading…' : 'No transactions match these filters.'} />
         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
           <span>Showing {rows.length} of {total}</span>
           {rows.length < total && <button type="button" disabled={loading} onClick={() => { const n = page + 1; setPage(n); void load(f, n); }} className="rounded-lg border px-3 py-1.5 text-sm text-foreground hover:bg-muted disabled:opacity-50">Load more</button>}

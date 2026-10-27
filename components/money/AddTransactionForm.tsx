@@ -11,11 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { addExpenseAction, addIncomeAction, settleAction } from '@/app/actions/money';
 import { splitEqually } from '@/lib/domain/money-math';
 import { istDate } from '@/lib/time';
-import type { Account, Category } from '@/lib/types/db';
+import type { Account, Category, TxLabel } from '@/lib/types/db';
+import { LabelPicker } from './LabelChips';
 
 type AddTransactionFormProps = {
   categories: Category[];
   accounts: Account[];
+  labels?: TxLabel[];
   onSaved?: () => void;
 };
 
@@ -24,7 +26,7 @@ const NONE = '__none__';
 /** Tabs: Expense / Income / Settle (spec section 6). Every submit goes
  *  through the money server actions, which revalidate the whole app so the
  *  wallet card and dashboard stay in sync. */
-export function AddTransactionForm({ categories, accounts, onSaved }: AddTransactionFormProps) {
+export function AddTransactionForm({ categories, accounts, labels = [], onSaved }: AddTransactionFormProps) {
   const router = useRouter();
   const today = istDate();
 
@@ -37,6 +39,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
   const [exCategory, setExCategory] = useState(NONE);
   const [exAccount, setExAccount] = useState(NONE);
   const [exDate, setExDate] = useState(today);
+  const [exLabels, setExLabels] = useState<string[]>([]);
 
   // income state
   const [inAmount, setInAmount] = useState('');
@@ -44,6 +47,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
   const [inCategory, setInCategory] = useState(NONE);
   const [inAccount, setInAccount] = useState(NONE);
   const [inDate, setInDate] = useState(today);
+  const [inLabels, setInLabels] = useState<string[]>([]);
 
   // settle state
   const [stDirection, setStDirection] = useState<'received' | 'paid'>('received');
@@ -76,6 +80,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
       category_id: exCategory === NONE ? null : exCategory,
       account_id: exAccount === NONE ? null : exAccount,
       date: exDate,
+      labels: exLabels,
     });
     setSaving(false);
     if (!res.ok) {
@@ -87,6 +92,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
     setExDesc('');
     setExShare('');
     setExCounterparty('');
+    setExLabels([]);
     router.refresh();
     onSaved?.();
   }
@@ -104,6 +110,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
       category_id: inCategory === NONE ? null : inCategory,
       account_id: inAccount === NONE ? null : inAccount,
       date: inDate,
+      labels: inLabels,
     });
     setSaving(false);
     if (!res.ok) {
@@ -113,6 +120,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
     toast.success('Income added');
     setInAmount('');
     setInDesc('');
+    setInLabels([]);
     router.refresh();
     onSaved?.();
   }
@@ -220,6 +228,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
               </Select>
             </Field>
           </div>
+          {labels.length > 0 && <Field label="Labels"><LabelPicker inline labels={labels} value={exLabels} onChange={setExLabels} /></Field>}
           <Button type="button" className="h-11 w-full sm:h-8" disabled={saving} onClick={submitExpense}>
             Add expense
           </Button>
@@ -269,6 +278,7 @@ export function AddTransactionForm({ categories, accounts, onSaved }: AddTransac
               </Select>
             </Field>
           </div>
+          {labels.length > 0 && <Field label="Labels"><LabelPicker inline labels={labels} value={inLabels} onChange={setInLabels} /></Field>}
           <Button type="button" className="h-11 w-full sm:h-8" disabled={saving} onClick={submitIncome}>
             Add income
           </Button>

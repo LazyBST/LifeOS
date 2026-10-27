@@ -10,6 +10,7 @@ import { parseDateIST, istDate, addDays } from '@/lib/time';
 import { splitEqually } from '@/lib/domain/money-math';
 import {
   addExpense,
+  listLabels,
   addIncome,
   settle as settleTx,
   defaultAccount,
@@ -44,12 +45,21 @@ function owedPhrase(owed: number, counterparty: string | null | undefined): stri
 // expense_add
 // ---------------------------------------------------------------------------
 
+/** Only labels that exist, spelled the way the user spelled them. */
+async function knownLabels(names?: string[]): Promise<string[]> {
+  if (!names?.length) return [];
+  const have = await listLabels();
+  return names.flatMap((n) => have.find((l) => l.name.toLowerCase() === n.trim().toLowerCase())?.name ?? []);
+}
+
 const expenseAddSchema = z.object({
   amount: z.number().min(0),
   description: z.string().optional(),
   my_share: z.coerce.number().min(0).optional(),
   counterparty: z.string().optional(),
   category: z.string().optional(),
+  /** names of the user's own labels, e.g. Necessity or Luxury; unknown names are ignored */
+  labels: z.array(z.string()).optional(),
   account: z.string().optional(),
   date: z.string().optional(),
   /** my share = splitEqually(total ?? amount, split_with) */
@@ -115,6 +125,7 @@ const expenseAdd: ToolDef<typeof expenseAddSchema> = {
       account: input.account ?? null,
       date: dateRes.date,
       raw_text: input.description ?? null,
+      labels: await knownLabels(input.labels),
     });
 
     const message =

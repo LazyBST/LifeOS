@@ -7,6 +7,8 @@ export type TxFilters = {
   /** category ids; 'none' means uncategorised */
   categoryIds?: string[];
   accountIds?: string[];
+  /** label names; a transaction matches when it has any of them */
+  labels?: string[];
   from?: string;
   to?: string;
   minAmount?: number;
@@ -26,7 +28,14 @@ export type TxPatch = {
   my_share?: number | null;
   counterparty?: string | null;
   note?: string | null;
+  labels?: string[];
 };
+
+/** Trimmed, no blanks, no repeats (compared ignoring case). */
+export function cleanLabels(labels: string[]): string[] {
+  const seen = new Set<string>();
+  return labels.map((l) => l.trim()).filter((l) => { const k = l.toLowerCase(); if (!l || seen.has(k)) return false; seen.add(k); return true; });
+}
 
 /** Remove the characters that would break a PostgREST `or(...)` filter. */
 export const cleanQuery = (q: string): string => q.replace(/[,()*%\\]/g, ' ').trim();

@@ -9,6 +9,14 @@ import {
   deleteTransaction,
   listAccounts,
   listCategories,
+  createCategory,
+  renameCategory,
+  deleteCategory,
+  listLabels,
+  createLabel,
+  updateLabel,
+  deleteLabel,
+  spendByLabel,
   listTransactions,
   owedByLabel,
   settle,
@@ -25,7 +33,7 @@ import {
   type SettleInput,
 } from '@/lib/domain/money';
 import type { TxFilters, TxPatch } from '@/lib/domain/money-filters';
-import type { Account, AccountBalance, Category, DateStr, OwedByLabel, Transaction, UUID, Wallet } from '@/lib/types/db';
+import type { Account, AccountBalance, Category, DateStr, OwedByLabel, Transaction, TxLabel, UUID, Wallet } from '@/lib/types/db';
 import { type ActionResult, run } from './_result';
 
 export async function walletAction(): Promise<ActionResult<Wallet>> {
@@ -140,4 +148,36 @@ export async function searchTransactionsAction(filters: TxFilters, page = 0): Pr
     ]);
     return { ...r, totals, counterparties };
   });
+}
+
+export async function listLabelsAction(): Promise<ActionResult<TxLabel[]>> {
+  return run(async () => { await requireUser(); return listLabels(); });
+}
+
+export async function createCategoryAction(name: string): Promise<ActionResult<Category>> {
+  return run(async () => { await requireUser(); const c = await createCategory(name); revalidatePath('/', 'layout'); return c; });
+}
+
+export async function renameCategoryAction(id: UUID, name: string): Promise<ActionResult<Category>> {
+  return run(async () => { await requireUser(); const c = await renameCategory(id, name); revalidatePath('/', 'layout'); return c; });
+}
+
+export async function deleteCategoryAction(id: UUID): Promise<ActionResult<{ transactions: number }>> {
+  return run(async () => { await requireUser(); const r = await deleteCategory(id); revalidatePath('/', 'layout'); return r; });
+}
+
+export async function createLabelAction(name: string, color?: string): Promise<ActionResult<TxLabel>> {
+  return run(async () => { await requireUser(); const l = await createLabel(name, color); revalidatePath('/', 'layout'); return l; });
+}
+
+export async function updateLabelAction(id: UUID, patch: { name?: string; color?: string }): Promise<ActionResult<TxLabel>> {
+  return run(async () => { await requireUser(); const l = await updateLabel(id, patch); revalidatePath('/', 'layout'); return l; });
+}
+
+export async function deleteLabelAction(id: UUID): Promise<ActionResult<{ transactions: number }>> {
+  return run(async () => { await requireUser(); const r = await deleteLabel(id); revalidatePath('/', 'layout'); return r; });
+}
+
+export async function spendByLabelAction(from: DateStr, to: DateStr): Promise<ActionResult<{ label: string; amount: number; count: number }[]>> {
+  return run(async () => { await requireUser(); return spendByLabel(from, to); });
 }

@@ -9,6 +9,7 @@ import type {
   DateStr,
   OwedByLabel,
   Transaction,
+  TxLabel,
   UUID,
   Wallet,
 } from '@/lib/types/db';
@@ -74,9 +75,96 @@ export async function categoryByName(name?: string | null): Promise<Category | n
 }
 
 export async function createCategory(name: string): Promise<Category> {
-  const { data, error } = await admin().from('categories').insert({ name }).select('*').single();
-  if (error) throw new Error(`category_create: ${error.message}`);
+  const clean = name.trim();
+  if (!clean) throw new Error('Give the category a name.');
+  const { data, error } = await admin().from('categories').insert({ name: clean }).select('*').single();
+  if (error) throw new Error(error.code === '23505' ? `There is already a category called “${clean}”.` : `category_create: ${error.message}`);
   return data as Category;
+}
+
+export async function renameCategory(id: UUID, name: string): Promise<Category> {
+  const clean = name.trim();
+  if (!clean) throw new Error('Give the category a name.');
+  const { data, error } = await admin().from('categories').update({ name: clean }).eq('id', id).select('*').single();
+  if (error) throw new Error(error.code === '23505' ? `There is already a category called “${clean}”.` : `category_rename: ${error.message}`);
+  return data as Category;
+}
+
+/** Transactions and scheduled payments in the category become uncategorised; its budget goes with it. */
+export async function deleteCategory(id: UUID): Promise<{ transactions: number }> {
+  const { count } = await admin().from('transactions').select('id', { count: 'exact', head: true }).eq('category_id', id).is('deleted_at', null);
+  const a = await admin().from('transactions').update({ category_id: null }).eq('category_id', id);
+  if (a.error) throw new Error(`category_delete: ${a.error.message}`);
+  const b = await admin().from('scheduled_payments').update({ category_id: null }).eq('category_id', id);
+  if (b.error && b.error.code !== '42P01') throw new Error(`category_delete: ${b.error.message}`);
+  const { error } = await admin().from('categories').delete().eq('id', id);
+  if (error) throw new Error(`category_delete: ${error.message}`);
+  return { transactions: count ?? 0 };
+}
+
+// ---- labels (migration 0024) ------------------------------------------------------------------------------
+
+/** The label list; empty before the migration has been run. */
+export async function listLabels(): Promise<TxLabel[]> {
+  const { data, error } = await admin().from('transaction_labels').select('*').order('created_at').order('name');
+  if (error) return [];
+  return data as TxLabel[];
+}
+
+export async function createLabel(name: string, color?: string): Promise<TxLabel> {
+  const clean = name.trim();
+  if (!clean) throw new Error('Give the label a name.');
+  const { data, error } = await admin().from('transaction_labels').insert({ name: clean, ...(color ? { color } : {}) }).select('*').single();
+  if (error) throw new Error(error.code === '23505' ? `There is already a label called “${clean}”.` : error.code === '42P01' ? 'Run migration 0024_transaction_labels.sql in Supabase first.' : `label_create: ${error.message}`);
+  return data as TxLabel;
+}
+
+export async function updateLabel(id: UUID, patch: { name?: string; color?: string }): Promise<TxLabel> {
+  const { data: cur } = await admin().from('transaction_labels').select('*').eq('id', id).single();
+  if (!cur) throw new Error('That label no longer exists.');
+  const old = (cur as TxLabel).name;
+  const row: Record<string, string> = {};
+  if (patch.color) row.color = patch.color;
+  if (patch.name !== undefined) { if (!patch.name.trim()) throw new Error('Give the label a name.'); row.name = patch.name.trim(); }
+  const { data, error } = await admin().from('transaction_labels').update(row).eq('id', id).select('*').single();
+  if (error) throw new Error(error.code === '23505' ? `There is already a label called “${row.name}”.` : `label_update: ${error.message}`);
+  if (row.name && row.name !== old) await replaceLabelOnTransactions(old, row.name);
+  return data as TxLabel;
+}
+
+/** Remove the label everywhere it was used. */
+export async function deleteLabel(id: UUID): Promise<{ transactions: number }> {
+  const { data: cur } = await admin().from('transaction_labels').select('*').eq('id', id).single();
+  if (!cur) return { transactions: 0 };
+  const n = await replaceLabelOnTransactions((cur as TxLabel).name, null);
+  const { error } = await admin().from('transaction_labels').delete().eq('id', id);
+  if (error) throw new Error(`label_delete: ${error.message}`);
+  return { transactions: n };
+}
+
+async function replaceLabelOnTransactions(from: string, to: string | null): Promise<number> {
+  const { data } = await admin().from('transactions').select('id,labels').contains('labels', [from]).limit(5000);
+  const rows = (data ?? []) as { id: string; labels: string[] }[];
+  await Promise.all(rows.map((r) => {
+    const next = r.labels.flatMap((l) => (l === from ? (to && !r.labels.includes(to) ? [to] : []) : [l]));
+    return admin().from('transactions').update({ labels: next }).eq('id', r.id);
+  }));
+  return rows.length;
+}
+
+/** My share of this period's expenses by label; a transaction with two labels counts under both. */
+export async function spendByLabel(from: DateStr, to: DateStr): Promise<{ label: string; amount: number; count: number }[]> {
+  const { data, error } = await admin().from('transactions').select('amount,my_share,labels').eq('kind', 'expense').is('deleted_at', null).gte('occurred_on', from).lte('occurred_on', to).limit(5000);
+  if (error) return [];
+  const out = new Map<string, { amount: number; count: number }>();
+  for (const r of (data ?? []) as { amount: number; my_share: number | null; labels: string[] | null }[]) {
+    const v = Number(r.my_share ?? r.amount);
+    for (const l of r.labels?.length ? r.labels : ['Unlabelled']) {
+      const e = out.get(l) ?? { amount: 0, count: 0 };
+      e.amount += v; e.count += 1; out.set(l, e);
+    }
+  }
+  return [...out].map(([label, e]) => ({ label, ...e })).sort((a, b) => b.amount - a.amount);
 }
 
 /** Keyword guess from the description; falls back to Misc (spec section 5). */
@@ -112,6 +200,7 @@ export type ExpenseInput = {
   date?: DateStr;
   note?: string | null;
   raw_text?: string | null;
+  labels?: string[];
 };
 
 export type IncomeInput = Omit<ExpenseInput, 'my_share' | 'counterparty'>;
@@ -171,6 +260,7 @@ export async function addExpense(input: ExpenseInput): Promise<RecordedTransacti
     counterparty: input.counterparty ?? null,
     note: input.note ?? null,
     raw_text: input.raw_text ?? null,
+    ...(input.labels?.length ? { labels: cleanLabels(input.labels) } : {}),
   };
   const { data, error } = await admin().from('transactions').insert(row).select('*').single();
   if (error) throw new Error(`expense_add: ${error.message}`);
@@ -190,6 +280,7 @@ export async function addIncome(input: IncomeInput): Promise<RecordedTransaction
     my_share: null,
     note: input.note ?? null,
     raw_text: input.raw_text ?? null,
+    ...(input.labels?.length ? { labels: cleanLabels(input.labels) } : {}),
   };
   const { data, error } = await admin().from('transactions').insert(row).select('*').single();
   if (error) throw new Error(`income_add: ${error.message}`);
@@ -301,7 +392,7 @@ export async function spendByCategory(from: DateStr, to: DateStr): Promise<{ cat
 
 // ---- editing and searching transactions -------------------------------------------------------------------
 
-import { cleanQuery, shareAfterAmountEdit, type TxFilters, type TxPatch } from './money-filters';
+import { cleanLabels, cleanQuery, shareAfterAmountEdit, type TxFilters, type TxPatch } from './money-filters';
 
 /** Edit one transaction in place. Keeps the rules the database checks: shares only on expenses, signed settlements. */
 export async function updateTransaction(id: UUID, patch: TxPatch): Promise<Transaction> {
@@ -317,6 +408,7 @@ export async function updateTransaction(id: UUID, patch: TxPatch): Promise<Trans
   if (patch.note !== undefined) row.note = patch.note?.trim() || null;
   if (patch.counterparty !== undefined) row.counterparty = patch.counterparty?.trim() || null;
   if (patch.account_id !== undefined) row.account_id = patch.account_id;
+  if (patch.labels !== undefined) row.labels = cleanLabels(patch.labels);
   if (patch.category_id !== undefined) row.category_id = t.kind === 'settlement' ? null : patch.category_id;
 
   if (patch.amount !== undefined) {
@@ -351,6 +443,7 @@ function applyFilters(q: any, f: TxFilters, view: boolean) { // eslint-disable-l
     const ids = f.categoryIds.filter((c) => c !== 'none');
     q = f.categoryIds.includes('none') ? q.or(`category_id.is.null${ids.length ? `,category_id.in.(${ids.join(',')})` : ''}`) : q.in('category_id', ids);
   }
+  if (f.labels?.length) q = q.overlaps('labels', f.labels);
   if (f.from) q = q.gte('occurred_on', f.from);
   if (f.to) q = q.lte('occurred_on', f.to);
   if (f.counterparty) q = q.eq('counterparty', f.counterparty);
