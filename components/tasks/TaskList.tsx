@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Trash2 } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, Trash2 } from 'lucide-react';
 import { dueLabel, isOverdue } from '@/lib/time';
 import { statusFor, isDone, type StatusDef } from '@/lib/types/statuses';
 import { StatusLabel } from '@/components/status/StatusLabel';
@@ -11,6 +11,7 @@ import type { GroupByKey, TaskSortKey } from '@/lib/types/filters';
 import { InlineAddTask } from './InlineAddTask';
 import { AreaChip, DueChip, PriorityChip, ProjectChip, dueText, type QuickUpdate } from './QuickEdit';
 import { SubtaskPanel } from './SubtaskPanel';
+import { EditableTitle } from './EditableTitle';
 import type { TaskCreateInput } from './useTaskViewState';
 
 export type TaskListProps = {
@@ -193,7 +194,14 @@ function Row({ task, onToggleComplete, onDelete, onUpdate, onSubtasksChanged }: 
               {task.subtask_total > 0 ? `${task.subtask_done}/${task.subtask_total}` : '+'}
             </button>
           )}
-          <Link href={`/tasks/${task.id}`} className={`min-w-0 truncate ${st.dim ? 'text-muted-foreground' : ''} ${st.strike_through ? 'line-through' : ''}`}>{task.title}</Link>
+          {onUpdate ? (
+            <>
+              <EditableTitle value={task.title} onSave={(title) => onUpdate(task.id, { title })} className={`${st.dim ? 'text-muted-foreground' : ''} ${st.strike_through ? 'line-through' : ''}`} />
+              <Link href={`/tasks/${task.id}`} aria-label={`Open ${task.title}`} title="Open the task" className={`shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground ${ghost}`}><ArrowUpRight className="size-3.5" /></Link>
+            </>
+          ) : (
+            <Link href={`/tasks/${task.id}`} className={`min-w-0 truncate ${st.dim ? 'text-muted-foreground' : ''} ${st.strike_through ? 'line-through' : ''}`}>{task.title}</Link>
+          )}
         </span>
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           {task.parent_title && <span className="truncate">↳ {task.parent_title}</span>}

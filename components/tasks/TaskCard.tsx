@@ -9,6 +9,7 @@ import type { TaskListItem } from '@/app/actions/tasks';
 import { PriorityIcon } from './PriorityIcon';
 import { AreaChip, DueChip, PriorityChip, ProjectChip, dueText, type QuickUpdate } from './QuickEdit';
 import { SubtaskPanel } from './SubtaskPanel';
+import { EditableTitle } from './EditableTitle';
 
 export const ISSUE_PREFIX = 'LIFE';
 
@@ -54,12 +55,14 @@ export function TaskCard({ task, dragging = false, onDelete, onUpdate, onSubtask
         shadow-[0_1px_1px_rgba(9,30,66,0.25),0_0_1px_rgba(9,30,66,0.31)] transition-colors
         hover:bg-[#f4f5f7] dark:hover:bg-muted ${dragging ? 'rotate-2 shadow-lg' : ''}`}
     >
-      <Link href={`/tasks/${task.id}`} draggable={false} className="flex flex-col gap-0.5 pr-5">
+      <div className="flex flex-col gap-0.5 pr-5">
         {task.parent_title && <span className="truncate text-[11px] text-muted-foreground">↳ {task.parent_title}</span>}
-        <span className={`line-clamp-3 break-words leading-5 ${st.dim ? 'text-muted-foreground' : ''} ${st.strike_through ? 'line-through' : ''}`}>
-          {task.title}
-        </span>
-      </Link>
+        {canEdit ? (
+          <EditableTitle multiline value={task.title} onSave={(title) => onUpdate(task.id, { title })} className={`line-clamp-3 break-words leading-5 ${st.dim ? 'text-muted-foreground' : ''} ${st.strike_through ? 'line-through' : ''}`} />
+        ) : (
+          <Link href={`/tasks/${task.id}`} draggable={false} className={`line-clamp-3 break-words leading-5 ${st.dim ? 'text-muted-foreground' : ''} ${st.strike_through ? 'line-through' : ''}`}>{task.title}</Link>
+        )}
+      </div>
 
       <span className="flex min-w-0 flex-wrap items-center gap-1">
         {canEdit ? (
@@ -77,9 +80,13 @@ export function TaskCard({ task, dragging = false, onDelete, onUpdate, onSubtask
 
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
         <CheckSquare className="size-3.5 shrink-0 text-[#4bade8]" fill="#4bade8" stroke="#fff" aria-hidden />
-        <span className="font-medium text-muted-foreground">
-          {ISSUE_PREFIX}-{task.task_no}
-        </span>
+        {canEdit ? (
+          <Link href={`/tasks/${task.id}`} draggable={false} onPointerDown={(e) => e.stopPropagation()} title="Open the task" className="font-medium text-muted-foreground hover:text-foreground hover:underline">
+            {ISSUE_PREFIX}-{task.task_no}
+          </Link>
+        ) : (
+          <span className="font-medium text-muted-foreground">{ISSUE_PREFIX}-{task.task_no}</span>
+        )}
         {canEdit && task.parent_task_id == null ? (
           <button type="button" {...stopDrag} onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} aria-expanded={open} title={task.subtask_total ? 'Show subtasks' : 'Add a subtask'}
             className={`inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground ${task.subtask_total || open ? '' : ghost}`}>

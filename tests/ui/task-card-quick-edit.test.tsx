@@ -44,6 +44,21 @@ describe('TaskCard quick edit', () => {
     expect(onUpdate).toHaveBeenCalledWith('t1', { project_id: 'p2' });
   });
 
+  it('renames the task by clicking its title, and ignores an empty title', () => {
+    const onUpdate = vi.fn();
+    card(onUpdate);
+    fireEvent.click(screen.getByLabelText(/Rename/));
+    const box = screen.getByLabelText('Task title');
+    fireEvent.change(box, { target: { value: 'Write the Q4 report' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(onUpdate).toHaveBeenCalledWith('t1', { title: 'Write the Q4 report' });
+    onUpdate.mockClear();
+    fireEvent.click(screen.getByLabelText(/Rename/));
+    fireEvent.change(screen.getByLabelText('Task title'), { target: { value: '   ' } });
+    fireEvent.blur(screen.getByLabelText('Task title'));
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
   it('opens the subtasks under the card and adds one with Enter', async () => {
     const onChanged = vi.fn();
     card(vi.fn(), onChanged);
