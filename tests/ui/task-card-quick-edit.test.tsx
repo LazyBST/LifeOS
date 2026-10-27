@@ -9,7 +9,11 @@ vi.mock('@/app/actions/tasks', () => ({
   reopenTaskAction: vi.fn(async () => ({ ok: true, data: {} })),
   listTasksAction: vi.fn(async () => ({ ok: true, data: [{ id: 's1', title: 'Draft outline', status: 'todo', due_date: null }] })),
 }));
-vi.mock('@/app/actions/lookup', () => ({ listAreasAction: vi.fn(async () => ({ ok: true, data: [{ id: 'a1', name: 'Business', color: '#2563eb' }] })) }));
+vi.mock('@/app/actions/lookup', () => ({
+  listAreasAction: vi.fn(async () => ({ ok: true, data: [{ id: 'a1', name: 'Business', color: '#2563eb' }] })),
+  listGoalsAction: vi.fn(async () => ({ ok: true, data: [{ id: 'g1', title: 'Launch the product' }] })),
+  listProjectsAction: vi.fn(async () => ({ ok: true, data: [{ id: 'p1', title: 'Website', goal_id: 'g1', emoji: null }, { id: 'p2', title: 'Pricing page', goal_id: 'g1', emoji: null }] })),
+}));
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }) }));
 
 import { TaskCard } from '@/components/tasks/TaskCard';
@@ -28,6 +32,16 @@ describe('TaskCard quick edit', () => {
     fireEvent.click(screen.getByLabelText(/Priority P2/));
     fireEvent.click(await screen.findByText(/P0 · Highest/));
     expect(onUpdate).toHaveBeenCalledWith('t1', { priority: 'P0' });
+  });
+
+  it('links the task to a project from the card, and unlinks it', async () => {
+    const onUpdate = vi.fn();
+    card(onUpdate);
+    fireEvent.click(screen.getByLabelText('Change project'));
+    fireEvent.change(await screen.findByLabelText('Find a project'), { target: { value: 'pric' } });
+    expect(screen.queryByText('Website')).toBeNull();
+    fireEvent.click(await screen.findByText('Pricing page'));
+    expect(onUpdate).toHaveBeenCalledWith('t1', { project_id: 'p2' });
   });
 
   it('opens the subtasks under the card and adds one with Enter', async () => {

@@ -9,7 +9,7 @@ import { useStatuses } from '@/components/status/StatusProvider';
 import type { TaskListItem } from '@/app/actions/tasks';
 import type { GroupByKey, TaskSortKey } from '@/lib/types/filters';
 import { InlineAddTask } from './InlineAddTask';
-import { AreaChip, DueChip, PriorityChip, dueText, type QuickUpdate } from './QuickEdit';
+import { AreaChip, DueChip, PriorityChip, ProjectChip, dueText, type QuickUpdate } from './QuickEdit';
 import { SubtaskPanel } from './SubtaskPanel';
 import type { TaskCreateInput } from './useTaskViewState';
 
@@ -197,7 +197,9 @@ function Row({ task, onToggleComplete, onDelete, onUpdate, onSubtasksChanged }: 
         </span>
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           {task.parent_title && <span className="truncate">↳ {task.parent_title}</span>}
-          {path && <span className="truncate">{path}</span>}
+          {canNest ? (
+            <>{task.project_title && task.goal_title && <span className="truncate">{task.goal_title} ›</span>}<span className={task.project_title ? '' : ghost}><ProjectChip task={task} onUpdate={onUpdate!} /></span></>
+          ) : path && <span className="truncate">{path}</span>}
           {area}
         </span>
         <span className="mt-0.5 flex items-center gap-2 sm:hidden">{prio}{dueChip}</span>

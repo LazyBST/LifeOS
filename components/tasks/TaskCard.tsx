@@ -7,7 +7,7 @@ import { isDone, statusFor } from '@/lib/types/statuses';
 import { useStatuses } from '@/components/status/StatusProvider';
 import type { TaskListItem } from '@/app/actions/tasks';
 import { PriorityIcon } from './PriorityIcon';
-import { AreaChip, DueChip, PriorityChip, dueText, type QuickUpdate } from './QuickEdit';
+import { AreaChip, DueChip, PriorityChip, ProjectChip, dueText, type QuickUpdate } from './QuickEdit';
 import { SubtaskPanel } from './SubtaskPanel';
 
 export const ISSUE_PREFIX = 'LIFE';
@@ -67,7 +67,9 @@ export function TaskCard({ task, dragging = false, onDelete, onUpdate, onSubtask
         ) : task.area_name ? (
           <span className="max-w-full truncate rounded-full px-1.5 py-px text-[12px] font-semibold" style={{ backgroundColor: `${task.area_color}29`, color: task.area_color }}>{task.area_name}</span>
         ) : null}
-        {label && <span className="max-w-full truncate rounded-[3px] bg-muted px-1.5 py-px text-[12px] font-medium text-muted-foreground">{label}</span>}
+        {canEdit && task.parent_task_id == null ? (
+          <span className={label ? '' : ghost}><ProjectChip task={task} onUpdate={onUpdate} /></span>
+        ) : label ? <span className="max-w-full truncate rounded-[3px] bg-muted px-1.5 py-px text-[12px] font-medium text-muted-foreground">{label}</span> : null}
         {task.tags.map((t) => (
           <span key={t} className="rounded-[3px] bg-muted px-1.5 py-px text-[12px] font-medium text-muted-foreground">{t}</span>
         ))}

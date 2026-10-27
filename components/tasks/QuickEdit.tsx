@@ -2,9 +2,9 @@
 import { useEffect, useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ClearableInput } from '@/components/ui/clearable-input';
-import { listAreasAction } from '@/app/actions/lookup';
+import { listAreasAction, listGoalsAction, listProjectsAction } from '@/app/actions/lookup';
 import { addDays, dueLabel, istDate, istInstant, istParts } from '@/lib/time';
-import { PRIORITIES, type Area, type Priority } from '@/lib/types/db';
+import { PRIORITIES, type Area, type Goal, type Priority, type Project } from '@/lib/types/db';
 import { PriorityIcon } from './PriorityIcon';
 import type { TaskListItem } from '@/app/actions/tasks';
 import type { TaskPatchLite } from './useTaskViewState';
@@ -22,6 +22,19 @@ function useAreas(): Area[] {
     void areaPending.then(() => areaCache && setAreas(areaCache));
   }, []);
   return areas;
+}
+
+// projects and their goals: fetched once, shared by every chip
+let projectCache: { projects: Project[]; goals: Goal[] } | null = null;
+let projectPending: Promise<void> | null = null;
+function useProjects() {
+  const [data, setData] = useState(projectCache);
+  useEffect(() => {
+    if (projectCache) return;
+    projectPending ??= Promise.all([listProjectsAction(), listGoalsAction()]).then(([p, g]) => { if (p.ok && g.ok) projectCache = { projects: p.data, goals: g.data }; });
+    void projectPending.then(() => projectCache && setData(projectCache));
+  }, []);
+  return data;
 }
 
 // a chip sits inside a draggable card: taps on it must not start a drag or follow the card's link
@@ -120,6 +133,38 @@ export function DueChip({ task, overdue, onUpdate }: { task: TaskListItem; overd
             <ClearableInput type="time" value={end} disabled={!date || !start} className="h-8 text-sm font-normal text-foreground" onChange={(e) => { setEnd(e.target.value); save(date, start, e.target.value); }} onClear={() => { setEnd(''); save(date, start, ''); }} clearLabel="Remove the end time" />
           </label>
         </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Link a task to a project (its goal follows). Subtasks take the project of their parent, so they only show it. */
+export function ProjectChip({ task, onUpdate }: { task: TaskListItem; onUpdate: QuickUpdate }) {
+  const data = useProjects();
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const goalName = (id: string) => data?.goals.find((g) => g.id === id)?.title;
+  const shown = (data?.projects ?? []).filter((p) => !q.trim() || `${p.title} ${goalName(p.goal_id) ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()));
+  const label = task.project_title ?? task.goal_title;
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQ(''); }}>
+      <PopoverTrigger {...stop} aria-label="Change project" title={task.goal_title && task.project_title ? `${task.goal_title} › ${task.project_title}` : 'Link to a project'}
+        className={`${chipBase} max-w-full shrink ${label ? 'bg-muted font-medium text-muted-foreground' : 'border border-dashed text-muted-foreground'}`}>
+        <span className="truncate">{label ?? '+ project'}</span>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 gap-1.5 p-1.5" {...stop}>
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a project…" aria-label="Find a project" className="h-8 rounded-md border bg-background px-2 text-sm outline-none focus:border-ring" />
+        <div className="max-h-60 space-y-0.5 overflow-y-auto">
+          {!data && <p className="px-2 py-1 text-xs text-muted-foreground">Loading…</p>}
+          {shown.map((p) => (
+            <button key={p.id} type="button" onClick={() => { setOpen(false); if (p.id !== task.project_id) onUpdate(task.id, { project_id: p.id }); }} className={`flex w-full flex-col items-start ${pill} text-left ${p.id === task.project_id ? 'bg-muted font-medium' : ''}`}>
+              <span className="max-w-full truncate text-sm">{p.emoji ? `${p.emoji} ` : ''}{p.title}</span>
+              {goalName(p.goal_id) && <span className="max-w-full truncate text-[11px] text-muted-foreground">{goalName(p.goal_id)}</span>}
+            </button>
+          ))}
+          {data && shown.length === 0 && <p className="px-2 py-1 text-xs text-muted-foreground">No project matches.</p>}
+        </div>
+        {task.project_id && <button type="button" onClick={() => { setOpen(false); onUpdate(task.id, { project_id: null }); }} className={`${pill} text-left text-muted-foreground`}>No project</button>}
       </PopoverContent>
     </Popover>
   );
