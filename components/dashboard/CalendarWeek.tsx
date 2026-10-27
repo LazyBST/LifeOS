@@ -10,6 +10,7 @@ import { completeTaskAction, reopenTaskAction, updateTaskAction } from '@/app/ac
 import { undoEventEditAction, updateEventAction } from '@/app/actions/calevents';
 import { EventDialog, type DialogTarget } from './EventDialog';
 import type { WeekBlock, WeekData } from '@/lib/domain/calweek';
+import { applyShow, CAL_SHOW_LABEL, type CalShow } from '@/lib/domain/calendar-view';
 import { assignColumns, blockHeights, fmtTime } from '@/lib/domain/day-layout';
 import { addDays, daysBetween, istDate, istInstant, istParts } from '@/lib/time';
 import { draggedRange, scaleStep } from '@/lib/domain/calendar-drag';
@@ -91,7 +92,11 @@ export function CalendarWeek() {
   const [mode, setMode] = useState<'week' | 'day'>('week');
   const [focus, setFocus] = useState(today);
   const ws = mondayOf(focus);
-  const [data, setData] = useState<WeekData | null>(null);
+  const [raw, setData] = useState<WeekData | null>(null);
+  const [show, setShowState] = useState<CalShow>('all');
+  useEffect(() => { try { const v = localStorage.getItem('lifeos:cal:show'); if (v === 'done' || v === 'hide-missed') setShowState(v); } catch {} }, []);
+  const setShow = (v: CalShow) => { setShowState(v); try { localStorage.setItem('lifeos:cal:show', v); } catch {} };
+  const data = useMemo(() => (raw ? applyShow(raw, show, istDate(), new Date().toISOString()) : null), [raw, show]);
   const [loading, setLoading] = useState(false);
   const [dialog, setDialog] = useState<DialogTarget>(null);
   const [menu, setMenu] = useState<MenuTarget | null>(null);
@@ -316,6 +321,16 @@ export function CalendarWeek() {
                     <button onClick={() => { anchor.current = null; setRow(fitRow); }} className="border-x px-2.5 py-1 hover:bg-muted" title="Fit the whole day on screen">Fit</button>
                     <button onClick={() => { anchor.current = null; setRow(row * 1.5); }} className="px-2.5 py-1 hover:bg-muted" aria-label="Zoom in" title="Zoom in down to 5 minutes (or pinch)">+</button>
                   </span>
+                </div>
+                <div role="group" aria-label="Show" className="rounded-lg px-2 py-1 text-xs">
+                  <span className="text-muted-foreground">Show</span>
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    {(Object.keys(CAL_SHOW_LABEL) as CalShow[]).map((k) => (
+                      <button key={k} role="menuitemradio" aria-checked={show === k} onClick={() => setShow(k)} className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted ${show === k ? 'bg-muted font-medium' : ''}`}>
+                        <span className={`size-2 rounded-full border ${show === k ? 'border-primary bg-primary' : 'border-muted-foreground/50'}`} />{CAL_SHOW_LABEL[k]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <button role="menuitem" onClick={() => { setTools(false); void syncTodayNow(); }} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" title="Sync only today's events with Google Calendar, both ways">Sync today</button>
                 <button role="menuitem" onClick={() => { setTools(false); void syncNow(); }} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" title="Fetch what changed in Google Calendar since the last sync">Sync Google</button>
