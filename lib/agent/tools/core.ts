@@ -121,7 +121,7 @@ const taskListSchema = z.object({
   project_ref: z.string().optional(),
   goal_ref: z.string().optional(),
   area: z.string().optional(),
-  status: z.enum(['todo', 'doing', 'done']).optional(),
+  status: z.enum(['todo', 'doing', 'review', 'done']).optional(),
   priority: z.enum(['P0', 'P1', 'P2', 'P3']).optional(),
   limit: z.number().int().positive().max(100).optional(),
 });

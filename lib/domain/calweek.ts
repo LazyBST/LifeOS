@@ -29,8 +29,8 @@ export async function weekData(weekStart: string): Promise<WeekData> {
   const [ev, tasks, goals, projects] = await Promise.all([
     loadEvents(),
     admin().from('tasks').select('id,title,due_at,duration_min,status,area_id').is('deleted_at', null).gte('due_at', from).lt('due_at', to).limit(300),
-    admin().from('goals').select('id,title,emoji,start_date,target_date,area_id').is('deleted_at', null).eq('status', 'active').not('target_date', 'is', null).gte('target_date', weekStart).limit(200),
-    admin().from('projects').select('id,title,emoji,start_date,target_date').is('deleted_at', null).eq('status', 'active').not('target_date', 'is', null).gte('target_date', weekStart).limit(200),
+    admin().from('goals').select('id,title,emoji,start_date,target_date,area_id').is('deleted_at', null).in('status', ['active', 'review']).not('target_date', 'is', null).gte('target_date', weekStart).limit(200),
+    admin().from('projects').select('id,title,emoji,start_date,target_date').is('deleted_at', null).in('status', ['active', 'review']).not('target_date', 'is', null).gte('target_date', weekStart).limit(200),
   ]);
   const blocks: WeekBlock[] = [];
   const allDay: WeekData['allDay'] = [];

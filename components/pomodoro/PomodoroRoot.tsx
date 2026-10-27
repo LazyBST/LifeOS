@@ -108,6 +108,7 @@ export function PomodoroRoot() {
   const [statsKey, setStatsKey] = useState(0);
   const [ready, setReady] = useState(false);
   const timerRef = useRef<PomoTimer | null>(null);
+  const idleTicks = useRef(0);
   const revRef = useRef(0); // when this view of the timer was last changed; the newest view wins across devices
   const skew = useRef(0); // server time minus this device's clock, so two devices agree on the time
   const tnow = useCallback(() => Date.now() + skew.current, []);
@@ -177,7 +178,13 @@ export function PomodoroRoot() {
   useEffect(() => {
     if (!ready) return;
     void syncFromServer();
-    const id = setInterval(() => { if (document.visibilityState === 'visible') void syncFromServer(); }, 5000);
+    // quick while a timer is live (another device may pause it), lazy while idle: each check is a server call
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      const t = timerRef.current;
+      idleTicks.current = t && t.status !== 'done' ? 0 : idleTicks.current + 1;
+      if (t && t.status !== 'done' || idleTicks.current % 6 === 0) void syncFromServer();
+    }, 5000);
     const wake = () => { if (document.visibilityState === 'visible') void syncFromServer(); };
     window.addEventListener('focus', wake);
     document.addEventListener('visibilitychange', wake);

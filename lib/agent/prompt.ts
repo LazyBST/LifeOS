@@ -73,12 +73,12 @@ async function describePage(page: PageContext): Promise<string> {
 }
 
 async function goalProjectIndex(): Promise<string> {
-  const goals = await listGoals({ status: ['active'] });
+  const goals = await listGoals({ status: ['active', 'review'] });
   if (goals.length === 0) return '(no active goals yet)';
   const lines: string[] = [];
   for (const g of goals) {
     lines.push(`- goal ${g.id}: ${g.title}`);
-    const projects = await listProjects({ goal_id: g.id, status: ['active'] });
+    const projects = await listProjects({ goal_id: g.id, status: ['active', 'review'] });
     for (const p of projects) lines.push(`  - project ${p.id}: ${p.title}`);
   }
   return lines.join('\n');

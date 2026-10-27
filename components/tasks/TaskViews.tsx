@@ -29,9 +29,12 @@ export type TaskViewsProps = {
 
 const PRESET_TABS: { key: TaskViewState['preset']; label: string }[] = [
   { key: 'today', label: 'Today' },
-  { key: 'week', label: 'Within 7 days' },
+  { key: 'tomorrow', label: 'Tomorrow' },
+  { key: 'today_tomorrow', label: 'Today + tomorrow' },
+  { key: 'week', label: 'Next 7 days' },
   { key: 'overdue', label: 'Overdue' },
   { key: 'open', label: 'All open' },
+  { key: 'range', label: 'Date range' },
 ];
 
 export function TaskViews({ base, scope, createDefaults, hidePresets, defaultView, defaultGroup, defaultPreset, title }: TaskViewsProps) {
@@ -45,6 +48,7 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
     clearFilters,
     tasks,
     loading,
+    fetching,
     error,
     createTask,
     completeTask,
@@ -115,12 +119,22 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
           {activeFilters > 0 && !showFilters && <button type="button" onClick={clearFilters} className="text-xs text-muted-foreground hover:underline">Clear</button>}
         </div>
       </div>
+      {!hidePresets && state.preset === 'range' && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Due between</span>
+          <ClearableInput type="date" className="h-8 w-40" aria-label="From date" value={state.filters.due_from ?? ''} max={state.filters.due_to ?? undefined} onChange={(e) => setFilters({ ...state.filters, due_from: e.target.value || undefined })} onClear={() => setFilters({ ...state.filters, due_from: undefined })} clearLabel="Clear the start date" />
+          <span className="text-xs text-muted-foreground">and</span>
+          <ClearableInput type="date" className="h-8 w-40" aria-label="To date" value={state.filters.due_to ?? ''} min={state.filters.due_from ?? undefined} onChange={(e) => setFilters({ ...state.filters, due_to: e.target.value || undefined })} onClear={() => setFilters({ ...state.filters, due_to: undefined })} clearLabel="Clear the end date" />
+        </div>
+      )}
       {showFilters && <div id="task-filters"><FilterBar filters={state.filters} base={base} onChange={setFilters} onClear={clearFilters} /></div>}
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       {loading ? (
         <ViewSkeleton view={state.view} />
-      ) : state.view === 'board' ? (
+      ) : (
+      <div className={fetching ? 'opacity-60 transition-opacity' : 'transition-opacity'} aria-busy={fetching}>
+      {state.view === 'board' ? (
         <Board
           tasks={tasks}
           onMove={moveTask}
@@ -141,6 +155,8 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
           onCreate={createTask}
           createDefaults={effectiveCreateDefaults}
         />
+      )}
+      </div>
       )}
     </div>
   );

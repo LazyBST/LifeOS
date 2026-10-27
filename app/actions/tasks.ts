@@ -13,12 +13,10 @@ import {
   listTasks,
   moveTask,
   reopenTask,
-  subtaskCounts,
   updateTask,
 } from '@/lib/domain/tasks';
 import { listAreas, areaColor } from '@/lib/domain/areas';
-import { listGoals } from '@/lib/domain/goals';
-import { listProjects } from '@/lib/domain/projects';
+import { admin } from '@/lib/supabase/admin';
 import { setNotes, type NoteEntity } from '@/lib/domain/notes';
 import type { Task, TaskStatus } from '@/lib/types/db';
 import type { TaskFilters } from '@/lib/types/filters';
@@ -32,19 +30,40 @@ export type TaskListItem = Task & {
   subtask_done: number;
 };
 
+/** Open subtask counts per parent, in one query that does not depend on the task list. */
+async function allSubtaskCounts(): Promise<Record<string, { total: number; done: number }>> {
+  const out: Record<string, { total: number; done: number }> = {};
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data } = await admin()
+      .from('tasks')
+      .select('parent_task_id,status')
+      .not('parent_task_id', 'is', null)
+      .is('deleted_at', null)
+      .range(from, from + 999);
+    for (const r of (data ?? []) as { parent_task_id: string; status: string }[]) {
+      const e = (out[r.parent_task_id] ??= { total: 0, done: 0 });
+      e.total += 1;
+      if (r.status === 'done') e.done += 1;
+    }
+    if ((data?.length ?? 0) < 1000) break;
+  }
+  return out;
+}
+
 export async function listTasksAction(filters: TaskFilters): Promise<ActionResult<TaskListItem[]>> {
   return run(async () => {
     await requireUser();
-    const [tasks, areas, goals, projects] = await Promise.all([
+    // every query runs at once; the names only need id + title/colour, not whole rows
+    const [tasks, areas, goals, projects, counts] = await Promise.all([
       listTasks(filters),
       listAreas(),
-      listGoals(),
-      listProjects(),
+      admin().from('goals').select('id,title').is('deleted_at', null),
+      admin().from('projects').select('id,title').is('deleted_at', null),
+      allSubtaskCounts(),
     ]);
     const areaMap = new Map(areas.map((a) => [a.id, a]));
-    const goalMap = new Map(goals.map((g) => [g.id, g.title]));
-    const projectMap = new Map(projects.map((p) => [p.id, p.title]));
-    const counts = await subtaskCounts(tasks.map((t) => t.id));
+    const goalMap = new Map(((goals.data ?? []) as { id: string; title: string }[]).map((g) => [g.id, g.title]));
+    const projectMap = new Map(((projects.data ?? []) as { id: string; title: string }[]).map((p) => [p.id, p.title]));
     return tasks.map((t) => {
       const area = t.area_id ? areaMap.get(t.area_id) ?? null : null;
       const c = counts[t.id];

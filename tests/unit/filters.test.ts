@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   viewStateToParams,
   paramsToViewState,
-  presetFilters,
+  presetFilters, dueWindow,
   DEFAULT_VIEW_STATE,
   type TaskViewState,
 } from '@/lib/types/filters';
@@ -17,7 +17,7 @@ describe('viewStateToParams / paramsToViewState round-trip', () => {
         goal_id: 'goal-1',
         project_id: 'project-1',
         priority: ['P0', 'P1'],
-        status: ['todo', 'doing'],
+        status: ['todo', 'doing', 'review'],
         due: 'overdue',
         due_from: '2026-10-01',
         due_to: '2026-10-31',
@@ -74,11 +74,26 @@ describe('presetFilters (spec section 6)', () => {
     expect(presetFilters('overdue')).toEqual({ due: 'overdue', include_done: false });
   });
 
-  it('open: todo/doing statuses, excludes done', () => {
-    expect(presetFilters('open')).toEqual({ status: ['todo', 'doing'], include_done: false });
+  it('open: everything not done, so review counts too', () => {
+    expect(presetFilters('open')).toEqual({ include_done: false });
   });
 
   it('all: includes done', () => {
     expect(presetFilters('all')).toEqual({ include_done: true });
+  });
+});
+
+describe('dueWindow', () => {
+  const add = (d: string, n: number) => { const x = new Date(`${d}T00:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  it('knows tomorrow and today + tomorrow', () => {
+    expect(dueWindow({ due: 'tomorrow' }, '2026-10-27', add)).toEqual({ gte: '2026-10-28', lte: '2026-10-28' });
+    expect(dueWindow({ due: 'today_tomorrow' }, '2026-10-27', add)).toEqual({ gte: '2026-10-27', lte: '2026-10-28' });
+  });
+  it('a custom range may be open at either end', () => {
+    expect(dueWindow({ due: 'custom', due_from: '2026-11-01' }, '2026-10-27', add)).toEqual({ gte: '2026-11-01' });
+    expect(dueWindow({ due: 'custom', due_to: '2026-11-05' }, '2026-10-27', add)).toEqual({ lte: '2026-11-05' });
+  });
+  it('overdue is anything before today', () => {
+    expect(dueWindow({ due: 'overdue' }, '2026-10-27', add)).toEqual({ lt: '2026-10-27' });
   });
 });

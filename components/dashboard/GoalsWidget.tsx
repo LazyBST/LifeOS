@@ -11,7 +11,7 @@ import { Reorderable } from '@/components/widgets/Reorderable';
 import { WidgetCard } from './WidgetCard';
 
 export async function GoalsWidget() {
-  const [goals, forecasts, areas] = await Promise.all([listGoals({ status: ['active'] }), goalForecasts(), listAreas()]);
+  const [goals, forecasts, areas] = await Promise.all([listGoals({ status: ['active', 'review'] }), goalForecasts(), listAreas()]);
   const fm = new Map(forecasts.map((f) => [f.goal_id, f]));
   const am = new Map(areas.map((a) => [a.id, a]));
   const [ledgers, order] = await Promise.all([Promise.all(goals.map((g) => ledgerForGoal(g.id))), getOrder('dash-goals')]);

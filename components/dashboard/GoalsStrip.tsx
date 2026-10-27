@@ -7,7 +7,7 @@ import { formatDate } from '@/lib/time';
 /** A card per active goal: emoji, Area colour, effort progress ring, forecast (spec section 6). */
 export async function GoalsStrip() {
   const [activeGoals, forecasts, areas] = await Promise.all([
-    listGoals({ status: ['active'] }),
+    listGoals({ status: ['active', 'review'] }),
     goalForecasts(),
     listAreas(),
   ]);

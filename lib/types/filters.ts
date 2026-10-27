@@ -2,7 +2,7 @@
 // the server actions and the agent's task_list tool (spec section 6).
 import type { Priority, TaskStatus, UUID } from './db';
 
-export type DuePreset = 'today' | 'week' | 'overdue' | 'none' | 'custom';
+export type DuePreset = 'today' | 'tomorrow' | 'today_tomorrow' | 'week' | 'overdue' | 'none' | 'custom';
 
 export type TaskFilters = {
   area_id?: UUID | null;
@@ -27,7 +27,7 @@ export type GroupByKey = 'none' | 'area' | 'goal' | 'project' | 'priority' | 'du
 
 export type TaskViewState = {
   view: 'board' | 'list';
-  preset: 'today' | 'week' | 'overdue' | 'open' | 'all';
+  preset: 'today' | 'tomorrow' | 'today_tomorrow' | 'week' | 'overdue' | 'open' | 'range' | 'all';
   filters: TaskFilters;
   sort: TaskSortKey;
   dir: 'asc' | 'desc';
@@ -43,17 +43,25 @@ export const DEFAULT_VIEW_STATE: TaskViewState = {
   group: 'none',
 };
 
+const PRESETS = ['today', 'tomorrow', 'today_tomorrow', 'week', 'overdue', 'open', 'range', 'all'];
+
 /** Presets from the dashboard tabs (spec section 6). */
 export function presetFilters(preset: TaskViewState['preset']): TaskFilters {
   switch (preset) {
     case 'today':
       return { due: 'today', include_done: false };
+    case 'tomorrow':
+      return { due: 'tomorrow', include_done: false };
+    case 'today_tomorrow':
+      return { due: 'today_tomorrow', include_done: false };
     case 'week':
       return { due: 'week', include_done: false };
+    case 'range':
+      return { due: 'custom', include_done: false };
     case 'overdue':
       return { due: 'overdue', include_done: false };
     case 'open':
-      return { status: ['todo', 'doing'], include_done: false };
+      return { include_done: false };
     case 'all':
     default:
       return { include_done: true };
@@ -94,7 +102,7 @@ export function paramsToViewState(
   const view = p.get('view');
   if (view === 'board' || view === 'list') s.view = view;
   const preset = p.get('preset');
-  if (preset && ['today', 'week', 'overdue', 'open', 'all'].includes(preset)) {
+  if (preset && PRESETS.includes(preset)) {
     s.preset = preset as TaskViewState['preset'];
   }
   const sort = p.get('sort');
@@ -115,4 +123,22 @@ export function paramsToViewState(
   if (p.get('tag')) f.tag = p.get('tag');
   if (p.get('q')) f.q = p.get('q');
   return s;
+}
+
+/** The due_date window a filter means, as inclusive bounds (`today` is the IST date). */
+export function dueWindow(
+  f: Pick<TaskFilters, 'due' | 'due_from' | 'due_to'>,
+  today: string,
+  addDays: (d: string, n: number) => string,
+): { gte?: string; lte?: string; lt?: string; none?: boolean } | null {
+  switch (f.due) {
+    case 'today': return { gte: today, lte: today };
+    case 'tomorrow': { const t = addDays(today, 1); return { gte: t, lte: t }; }
+    case 'today_tomorrow': return { gte: today, lte: addDays(today, 1) };
+    case 'week': return { gte: today, lte: addDays(today, 7) };
+    case 'overdue': return { lt: today };
+    case 'none': return { none: true };
+    case 'custom': return { ...(f.due_from ? { gte: f.due_from } : {}), ...(f.due_to ? { lte: f.due_to } : {}) };
+    default: return null;
+  }
 }

@@ -4,7 +4,7 @@
 // actions in app/actions/tasks.ts (spec section 6, docs/CONTRACTS.md).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   DEFAULT_VIEW_STATE,
   type GroupByKey,
@@ -72,7 +72,6 @@ export function useTaskViewState(opts: {
   defaultPreset?: TaskViewState['preset'];
 }) {
   const { base, scope, defaultView, defaultGroup, defaultPreset } = opts;
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -87,12 +86,14 @@ export function useTaskViewState(opts: {
   });
 
   const restored = useRef(false);
+  // the first fetch waits for the saved view to be restored, so the page asks the server once, not twice
+  const [restoredReady, setRestoredReady] = useState(false);
   // Restore the last-used view from localStorage on first mount, only when
   // the URL itself carried no state (so a bookmarked/shared URL always wins).
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
-    if (searchParams.toString()) return;
+    if (searchParams.toString()) { setRestoredReady(true); return; }
     try {
       const raw = localStorage.getItem(storageKey(scope));
       if (!raw) return;
@@ -104,6 +105,8 @@ export function useTaskViewState(opts: {
       }));
     } catch {
       // corrupt or unavailable storage: ignore and keep defaults
+    } finally {
+      setRestoredReady(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -119,7 +122,8 @@ export function useTaskViewState(opts: {
   useEffect(() => {
     const urlState: TaskViewState = { ...state, filters: stripBase(state.filters, base) };
     const qs = viewStateToParams(urlState).toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // only the address bar changes: router.replace would re-render the whole route on the server for every filter click
+    try { window.history.replaceState(window.history.state, '', qs ? `${pathname}?${qs}` : pathname); } catch {}
     try {
       localStorage.setItem(storageKey(scope), JSON.stringify(urlState));
     } catch {
@@ -131,13 +135,17 @@ export function useTaskViewState(opts: {
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
   const tasksRef = useRef<TaskListItem[]>([]);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // nothing to show yet
+  const [fetching, setFetching] = useState(false); // a newer list is on its way; the old one stays on screen
   const [error, setError] = useState<string | null>(null);
 
   const filtersKey = JSON.stringify(effectiveFilters);
+  const latest = useRef(0);
   const refetch = useCallback(() => {
-    setLoading(true);
+    const mine = ++latest.current;
+    setFetching(true);
     listTasksAction(JSON.parse(filtersKey) as TaskFilters).then((res) => {
+      if (mine !== latest.current) return; // a newer request already answered or is pending
       if (res.ok) {
         setTasks(res.data);
         setError(null);
@@ -145,12 +153,18 @@ export function useTaskViewState(opts: {
         setError(res.error);
       }
       setLoading(false);
+      setFetching(false);
+    }).catch(() => {
+      if (mine !== latest.current) return;
+      setError('Could not load tasks. Check your connection and try again.');
+      setLoading(false);
+      setFetching(false);
     });
   }, [filtersKey]);
 
   useEffect(() => {
-    refetch();
-  }, [refetch]);
+    if (restoredReady) refetch();
+  }, [refetch, restoredReady]);
 
   const patchLocal = useCallback((id: string, patch: Partial<TaskListItem>) => {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -259,7 +273,12 @@ export function useTaskViewState(opts: {
   );
 
   const setPreset = useCallback((preset: TaskViewState['preset']) => {
-    setState((s) => ({ ...s, preset }));
+    // a due pick in the filter panel would otherwise outrank the tab that was just chosen
+    setState((s) => {
+      const rest = { ...s.filters };
+      delete rest.due;
+      return { ...s, preset, filters: rest };
+    });
   }, []);
   const setView = useCallback((view: TaskViewState['view']) => {
     setState((s) => ({ ...s, view }));
@@ -287,6 +306,7 @@ export function useTaskViewState(opts: {
     clearFilters,
     tasks,
     loading,
+    fetching,
     error,
     refetch,
     createTask,

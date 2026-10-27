@@ -33,9 +33,10 @@ export type AuthCheck =
 /** Why a user is (not) allowed in: lets the login page say what actually failed. */
 export async function checkUser(): Promise<AuthCheck> {
   const sb = await supabaseSession();
-  const { data } = await sb.auth.getUser();
-  const user = data.user;
-  if (!user?.email) return { ok: false, reason: 'no_session' };
+  // the signature is verified locally when the project signs with asymmetric keys; otherwise the auth server is asked
+  const { data } = await sb.auth.getClaims();
+  const user = data?.claims?.sub && data.claims.email ? { id: data.claims.sub, email: String(data.claims.email) } : null;
+  if (!user) return { ok: false, reason: 'no_session' };
   if (user.email.trim().toLowerCase() !== env.ownerEmail.trim().toLowerCase()) {
     await sb.auth.signOut();
     return { ok: false, reason: 'wrong_account' };

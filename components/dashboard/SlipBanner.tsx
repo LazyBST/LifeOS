@@ -4,7 +4,7 @@ import { habitStatuses } from '@/lib/domain/habits';
 
 /** The visible reward and loss: days each active goal has moved, in both directions. */
 export async function SlipBanner() {
-  const goals = await listGoals({ status: ['active'] }).catch(() => []);
+  const goals = await listGoals({ status: ['active', 'review'] }).catch(() => []);
   const ledgers = await Promise.all(goals.map((g) => ledgerForGoal(g.id)));
   const streak = await habitStatuses().then((h) => Math.max(0, ...h.map((x) => x.current_streak))).catch(() => 0);
   const moved = goals.map((g, i) => ({ g, net: ledgers[i].net })).filter((x) => x.net !== 0);

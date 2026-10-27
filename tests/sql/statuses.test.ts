@@ -6,7 +6,7 @@ describe('statuses table', () => {
     const db = await freshDb();
     const r = await rows<{ key: string; color: string; bg_color: string }>(
       db, `select key, color, bg_color from statuses order by sort_order`);
-    expect(r.map((x) => x.key)).toEqual(['todo', 'doing', 'done', 'active', 'paused', 'dropped', 'to_read', 'reading', 'finished']);
+    expect(r.map((x) => x.key)).toEqual(['todo', 'doing', 'review', 'done', 'active', 'paused', 'dropped', 'to_read', 'reading', 'finished']);
     expect(r.every((x) => /^#[0-9a-f]{6}$/i.test(x.color) && /^#[0-9a-f]{6}$/i.test(x.bg_color))).toBe(true);
   });
 
@@ -37,5 +37,15 @@ describe('statuses table', () => {
       join statuses s on s.is_default and v.k = any(s.default_for) group by k`);
     expect(r).toHaveLength(3);
     expect(r.every((x) => x.n === 1)).toBe(true);
+  });
+
+  test('review is a status for tasks, projects and goals, and a board column before Done', async () => {
+    const db = await freshDb();
+    await db.query(`insert into tasks (title, status) values ('t', 'review')`);
+    await db.query(`insert into goals (title, status) values ('g', 'review')`);
+    const g = await row<{ id: string }>(db, `insert into goals (title) values ('g2') returning id`);
+    await db.query(`insert into projects (title, goal_id, status) values ('p', $1, 'review')`, [g!.id]);
+    const cols = await rows<{ key: string }>(db, `select key from statuses where board_order is not null and 'task' = any(applies_to) order by board_order`);
+    expect(cols.map((c) => c.key)).toEqual(['todo', 'doing', 'review', 'done']);
   });
 });

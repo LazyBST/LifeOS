@@ -25,7 +25,7 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   const book = await getBook(id);
   if (!book) notFound();
   const [areas, log, links, goals, projects, tasks, habits, statuses] = await Promise.all([
-    listAreas(), readingLog(id), linksOfBook(id), listGoals({ status: ['active'] }), listProjects({ status: ['active'] }),
+    listAreas(), readingLog(id), linksOfBook(id), listGoals({ status: ['active', 'review'] }), listProjects({ status: ['active', 'review'] }),
     listTasks({ include_done: false, limit: 300 }), listHabits(), listStatuses(),
   ]);
   const today = istDate();

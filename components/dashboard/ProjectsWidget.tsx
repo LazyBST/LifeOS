@@ -7,7 +7,7 @@ import { Reorderable } from '@/components/widgets/Reorderable';
 import { WidgetCard } from './WidgetCard';
 
 export async function ProjectsWidget() {
-  const [projects, forecasts] = await Promise.all([listProjects({ status: ['active'] }), projectForecasts()]);
+  const [projects, forecasts] = await Promise.all([listProjects({ status: ['active', 'review'] }), projectForecasts()]);
   const fm = new Map(forecasts.map((f) => [f.project_id, f]));
   const [ledgers, order] = await Promise.all([Promise.all(projects.map((p) => ledgerForProject(p.id))), getOrder('dash-projects')]);
   return (

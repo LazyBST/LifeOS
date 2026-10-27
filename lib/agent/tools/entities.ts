@@ -21,8 +21,8 @@ import {
 import type { UUID } from '@/lib/types/db';
 
 const PRIORITY = z.enum(['P0', 'P1', 'P2', 'P3']);
-const ENTITY_STATUS = z.enum(['active', 'paused', 'done', 'dropped']);
-const TASK_STATUS = z.enum(['todo', 'doing', 'done']);
+const ENTITY_STATUS = z.enum(['active', 'review', 'paused', 'done', 'dropped']);
+const TASK_STATUS = z.enum(['todo', 'doing', 'review', 'done']);
 
 /** A tool ref resolution that isn't 'auto' turns into a terminal ToolOutcome
  * (an ask-pending or a plain refusal); 'auto' returns the resolved id. */

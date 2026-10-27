@@ -22,31 +22,35 @@ export type FilterBarProps = {
 const DUE_OPTIONS: { value: DuePreset | ''; label: string }[] = [
   { value: '', label: 'Any due date' },
   { value: 'today', label: 'Today' },
-  { value: 'week', label: 'Within 7 days' },
+  { value: 'tomorrow', label: 'Tomorrow' },
+  { value: 'today_tomorrow', label: 'Today + tomorrow' },
+  { value: 'week', label: 'Next 7 days' },
   { value: 'overdue', label: 'Overdue' },
   { value: 'none', label: 'No date' },
   { value: 'custom', label: 'Custom range' },
 ];
 
+// the lookups rarely change, so every filter bar after the first one starts with them already in hand
+const cache: { areas?: Area[]; goals?: Goal[]; projects: Map<string, Project[]> } = { projects: new Map() };
+
 export function FilterBar({ filters, base, onChange, onClear }: FilterBarProps) {
   const statusOptions = statusesFor(useStatuses(), 'task');
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [areas, setAreas] = useState<Area[]>(cache.areas ?? []);
+  const [goals, setGoals] = useState<Goal[]>(cache.goals ?? []);
+  const effectiveGoalId = filters.goal_id ?? base.goal_id ?? undefined;
+  const [projects, setProjects] = useState<Project[]>(cache.projects.get(effectiveGoalId ?? '') ?? []);
 
   useEffect(() => {
-    listAreasAction().then((r) => {
-      if (r.ok) setAreas(r.data);
-    });
-    listGoalsAction().then((r) => {
-      if (r.ok) setGoals(r.data);
-    });
+    if (!cache.areas) listAreasAction().then((r) => { if (r.ok) { cache.areas = r.data; setAreas(r.data); } });
+    if (!cache.goals) listGoalsAction().then((r) => { if (r.ok) { cache.goals = r.data; setGoals(r.data); } });
   }, []);
 
-  const effectiveGoalId = filters.goal_id ?? base.goal_id ?? undefined;
   useEffect(() => {
+    const key = effectiveGoalId ?? '';
+    const hit = cache.projects.get(key);
+    if (hit) setProjects(hit);
     listProjectsAction(effectiveGoalId ?? undefined).then((r) => {
-      if (r.ok) setProjects(r.data);
+      if (r.ok) { cache.projects.set(key, r.data); setProjects(r.data); }
     });
   }, [effectiveGoalId]);
 

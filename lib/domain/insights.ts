@@ -53,7 +53,7 @@ export async function loadInsights(today = istDate()): Promise<Insights> {
   }).filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
 
   const count = <K extends string>(list: string[], order: K[]) => order.map((k) => ({ name: k, value: list.filter((x) => x === k).length }));
-  const STATUS: Record<string, { label: string; color: string }> = { todo: { label: 'Not started', color: '#94a3b8' }, doing: { label: 'In progress', color: '#3b82f6' }, done: { label: 'Done', color: '#22c55e' } };
+  const STATUS: Record<string, { label: string; color: string }> = { todo: { label: 'Not started', color: '#94a3b8' }, doing: { label: 'In progress', color: '#3b82f6' }, review: { label: 'In review', color: '#7c3aed' }, done: { label: 'Done', color: '#22c55e' } };
   const statusMix = Object.entries(STATUS).map(([k, v]) => ({ name: v.label, color: v.color, value: statusRows.filter((r) => r.status === k).length })).filter((x) => x.value > 0);
   const priorityMix = count(statusRows.filter((r) => r.status !== 'done').map((r) => r.priority), ['P0', 'P1', 'P2', 'P3']);
 

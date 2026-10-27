@@ -6,7 +6,7 @@ import { getGoal } from './goals';
 import { addDays, istDate } from '@/lib/time';
 import { syncTaskReminders } from './reminders';
 import { drainOutbox } from '@/lib/google/sync';
-import type { TaskFilters } from '@/lib/types/filters';
+import { dueWindow, type TaskFilters } from '@/lib/types/filters';
 import type { DateStr, Priority, Task, TaskStatus, UUID } from '@/lib/types/db';
 
 export const MAX_SUBTASK_DEPTH = 3; // spec section 4
@@ -97,26 +97,15 @@ export async function listTasks(f: TaskFilters = {}): Promise<Task[]> {
   if (f.priority?.length) q = q.in('priority', f.priority);
   if (f.status?.length) q = q.in('status', f.status);
   else if (f.include_done === false) q = q.neq('status', 'done');
-  switch (f.due) {
-    case 'today':
-      q = q.eq('due_date', today);
-      break;
-    case 'week':
-      q = q.gte('due_date', today).lte('due_date', addDays(today, 7));
-      break;
-    case 'overdue':
-      q = q.lt('due_date', today).neq('status', 'done');
-      break;
-    case 'none':
-      q = q.is('due_date', null);
-      break;
-    case 'custom':
-      if (f.due_from) q = q.gte('due_date', f.due_from);
-      if (f.due_to) q = q.lte('due_date', f.due_to);
-      break;
+  const win = dueWindow(f, today, addDays);
+  if (win) {
+    if (win.none) q = q.is('due_date', null);
+    if (win.gte) q = q.gte('due_date', win.gte);
+    if (win.lte) q = q.lte('due_date', win.lte);
+    if (win.lt) q = q.lt('due_date', win.lt).neq('status', 'done');
   }
   if (f.tag) q = q.contains('tags', [f.tag]);
-  if (f.q) q = q.ilike('title', `%${f.q}%`);
+  if (f.q?.trim()) q = q.ilike('title', `%${f.q.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
   const { data, error } = await q
     .order('sort_order')
     .order('priority')

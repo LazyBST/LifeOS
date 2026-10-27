@@ -43,9 +43,11 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const { data } = await supabase.auth.getUser();
+  // verifies the token's signature here (no round trip to Supabase) when the project uses
+  // asymmetric signing keys, and asks the auth server otherwise; either way an unverified cookie is not trusted
+  const { data } = await supabase.auth.getClaims();
 
-  if (!data.user && !isPublic(request.nextUrl.pathname)) {
+  if (!data?.claims?.sub && !isPublic(request.nextUrl.pathname)) {
     // API routes answer with JSON themselves (they call requireUser), so a
     // redirect here would hand fetch() an HTML login page instead of a 401.
     if (request.nextUrl.pathname.startsWith('/api/')) {
