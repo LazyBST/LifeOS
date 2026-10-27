@@ -142,3 +142,27 @@ export function dueWindow(
     default: return null;
   }
 }
+
+/**
+ * What a task created while these filters are on should start with, so it shows up in the view it was
+ * made in: the picked project/goal/area, the day the tab or range points at, one status, one priority, the tag.
+ */
+export function createDefaultsFor(
+  f: TaskFilters,
+  today: string,
+  addDays: (d: string, n: number) => string,
+): { project_id?: string; goal_id?: string; area_id?: string; due_date?: string; status?: TaskStatus; priority?: Priority; tags?: string[] } {
+  const out: ReturnType<typeof createDefaultsFor> = {};
+  if (f.project_id) out.project_id = f.project_id;
+  else if (f.goal_id) out.goal_id = f.goal_id;
+  if (f.area_id) out.area_id = f.area_id;
+  switch (f.due) {
+    case 'today': case 'today_tomorrow': case 'week': out.due_date = today; break;
+    case 'tomorrow': out.due_date = addDays(today, 1); break;
+    case 'custom': { const d = f.due_from ?? f.due_to; if (d) out.due_date = d; break; }
+  }
+  if (f.status?.length) out.status = f.status[0];
+  if (f.priority?.length === 1) out.priority = f.priority[0];
+  if (f.tag) out.tags = [f.tag];
+  return out;
+}

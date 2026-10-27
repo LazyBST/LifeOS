@@ -4,7 +4,8 @@ import { Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ClearableInput } from '@/components/ui/clearable-input';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { GroupByKey, TaskFilters, TaskViewState } from '@/lib/types/filters';
+import { createDefaultsFor, type GroupByKey, type TaskFilters, type TaskViewState } from '@/lib/types/filters';
+import { addDays, istDate } from '@/lib/time';
 import { useTaskViewState, type TaskCreateInput } from './useTaskViewState';
 import { Board } from './Board';
 import { TaskList } from './TaskList';
@@ -40,6 +41,7 @@ const PRESET_TABS: { key: TaskViewState['preset']; label: string }[] = [
 export function TaskViews({ base, scope, createDefaults, hidePresets, defaultView, defaultGroup, defaultPreset, title }: TaskViewsProps) {
   const {
     state,
+    effectiveFilters,
     setPreset,
     setView,
     setGroup,
@@ -57,9 +59,10 @@ export function TaskViews({ base, scope, createDefaults, hidePresets, defaultVie
     moveTask,
   } = useTaskViewState({ base, scope, defaultView, defaultGroup, defaultPreset });
 
+  // a task made here starts out matching the filters, so typing a title is all it takes
   const effectiveCreateDefaults: TaskCreateInput = useMemo(
-    () => ({ title: '', ...createDefaults }),
-    [createDefaults],
+    () => ({ title: '', ...createDefaultsFor(effectiveFilters, istDate(), addDays), ...createDefaults }),
+    [effectiveFilters, createDefaults],
   );
 
   // the filter bar stays tucked away until asked for, and remembers that choice per view

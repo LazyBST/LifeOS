@@ -39,6 +39,7 @@ export type TaskCreateInput = {
   priority?: Priority;
   due_date?: string | null;
   estimate_min?: number | null;
+  tags?: string[];
 };
 
 export type TaskPatchLite = Partial<{
@@ -189,7 +190,7 @@ export function useTaskViewState(opts: {
         duration_min: null,
         estimate_min: input.estimate_min ?? null,
         notes_md: '',
-        tags: [],
+        tags: input.tags ?? [],
         sort_order: Date.now() / 1000,
         completed_at: null,
         created_at: now,
@@ -298,6 +299,7 @@ export function useTaskViewState(opts: {
 
   return {
     state,
+    effectiveFilters,
     setPreset,
     setView,
     setGroup,

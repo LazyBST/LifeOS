@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   viewStateToParams,
   paramsToViewState,
-  presetFilters, dueWindow,
+  presetFilters, dueWindow, createDefaultsFor,
   DEFAULT_VIEW_STATE,
   type TaskViewState,
 } from '@/lib/types/filters';
@@ -95,5 +95,22 @@ describe('dueWindow', () => {
   });
   it('overdue is anything before today', () => {
     expect(dueWindow({ due: 'overdue' }, '2026-10-27', add)).toEqual({ lt: '2026-10-27' });
+  });
+});
+
+describe('createDefaultsFor', () => {
+  const add = (d: string, n: number) => { const x = new Date(`${d}T00:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  it('fills a task from the project, day, status, priority and tag in play', () => {
+    expect(createDefaultsFor({ project_id: 'p1', goal_id: 'g1', due: 'today', status: ['todo'], priority: ['P1'], tag: 'x' }, '2026-10-27', add))
+      .toEqual({ project_id: 'p1', due_date: '2026-10-27', status: 'todo', priority: 'P1', tags: ['x'] });
+  });
+  it('tomorrow and ranges point at a real day; overdue and no filter leave it empty', () => {
+    expect(createDefaultsFor({ due: 'tomorrow' }, '2026-10-27', add).due_date).toBe('2026-10-28');
+    expect(createDefaultsFor({ due: 'custom', due_from: '2026-11-03' }, '2026-10-27', add).due_date).toBe('2026-11-03');
+    expect(createDefaultsFor({ due: 'overdue' }, '2026-10-27', add).due_date).toBeUndefined();
+    expect(createDefaultsFor({}, '2026-10-27', add)).toEqual({});
+  });
+  it('a goal alone is kept, several priorities are not guessed', () => {
+    expect(createDefaultsFor({ goal_id: 'g1', priority: ['P0', 'P1'] }, '2026-10-27', add)).toEqual({ goal_id: 'g1' });
   });
 });
