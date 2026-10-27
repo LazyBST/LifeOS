@@ -26,7 +26,7 @@ function useAreas(): Area[] {
 
 // a chip sits inside a draggable card: taps on it must not start a drag or follow the card's link
 const stop = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation(), onClick: (e: React.MouseEvent) => e.stopPropagation(), onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation() };
-const chipBase = 'inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[12px] font-semibold transition-colors hover:ring-2 hover:ring-ring/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60';
+const chipBase = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-px text-[12px] font-semibold transition-colors hover:ring-2 hover:ring-ring/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60';
 const pill = 'rounded-md px-2 py-1 text-xs hover:bg-muted';
 
 export function PriorityChip({ task, onUpdate }: { task: TaskListItem; onUpdate: QuickUpdate }) {
@@ -50,7 +50,7 @@ export function AreaChip({ task, onUpdate, children }: { task: TaskListItem; onU
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger {...stop} aria-label="Change area" title="Change area" className={`${chipBase} max-w-full ${task.area_name ? '' : 'border border-dashed text-muted-foreground'}`} style={task.area_name ? { backgroundColor: `${task.area_color}29`, color: task.area_color } : undefined}>
+      <PopoverTrigger {...stop} aria-label="Change area" title="Change area" className={`${chipBase} max-w-full shrink ${task.area_name ? '' : 'border border-dashed text-muted-foreground'}`} style={task.area_name ? { backgroundColor: `${task.area_color}29`, color: task.area_color } : undefined}>
         {children ?? <span className="truncate">{task.area_name ?? '+ area'}</span>}
       </PopoverTrigger>
       <PopoverContent align="start" className="max-h-64 w-48 gap-0.5 overflow-y-auto p-1" {...stop}>

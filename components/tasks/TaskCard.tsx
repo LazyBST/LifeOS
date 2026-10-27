@@ -73,28 +73,28 @@ export function TaskCard({ task, dragging = false, onDelete, onUpdate, onSubtask
         ))}
       </span>
 
-      <span className="flex items-center gap-2 text-xs">
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
         <CheckSquare className="size-3.5 shrink-0 text-[#4bade8]" fill="#4bade8" stroke="#fff" aria-hidden />
         <span className="font-medium text-muted-foreground">
           {ISSUE_PREFIX}-{task.task_no}
         </span>
         {canEdit && task.parent_task_id == null ? (
           <button type="button" {...stopDrag} onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} aria-expanded={open} title={task.subtask_total ? 'Show subtasks' : 'Add a subtask'}
-            className={`inline-flex items-center gap-0.5 rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground ${task.subtask_total || open ? '' : ghost}`}>
+            className={`inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground ${task.subtask_total || open ? '' : ghost}`}>
             <ListTree className="size-3" aria-hidden />
             {task.subtask_total > 0 ? `${task.subtask_done}/${task.subtask_total}` : 'Subtask'}
           </button>
         ) : task.subtask_total > 0 ? (
           <span className="inline-flex items-center gap-0.5 text-muted-foreground" title="Subtasks done"><ListTree className="size-3" aria-hidden />{task.subtask_done}/{task.subtask_total}</span>
         ) : null}
-        <span className="ml-auto flex items-center gap-1.5">
+        <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
           {canEdit ? (
             <span className={hasDue ? '' : ghost}><DueChip task={task} overdue={overdue} onUpdate={onUpdate} /></span>
           ) : hasDue ? (
-            <span className={`rounded-full px-1.5 py-px text-[12px] font-semibold ${overdue ? 'bg-[#ffebe6] text-[#bf2600] dark:bg-red-500/20 dark:text-red-400' : 'bg-[#dfe1e6] text-[#42526e] dark:bg-muted dark:text-muted-foreground'}`}>{dueText(task)}</span>
+            <span className={`whitespace-nowrap rounded-full px-1.5 py-px text-[12px] font-semibold ${overdue ? 'bg-[#ffebe6] text-[#bf2600] dark:bg-red-500/20 dark:text-red-400' : 'bg-[#dfe1e6] text-[#42526e] dark:bg-muted dark:text-muted-foreground'}`}>{dueText(task)}</span>
           ) : null}
           {task.estimate_min != null && (
-            <span className="rounded-full bg-[#dfe1e6] px-1.5 py-px text-[12px] font-semibold text-[#42526e] dark:bg-muted dark:text-muted-foreground">
+            <span className="whitespace-nowrap rounded-full bg-[#dfe1e6] px-1.5 py-px text-[12px] font-semibold text-[#42526e] dark:bg-muted dark:text-muted-foreground">
               {fmtEstimate(task.estimate_min)}
             </span>
           )}
