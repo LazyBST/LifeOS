@@ -424,9 +424,7 @@ export async function updateTransaction(id: UUID, patch: TxPatch): Promise<Trans
   }
   if (patch.my_share !== undefined) {
     if (t.kind !== 'expense') throw new Error('Only expenses have a share.');
-    const amount = Number(row.amount ?? t.amount);
     if (patch.my_share === null || !(patch.my_share >= 0)) throw new Error('Enter your share.');
-    if (patch.my_share > amount) throw new Error('Your share cannot be more than the amount.');
     row.my_share = patch.my_share;
   }
   if (Object.keys(row).length === 0) return t;

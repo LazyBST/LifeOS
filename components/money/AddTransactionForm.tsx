@@ -66,16 +66,21 @@ export function AddTransactionForm({ categories, accounts, labels = [], onSaved 
   }
 
   async function submitExpense() {
-    const amount = Number(exAmount);
-    if (!amount || amount <= 0) {
-      toast.error('Enter an amount');
+    const amount = Number(exAmount) || 0;
+    const share = exShare.trim() ? Number(exShare) : amount;
+    if (amount < 0 || !(share >= 0)) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    if (amount === 0 && !(share > 0)) {
+      toast.error(exShare.trim() ? 'Enter your share' : 'Enter an amount, or your share if someone else paid');
       return;
     }
     setSaving(true);
     const res = await addExpenseAction({
       amount,
       description: exDesc.trim() || null,
-      my_share: exShare.trim() ? Number(exShare) : amount,
+      my_share: share,
       counterparty: exCounterparty.trim() || null,
       category_id: exCategory === NONE ? null : exCategory,
       account_id: exAccount === NONE ? null : exAccount,

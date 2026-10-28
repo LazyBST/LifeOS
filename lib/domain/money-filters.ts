@@ -42,10 +42,10 @@ export const cleanQuery = (q: string): string => q.replace(/[,()*%\\]/g, ' ').tr
 
 /**
  * What the amount fields should become when `amount` is edited. A solo expense (my share = the whole amount) keeps
- * following the amount; a split expense keeps its share, but never more than the amount.
+ * following the amount; a split expense keeps its share, but never more than the amount (unless it already was, i.e. someone else paid and you owe).
  */
 export function shareAfterAmountEdit(kind: TxKind, oldAmount: number, oldShare: number | null, newAmount: number): number | null {
   if (kind !== 'expense') return null;
   const share = oldShare ?? oldAmount;
-  return Math.abs(share - oldAmount) < 0.005 ? newAmount : Math.min(share, newAmount);
+  return Math.abs(share - oldAmount) < 0.005 ? newAmount : share > oldAmount ? share : Math.min(share, newAmount);
 }
