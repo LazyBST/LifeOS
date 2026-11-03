@@ -40,13 +40,13 @@ const PHASE = { work: { name: 'Focus' }, break: { name: 'Break' } } as const;
 /** Muted by default; each theme has a look for focus and a calmer one for breaks. `ink` is the colour of the play button. */
 type Look = { bg: string; accent: string; ink: string };
 const THEMES: Record<string, { name: string; work: Look; break: Look }> = {
-  dusk: { name: 'Dusk', work: { bg: 'linear-gradient(135deg,#3f4468,#2a2d48)', accent: '#f4a99b', ink: '#3f4468' }, break: { bg: 'linear-gradient(135deg,#2f5c61,#1f4146)', accent: '#8be0cc', ink: '#2f5c61' } },
-  forest: { name: 'Forest', work: { bg: 'linear-gradient(135deg,#34523f,#1f3328)', accent: '#a8d8b0', ink: '#34523f' }, break: { bg: 'linear-gradient(135deg,#355a6b,#233e4b)', accent: '#9ad4ea', ink: '#355a6b' } },
-  ember: { name: 'Ember', work: { bg: 'linear-gradient(135deg,#6a4036,#3d2521)', accent: '#f2b08c', ink: '#6a4036' }, break: { bg: 'linear-gradient(135deg,#365a5e,#223e42)', accent: '#9fe0d0', ink: '#365a5e' } },
-  ocean: { name: 'Ocean', work: { bg: 'linear-gradient(135deg,#2a4f78,#17304b)', accent: '#86c9f2', ink: '#2a4f78' }, break: { bg: 'linear-gradient(135deg,#2f625e,#1d3f3c)', accent: '#98e0cf', ink: '#2f625e' } },
-  orchid: { name: 'Orchid', work: { bg: 'linear-gradient(135deg,#54426e,#33264b)', accent: '#dcb0f2', ink: '#54426e' }, break: { bg: 'linear-gradient(135deg,#325d5c,#213f3e)', accent: '#9ee0d4', ink: '#325d5c' } },
-  mono: { name: 'Mono', work: { bg: 'linear-gradient(135deg,#2c2c30,#18181b)', accent: '#e4e4e7', ink: '#2c2c30' }, break: { bg: 'linear-gradient(135deg,#27312f,#161c1b)', accent: '#a7f3d0', ink: '#27312f' } },
-  bright: { name: 'Bright', work: { bg: 'linear-gradient(135deg,#f43f5e,#f97316,#f59e0b)', accent: '#fff', ink: '#f43f5e' }, break: { bg: 'linear-gradient(135deg,#10b981,#14b8a6,#06b6d4)', accent: '#fff', ink: '#0d9488' } },
+  dusk: { name: 'Dusk', work: { bg: 'linear-gradient(135deg,#2f5c61,#1f4146)', accent: '#8be0cc', ink: '#2f5c61' }, break: { bg: 'linear-gradient(135deg,#3f4468,#2a2d48)', accent: '#f4a99b', ink: '#3f4468' } },
+  forest: { name: 'Forest', work: { bg: 'linear-gradient(135deg,#355a6b,#233e4b)', accent: '#9ad4ea', ink: '#355a6b' }, break: { bg: 'linear-gradient(135deg,#34523f,#1f3328)', accent: '#a8d8b0', ink: '#34523f' } },
+  ember: { name: 'Ember', work: { bg: 'linear-gradient(135deg,#365a5e,#223e42)', accent: '#9fe0d0', ink: '#365a5e' }, break: { bg: 'linear-gradient(135deg,#6a4036,#3d2521)', accent: '#f2b08c', ink: '#6a4036' } },
+  ocean: { name: 'Ocean', work: { bg: 'linear-gradient(135deg,#2f625e,#1d3f3c)', accent: '#98e0cf', ink: '#2f625e' }, break: { bg: 'linear-gradient(135deg,#2a4f78,#17304b)', accent: '#86c9f2', ink: '#2a4f78' } },
+  orchid: { name: 'Orchid', work: { bg: 'linear-gradient(135deg,#325d5c,#213f3e)', accent: '#9ee0d4', ink: '#325d5c' }, break: { bg: 'linear-gradient(135deg,#54426e,#33264b)', accent: '#dcb0f2', ink: '#54426e' } },
+  mono: { name: 'Mono', work: { bg: 'linear-gradient(135deg,#27312f,#161c1b)', accent: '#a7f3d0', ink: '#27312f' }, break: { bg: 'linear-gradient(135deg,#2c2c30,#18181b)', accent: '#e4e4e7', ink: '#2c2c30' } },
+  bright: { name: 'Bright', work: { bg: 'linear-gradient(135deg,#10b981,#14b8a6,#06b6d4)', accent: '#fff', ink: '#0d9488' }, break: { bg: 'linear-gradient(135deg,#f43f5e,#f97316,#f59e0b)', accent: '#fff', ink: '#f43f5e' } },
 };
 const PAUSED: Look = { bg: 'linear-gradient(135deg,#5b6472,#3a414d)', accent: '#e2e8f0', ink: '#4b5563' };
 type Prefs = { theme: string; cover: string; sound: SoundId; celebrate: CelebrationMode };

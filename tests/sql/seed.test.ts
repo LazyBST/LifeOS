@@ -14,7 +14,7 @@ describe('supabase/seed.sql', () => {
     await loadSeed(db);
 
     const areas = await row<{ count: string }>(db, `select count(*) from areas`);
-    expect(Number(areas!.count)).toBe(4);
+    expect(Number(areas!.count)).toBe(5);
 
     const goals = await row<{ count: string }>(db, `select count(*) from goals`);
     expect(Number(goals!.count)).toBe(2);

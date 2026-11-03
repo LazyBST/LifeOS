@@ -61,12 +61,12 @@ export function FocusDay({ refreshKey = 0, light = false }: { refreshKey?: numbe
       <div>
         <div className="mb-1 flex items-baseline justify-between"><span className="font-medium">Time set aside</span><span className={muted}>{mins(s.allottedSec)} planned in timers</span></div>
         <div className={`flex h-3 overflow-hidden rounded-full ${light ? 'bg-white/20' : 'bg-muted'}`} role="img" aria-label="Work, break and unused time">
-          <div className="bg-rose-500" style={{ width: `${(s.workSec / allotted) * 100}%` }} title={`Work ${mins(s.workSec)}`} />
-          <div className="bg-emerald-500" style={{ width: `${(s.breakSec / allotted) * 100}%` }} title={`Break ${mins(s.breakSec)}`} />
+          <div className="bg-emerald-500" style={{ width: `${(s.workSec / allotted) * 100}%` }} title={`Work ${mins(s.workSec)}`} />
+          <div className="bg-rose-500" style={{ width: `${(s.breakSec / allotted) * 100}%` }} title={`Break ${mins(s.breakSec)}`} />
         </div>
         <div className={`mt-1 flex flex-wrap gap-x-4 text-xs ${muted}`}>
-          <span><span className="mr-1 inline-block size-2 rounded-full bg-rose-500" />Work {mins(s.workSec)}{s.focusShare !== null ? ` (${Math.round(s.focusShare * 100)}% of active time)` : ''}</span>
-          <span><span className="mr-1 inline-block size-2 rounded-full bg-emerald-500" />Break {mins(s.breakSec)}</span>
+          <span><span className="mr-1 inline-block size-2 rounded-full bg-emerald-500" />Work {mins(s.workSec)}{s.focusShare !== null ? ` (${Math.round(s.focusShare * 100)}% of active time)` : ''}</span>
+          <span><span className="mr-1 inline-block size-2 rounded-full bg-rose-500" />Break {mins(s.breakSec)}</span>
           {unused > 0 && <span>Not used {mins(unused)}</span>}
         </div>
       </div>
@@ -76,7 +76,7 @@ export function FocusDay({ refreshKey = 0, light = false }: { refreshKey?: numbe
         <div className="flex h-14 items-end gap-1.5">
           {data.week.map((w) => (
             <button key={w.date} type="button" onClick={() => setDate(w.date)} title={`${formatDate(w.date)}: ${w.workMin} min, ${w.sessions} sessions`} className="flex flex-1 flex-col items-center justify-end gap-0.5">
-              <span className={`w-full rounded-t ${w.date === date ? 'bg-rose-500' : light ? 'bg-white/40' : 'bg-rose-300 dark:bg-rose-500/50'}`} style={{ height: `${Math.max(3, (w.workMin / maxWeek) * 40)}px` }} />
+              <span className={`w-full rounded-t ${w.date === date ? 'bg-emerald-500' : light ? 'bg-white/40' : 'bg-emerald-300 dark:bg-emerald-500/50'}`} style={{ height: `${Math.max(3, (w.workMin / maxWeek) * 40)}px` }} />
               <span className={`text-[10px] ${muted}`}>{new Date(`${w.date}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'narrow', timeZone: 'UTC' })}</span>
             </button>
           ))}
@@ -87,7 +87,7 @@ export function FocusDay({ refreshKey = 0, light = false }: { refreshKey?: numbe
         <ul className="space-y-1">
           {data.segments.map((g) => (
             <li key={g.id} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${tile}`}>
-              <span className={`size-2 shrink-0 rounded-full ${g.kind === 'work' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+              <span className={`size-2 shrink-0 rounded-full ${g.kind === 'work' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
               <span className={`w-16 shrink-0 text-xs tabular-nums ${muted}`}>{hhmm(g.started_at)}</span>
               <span className="min-w-0 flex-1 truncate">{g.kind === 'break' ? 'Break' : g.label || 'Focus'}</span>
               <span className={`shrink-0 text-xs tabular-nums ${muted}`}>{mins(g.actual_sec)}/{mins(g.planned_sec)}{g.pauses ? ` · ${g.pauses}⏸` : ''}</span>

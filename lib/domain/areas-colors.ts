@@ -4,6 +4,7 @@ export const AREA_COLORS: Record<string, string> = {
   'Health & Fitness': '#10b981',
   Relationships: '#d6409f',
   Finances: '#06b6d4',
+  Miscellaneous: '#eab308',
 };
 
 export function areaColor(area: { name: string; color?: string | null } | null | undefined): string {
