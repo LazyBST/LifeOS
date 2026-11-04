@@ -70,6 +70,8 @@ export async function getRun(): Promise<RunDoc> {
 export async function saveRun(timer: Record<string, unknown> | null, rev: number): Promise<RunDoc> {
   if (timer !== null) {
     const cfg = timer.cfg as { workMin?: unknown; breakMin?: unknown } | undefined;
+    const plan = (timer.cfg as { plan?: unknown } | undefined)?.plan;
+    if (plan !== undefined && (!Array.isArray(plan) || plan.length < 1 || plan.length > 20 || plan.some((x) => typeof x?.workMin !== 'number' || typeof x?.breakMin !== 'number'))) throw new Error('Bad timer.');
     if (typeof timer.runId !== 'string' || typeof timer.phaseStartedAt !== 'number' || !cfg || typeof cfg.workMin !== 'number' || typeof cfg.breakMin !== 'number') throw new Error('Bad timer.');
   }
   if (!Number.isFinite(rev)) throw new Error('Bad revision.');

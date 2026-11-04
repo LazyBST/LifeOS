@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advance, celebrationFor, clock, elapsedMs, endInstant, pause, remainingMs, resume, segmentOf, startRun, summariseDay } from '@/lib/domain/pomodoro-math';
+import { advance, breakNow, celebrationFor, extendBreak, phaseMs, planConfig, clock, elapsedMs, endInstant, pause, remainingMs, resume, segmentOf, startRun, summariseDay } from '@/lib/domain/pomodoro-math';
 
 const MIN = 60_000;
 const cfg = { workMin: 25, breakMin: 5, repeats: 2 };
@@ -89,5 +89,45 @@ describe('celebrations', () => {
     const done = advance(t, endInstant(t), 'a').next;
     expect(celebrationFor(t, done, () => 0.9, 'sparkle')).toBe('sparkle');
     expect(celebrationFor(t, done, () => 0.9, 'off')).toBeNull();
+  });
+});
+
+describe('mixed sessions and breaks on demand', () => {
+  const plan = planConfig([{ workMin: 50, breakMin: 10 }, { workMin: 25, breakMin: 5 }, { workMin: 35, breakMin: 0 }]);
+  it('runs each step of the plan in order, then finishes without a last break', () => {
+    let t = startRun(plan, 0, 'r', 'a');
+    const lens: [string, number][] = [];
+    for (let i = 0; i < 10 && t.status !== 'done'; i++) {
+      lens.push([t.phase, phaseMs(t) / MIN]);
+      t = advance(t, endInstant(t), 'a').next;
+    }
+    expect(lens).toEqual([['work', 50], ['break', 10], ['work', 25], ['break', 5], ['work', 35]]);
+    expect(t.status).toBe('done');
+  });
+  it('extends the running break by 5/10/15/20 minutes and the next phase starts clean', () => {
+    let t = advance(startRun(plan, 0, 'r', 'a'), 50 * MIN, 'a').next;
+    t = extendBreak(extendBreak(t, 10), 5);
+    expect(phaseMs(t) / MIN).toBe(25);
+    expect(extendBreak(t, 7)).toBe(t);
+    const w = advance(t, endInstant(t), 'a').next;
+    expect(w.phase).toBe('work');
+    expect(phaseMs(w) / MIN).toBe(25);
+    expect(extendBreak(w, 5)).toBe(w); // only a break can be extended
+  });
+  it('takes a break right now and returns to the same session with the time that was left', () => {
+    const t = startRun(plan, 0, 'r', 'a');
+    const r = breakNow(t, 20 * MIN, 10)!;
+    expect(r.segment.completed).toBe(false);
+    expect(r.segment.actual_sec).toBe(20 * 60);
+    expect(r.next.phase).toBe('break');
+    expect(phaseMs(r.next) / MIN).toBe(10);
+    const back = advance(r.next, endInstant(r.next), 'a').next;
+    expect(back.phase).toBe('work');
+    expect(back.cycle).toBe(1);
+    expect(phaseMs(back) / MIN).toBe(30); // 50 minus the 20 already done
+    const after = advance(back, endInstant(back), 'a').next;
+    expect(after.phase).toBe('break');
+    expect(phaseMs(after) / MIN).toBe(10); // the planned break, not the early one
+    expect(breakNow(r.next, 0, 5)).toBeNull();
   });
 });

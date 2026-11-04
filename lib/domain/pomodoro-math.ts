@@ -1,8 +1,14 @@
 // Pure Pomodoro maths: the timer is built from timestamps (never from counting ticks), so it stays right when the
 // tab sleeps or the page is reloaded. No Supabase, no server-only: the browser timer and the day summary share it.
 
+const MIN_MS = 60_000;
 export type Phase = 'work' | 'break';
-export type PomoConfig = { workMin: number; breakMin: number; /** null = keep going until stopped */ repeats: number | null };
+export type PomoStep = { workMin: number; breakMin: number };
+export type PomoConfig = {
+  workMin: number; breakMin: number; /** null = keep going until stopped */ repeats: number | null;
+  /** a sequence of different sessions (50/10, 25/5, ...); when present, `repeats` is its length and workMin/breakMin mirror the first step */
+  plan?: PomoStep[];
+};
 
 export type PomoTimer = {
   runId: string;
@@ -20,6 +26,12 @@ export type PomoTimer = {
   /** work sessions finished in this run, and the focused seconds they added up to */
   doneWork?: number;
   focusedSec?: number;
+  /** minutes added to the current break with "extend break" */
+  extraMs?: number;
+  /** a break taken on the spot: its own length, and the focus time left to come back to (same session) */
+  inserted?: boolean;
+  breakOverrideMs?: number;
+  workOverrideMs?: number;
 };
 
 export type Segment = {
@@ -27,7 +39,13 @@ export type Segment = {
   paused_sec: number; pauses: number; completed: boolean; started_at: string; ended_at: string;
 };
 
-export const phaseMs = (t: PomoTimer): number => (t.phase === 'work' ? t.cfg.workMin : t.cfg.breakMin) * 60_000;
+/** The lengths for the session the timer is on: the plan's step for this cycle, or the single work/break pair. */
+export const stepOf = (t: PomoTimer): PomoStep => t.cfg.plan?.length ? t.cfg.plan[Math.min(t.cycle, t.cfg.plan.length) - 1] : { workMin: t.cfg.workMin, breakMin: t.cfg.breakMin };
+export const phaseMs = (t: PomoTimer): number =>
+  t.phase === 'work' ? t.workOverrideMs ?? stepOf(t).workMin * 60_000 : (t.breakOverrideMs ?? stepOf(t).breakMin * 60_000) + (t.extraMs ?? 0);
+
+/** Turn a list of steps into a config that runs each once, in order. */
+export const planConfig = (plan: PomoStep[]): PomoConfig => ({ workMin: plan[0].workMin, breakMin: plan[0].breakMin, repeats: plan.length, plan });
 export const elapsedMs = (t: PomoTimer, now: number): number => Math.max(0, (t.pausedAt ?? now) - t.phaseStartedAt - t.pausedMs);
 export const remainingMs = (t: PomoTimer, now: number): number => Math.max(0, phaseMs(t) - elapsedMs(t, now));
 /** The instant this phase finishes (or finished), pauses included. */
@@ -59,13 +77,32 @@ export function segmentOf(t: PomoTimer, now: number, completed: boolean): Segmen
 export function advance(t: PomoTimer, now: number, label: string, completed = true): { segment: Segment; next: PomoTimer } {
   const segment = segmentOf(t, now, completed);
   if (t.phase === 'work' && completed) t = { ...t, doneWork: (t.doneWork ?? 0) + 1, focusedSec: (t.focusedSec ?? 0) + segment.actual_sec };
-  const fresh = (phase: Phase, cycle: number): PomoTimer => ({ ...t, phase, cycle, phaseStartedAt: now, pausedAt: null, pausedMs: 0, pauses: 0, label, status: 'running' });
+  const fresh = (phase: Phase, cycle: number, keepWork = false): PomoTimer => ({
+    ...t, phase, cycle, phaseStartedAt: now, pausedAt: null, pausedMs: 0, pauses: 0, label, status: 'running',
+    extraMs: 0, inserted: false, breakOverrideMs: undefined, workOverrideMs: keepWork ? t.workOverrideMs : undefined,
+  });
   const lastWork = t.cfg.repeats !== null && t.cycle >= t.cfg.repeats;
   if (t.phase === 'work') {
     if (lastWork) return { segment, next: { ...t, status: 'done' } }; // no break needed after the last session
-    return { segment, next: t.cfg.breakMin > 0 ? fresh('break', t.cycle) : fresh('work', t.cycle + 1) };
+    const next = fresh('break', t.cycle);
+    return { segment, next: stepOf(t).breakMin > 0 ? next : fresh('work', t.cycle + 1) };
   }
+  if (t.inserted) return { segment, next: fresh('work', t.cycle, true) }; // an unplanned break: back to the same session
   return { segment, next: lastWork ? { ...t, status: 'done' } : fresh('work', t.cycle + 1) };
+}
+
+/** Break now: end focus early (what was done is logged by the caller) and rest `min` minutes, then pick the same session back up. */
+export function breakNow(t: PomoTimer, now: number, min: number, label = 'Break'): { segment: Segment; next: PomoTimer } | null {
+  if (t.status === 'done' || t.phase !== 'work' || !(min > 0)) return null;
+  const segment = segmentOf(t, now, false);
+  const left = Math.max(60_000, remainingMs(t, now));
+  return { segment, next: { ...t, phase: 'break', phaseStartedAt: now, pausedAt: null, pausedMs: 0, pauses: 0, label, status: 'running', extraMs: 0, inserted: true, breakOverrideMs: min * MIN_MS, workOverrideMs: left } };
+}
+
+/** Add 5, 10, 15 or 20 minutes to the break that is running. */
+export function extendBreak(t: PomoTimer, min: number): PomoTimer {
+  if (t.phase !== 'break' || t.status === 'done' || ![5, 10, 15, 20].includes(min)) return t;
+  return { ...t, extraMs: (t.extraMs ?? 0) + min * MIN_MS };
 }
 
 export const clock = (ms: number): string => {

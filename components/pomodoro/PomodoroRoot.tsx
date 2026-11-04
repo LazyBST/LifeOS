@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
 import { logPomodoroSegmentAction, pomodoroGetRunAction, pomodoroSaveRunAction } from '@/app/actions/pomodoro';
-import { advance, celebrationFor, clock, elapsedMs, endInstant, pause, phaseMs, remainingMs, resume, segmentOf, startRun, type Celebration as CelebrationKind, type CelebrationMode, type PomoConfig, type PomoTimer, type Segment } from '@/lib/domain/pomodoro-math';
+import { advance, breakNow, celebrationFor, clock, elapsedMs, endInstant, extendBreak, pause, phaseMs, planConfig, remainingMs, resume, segmentOf, startRun, stepOf, type Celebration as CelebrationKind, type CelebrationMode, type PomoConfig, type PomoStep, type PomoTimer, type Segment } from '@/lib/domain/pomodoro-math';
 import { istDate, istParts } from '@/lib/time';
 import { weekStart } from '@/lib/domain/lifecal-math';
 import type { WeekBlock } from '@/lib/domain/calweek';
@@ -329,6 +329,18 @@ export function PomodoroRoot() {
     cue(r.next);
     setNow(n);
   };
+  /** Rest now for `min` minutes, then come back to the same session. */
+  const takeBreak = (min: number) => {
+    const t = timerRef.current, n = tnow();
+    if (!t) return;
+    const r = breakNow(t, n, min);
+    if (!r) return;
+    log(r.segment);
+    commit(r.next);
+    cue(r.next);
+    setNow(n);
+  };
+  const extend = (min: number) => { const t = timerRef.current; if (t) { commit(extendBreak(t, min)); setNow(tnow()); } };
   const stop = () => {
     const t = timerRef.current;
     if (t && t.status !== 'done') log(segmentOf(t, tnow(), false));
@@ -347,9 +359,29 @@ export function PomodoroRoot() {
   const done = timer?.status === 'done';
   const paused = timer?.status === 'paused';
   const heading = timer?.phase === 'break' ? 'Take a breather' : current.title;
-  const sessionText = timer ? (timer.phase === 'work' ? `Focus ${timer.cycle}${timer.cfg.repeats ? ` of ${timer.cfg.repeats}` : ''}` : `Break after session ${timer.cycle}`) : '';
+  const stepText = timer?.cfg.plan?.length ? ` · ${stepOf(timer).workMin}/${stepOf(timer).breakMin}` : '';
+  const sessionText = timer ? (timer.phase === 'work' ? `Focus ${timer.cycle}${timer.cfg.repeats ? ` of ${timer.cfg.repeats}` : ''}${stepText}` : timer.inserted ? 'Break (taken early)' : `Break after session ${timer.cycle}${stepText}`) : '';
+  const nextText = timer?.cfg.plan?.length && timer.cycle < timer.cfg.plan.length && !timer.inserted ? `Next: ${timer.cfg.plan[timer.cycle].workMin}/${timer.cfg.plan[timer.cycle].breakMin}` : null;
   // desktop: stacked above the chat icon (same size); with the chat open, left of the chat window
   const fab = `fixed right-4 bottom-20 z-40 ${chatOpen ? 'md:right-[396px] md:bottom-4' : 'md:right-4 md:bottom-20'}`;
+
+  const chip = 'rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium text-white hover:bg-white/25';
+  const extras = timer && !done && (
+    <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-white">
+      {timer.phase === 'work' ? (
+        <>
+          <span className="text-xs text-white/75">Break now:</span>
+          {[5, 10, 15, 20].map((m) => <button key={m} type="button" onClick={() => takeBreak(m)} className={chip} aria-label={`Take a ${m} minute break now`}>{m} min</button>)}
+        </>
+      ) : (
+        <>
+          <span className="text-xs text-white/75">Extend break:</span>
+          {[5, 10, 15, 20].map((m) => <button key={m} type="button" onClick={() => extend(m)} className={chip} aria-label={`Extend the break by ${m} minutes`}>+{m}</button>)}
+        </>
+      )}
+      {nextText && <span className="w-full text-center text-[11px] text-white/70">{nextText}</span>}
+    </div>
+  );
 
   const controls = (big: boolean) => timer && !done && (
     <div className="flex items-center justify-center gap-3">
@@ -398,6 +430,7 @@ export function PomodoroRoot() {
                 <div className="my-3 text-6xl font-black tracking-tight tabular-nums">{clock(mem.left)}</div>
                 <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-white/25"><div className="h-full rounded-full bg-white" style={{ width: `${mem.pct * 100}%`, transition: 'width 0.3s linear' }} /></div>
                 {controls(false)}
+                {extras}
               </>
             )}
           </div>
@@ -425,6 +458,7 @@ export function PomodoroRoot() {
                   {!timer.cfg.repeats && <span className="text-xs text-white/80">until you stop</span>}
                 </div>
                 {controls(true)}
+                {extras}
               </>
             )}
             <div className="mt-12 w-full rounded-3xl bg-black/20 p-5 text-left backdrop-blur"><FocusDay light refreshKey={statsKey} /></div>
@@ -454,12 +488,52 @@ function SetupForm({ initial, prefs, onPrefs, onPreview, heading, onStart, onHid
   const [work, setWork] = useState(String(initial.workMin));
   const [brk, setBrk] = useState(String(initial.breakMin));
   const [forever, setForever] = useState(initial.repeats === null);
-  const [times, setTimes] = useState(String(initial.repeats ?? 4));
+  const [times, setTimes] = useState(String(initial.plan?.length ? 4 : initial.repeats ?? 4));
+  const [seq, setSeq] = useState(!!initial.plan?.length);
+  const [steps, setSteps] = useState<{ work: string; brk: string }[]>(initial.plan?.length ? initial.plan.map((x) => ({ work: String(x.workMin), brk: String(x.breakMin) })) : [{ work: '50', brk: '10' }, { work: '25', brk: '5' }, { work: '50', brk: '10' }, { work: '25', brk: '5' }]);
   const w = Number(work), b = Number(brk), r = Number(times);
-  const problem = !(w >= 1 && w <= 180) ? 'Work sessions can be 1 to 180 minutes.' : !(b >= 0 && b <= 60) ? 'Breaks can be 0 to 60 minutes.' : !forever && !(r >= 1 && r <= 50) ? 'Repeat 1 to 50 times.' : null;
+  const plan: PomoStep[] = steps.map((x) => ({ workMin: Number(x.work), breakMin: Number(x.brk) }));
+  const stepBad = plan.some((x) => !(x.workMin >= 1 && x.workMin <= 180) || !(x.breakMin >= 0 && x.breakMin <= 60));
+  const patch = (i: number, k: 'work' | 'brk', v: string) => setSteps((xs) => xs.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const move = (i: number, d: number) => setSteps((xs) => { const j = i + d; if (j < 0 || j >= xs.length) return xs; const c = [...xs]; [c[i], c[j]] = [c[j], c[i]]; return c; });
+  const totalMin = plan.reduce((a, x) => a + (x.workMin || 0) + (x.breakMin || 0), 0) - (plan[plan.length - 1]?.breakMin || 0);
+  const problem = seq
+    ? (steps.length < 1 ? 'Add at least one session.' : steps.length > 20 ? 'Up to 20 sessions in a sequence.' : stepBad ? 'Each work session can be 1 to 180 minutes and each break 0 to 60.' : null)
+    : !(w >= 1 && w <= 180) ? 'Work sessions can be 1 to 180 minutes.' : !(b >= 0 && b <= 60) ? 'Breaks can be 0 to 60 minutes.' : !forever && !(r >= 1 && r <= 50) ? 'Repeat 1 to 50 times.' : null;
   return (
     <div className="space-y-4 text-sm">
       <div className="rounded-xl bg-muted/60 px-3 py-2"><div className="text-[11px] uppercase tracking-wide text-muted-foreground">Working on</div><div className="font-semibold">{heading.title}</div>{heading.sub && <div className="text-xs text-muted-foreground">{heading.sub}</div>}</div>
+      <div className="flex rounded-lg bg-muted p-0.5 text-xs">
+        <button type="button" onClick={() => setSeq(false)} className={`flex-1 rounded-md px-3 py-1.5 font-medium ${!seq ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>Same session</button>
+        <button type="button" onClick={() => setSeq(true)} className={`flex-1 rounded-md px-3 py-1.5 font-medium ${seq ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>Mix of sessions</button>
+      </div>
+      {seq ? (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Line up different sessions, e.g. 50/10, then 25/5, then 50/10 again. Work / break in minutes.</p>
+          <ol className="space-y-1.5">
+            {steps.map((x, i) => (
+              <li key={i} className="flex items-center gap-1.5">
+                <span className="w-5 text-right text-xs text-muted-foreground">{i + 1}.</span>
+                <Input type="number" min={1} max={180} value={x.work} onChange={(e) => patch(i, 'work', e.target.value)} className="h-8 w-16" aria-label={`Session ${i + 1} work minutes`} />
+                <span className="text-muted-foreground">/</span>
+                <Input type="number" min={0} max={60} value={x.brk} onChange={(e) => patch(i, 'brk', e.target.value)} className="h-8 w-16" aria-label={`Session ${i + 1} break minutes`} />
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="rounded px-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30" aria-label="Move up">↑</button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === steps.length - 1} className="rounded px-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30" aria-label="Move down">↓</button>
+                <button type="button" onClick={() => setSteps((xs) => xs.filter((_, j) => j !== i))} className="rounded px-1.5 text-muted-foreground hover:bg-muted" aria-label="Remove session">✕</button>
+              </li>
+            ))}
+          </ol>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Add:</span>
+            {[...PRESETS, [35, 5], [40, 20]].map(([pw, pb]) => (
+              <button key={`${pw}/${pb}`} type="button" onClick={() => setSteps((xs) => [...xs, { work: String(pw), brk: String(pb) }])} className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted">+ {pw}/{pb}</button>
+            ))}
+            <button type="button" onClick={() => setSteps((xs) => [...xs, { work: '25', brk: '5' }])} className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted">+ custom</button>
+          </div>
+          {!stepBad && steps.length > 0 && <p className="text-xs text-muted-foreground">{steps.length} sessions · about {Math.floor(totalMin / 60)}h {totalMin % 60}m in all</p>}
+        </div>
+      ) : (
+        <>
       <div className="flex flex-wrap gap-1.5">
         {PRESETS.map(([pw, pb]) => (
           <button key={pw} type="button" onClick={() => { setWork(String(pw)); setBrk(String(pb)); }} className={`rounded-full border px-3 py-1 text-xs ${Number(work) === pw && Number(brk) === pb ? 'border-primary bg-primary/10 font-semibold' : 'hover:bg-muted'}`}>{pw} / {pb}</button>
@@ -477,6 +551,8 @@ function SetupForm({ initial, prefs, onPrefs, onPreview, heading, onStart, onHid
         </div>
         {!forever && <div className="flex items-center gap-2"><Input type="number" min={1} max={50} value={times} onChange={(e) => setTimes(e.target.value)} className="w-24" /><span className="text-muted-foreground">work sessions</span></div>}
       </div>
+        </>
+      )}
       <div className="space-y-2">
         <div className="font-medium">Look</div>
         <div className="flex flex-wrap gap-2">
@@ -511,7 +587,7 @@ function SetupForm({ initial, prefs, onPrefs, onPreview, heading, onStart, onHid
       {problem && <p className="text-xs text-red-600">{problem}</p>}
       <div className="flex items-center justify-between gap-2">
         <button type="button" onClick={onHide} className="text-xs text-muted-foreground underline">Hide the timer button</button>
-        <button type="button" disabled={!!problem} onClick={() => onStart({ workMin: w, breakMin: b, repeats: forever ? null : r })} className="rounded-xl bg-primary px-5 py-2 font-semibold text-primary-foreground disabled:opacity-50">Start</button>
+        <button type="button" disabled={!!problem} onClick={() => onStart(seq ? planConfig(plan) : { workMin: w, breakMin: b, repeats: forever ? null : r })} className="rounded-xl bg-primary px-5 py-2 font-semibold text-primary-foreground disabled:opacity-50">Start</button>
       </div>
     </div>
   );
