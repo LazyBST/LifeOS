@@ -2,7 +2,8 @@ import type { NextConfig } from 'next';
 import withSerwistInit from '@serwist/next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // unpdf reads the statement PDFs on the server; it is loaded from node_modules rather than bundled (it uses import.meta)
+  serverExternalPackages: ['unpdf'],
 };
 
 const withSerwist = withSerwistInit({
