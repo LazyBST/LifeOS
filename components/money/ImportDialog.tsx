@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { commitImportAction, previewImportAction } from '@/app/actions/money';
+import { LabelPicker } from './LabelChips';
 import { formatINR } from '@/lib/format';
 import { IMPORT_SOURCES, type Classified, type ExtractedRow, type ImportSource } from '@/lib/domain/statement-import-math';
 import type { CommitItem, ImportPreview } from '@/lib/domain/statement-import';
@@ -15,7 +16,7 @@ const BADGE: Record<Classified['status'], { text: string; cls: string }> = {
   new: { text: 'New', cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' },
   merge: { text: 'Merge', cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-300' },
   duplicate: { text: 'Already there', cls: 'bg-muted text-muted-foreground' },
-  transfer: { text: 'Own transfer', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300' },
+  transfer: { text: 'Transfer', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300' },
 };
 const selectCls = 'h-8 min-w-0 rounded-lg border border-input bg-transparent px-2 text-xs';
 
@@ -52,15 +53,16 @@ function Importer({ onDone }: { onDone: () => void }) {
   const [cat, setCat] = useState<Record<number, string>>({});
   const [acc, setAcc] = useState<Record<number, string>>({});
   const [removeOther, setRemoveOther] = useState<Record<number, boolean>>({});
+  const [lab, setLab] = useState<Record<number, string[]>>({});
 
   async function run(rows: ExtractedRow[], aId: string | null, map: Record<string, string>, l4: string | null) {
     const r = await previewImportAction(source, rows, aId, map, l4);
     if (!r.ok) { toast.error(r.error); return false; }
     setPreview(r.data);
     setAccountId(aId ?? r.data.defaultAccountId);
-    setPicked(Object.fromEntries(r.data.rows.map((x) => [x.idx, x.status === 'new' || x.status === 'merge'])));
+    setPicked(Object.fromEntries(r.data.rows.map((x) => [x.idx, x.status === 'new' || x.status === 'merge' || x.status === 'transfer'])));
     setRemoveOther(Object.fromEntries(r.data.rows.filter((x) => x.counterpartIds.length).map((x) => [x.idx, true])));
-    setCat({}); setAcc({});
+    setCat({}); setAcc({}); setLab({});
     return true;
   }
 
@@ -117,17 +119,15 @@ function Importer({ onDone }: { onDone: () => void }) {
     setBusy('Adding…');
     const items: CommitItem[] = chosen.filter((r) => r.status !== 'merge').map((r) => ({
       date: r.date, name: r.name, raw: r.raw, direction: r.direction, amount: r.amount, ref: r.ref,
-      account_id: acc[r.idx] ?? r.account_id, category: r.direction === 'credit' ? null : cat[r.idx] ?? r.category,
+      account_id: acc[r.idx] ?? r.account_id, category: (cat[r.idx] ?? r.category) || null, labels: lab[r.idx] ?? [],
+      ...(r.status === 'transfer' && r.transfer?.from && r.transfer.to ? { transfer: { from: r.transfer.from, to: r.transfer.to } } : {}),
     }));
-    for (const r of rows.filter((x) => x.status === 'transfer' && !picked[x.idx])) {
-      items.push({ date: r.date, name: r.name, raw: r.raw, direction: r.direction, amount: r.amount, ref: r.ref, account_id: r.account_id, category: null, remembered: true });
-    }
     const merges = [
       ...chosen.filter((r) => r.status === 'merge' && r.matchId).map((r) => ({ id: r.matchId!, ...(r.patch ?? {}) })),
       // remembering the reference on an entry you typed yourself costs nothing and stops a later duplicate
       ...rows.filter((r) => r.status === 'duplicate' && r.matchId && r.patch?.ext_ref).map((r) => ({ id: r.matchId!, ext_ref: r.patch!.ext_ref })),
     ];
-    const removeIds = rows.filter((r) => r.counterpartIds.length && removeOther[r.idx] && !picked[r.idx]).flatMap((r) => r.counterpartIds);
+    const removeIds = rows.filter((r) => r.counterpartIds.length && removeOther[r.idx] && picked[r.idx]).flatMap((r) => r.counterpartIds);
     const res = await commitImportAction(source, items, merges, removeIds, IMPORT_SOURCES[source].label, last4);
     setBusy(null);
     if (!res.ok) { toast.error(res.error); return; }
@@ -160,6 +160,7 @@ function Importer({ onDone }: { onDone: () => void }) {
   }
 
   const accountOptions = preview.accounts;
+  const accountName = (id: string | null) => accountOptions.find((a) => a.id === id)?.name ?? 'an account';
   return (
     <div className="space-y-3 text-sm">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
@@ -167,7 +168,7 @@ function Importer({ onDone }: { onDone: () => void }) {
         <span className="text-emerald-700 dark:text-emerald-300">{counts.new} new</span>
         {counts.merge > 0 && <span className="text-sky-700 dark:text-sky-300">{counts.merge} to merge</span>}
         <span className="text-muted-foreground">{counts.duplicate} already there</span>
-        {counts.transfer > 0 && <span className="text-amber-700 dark:text-amber-300">{counts.transfer} own transfers</span>}
+        {counts.transfer > 0 && <span className="text-amber-700 dark:text-amber-300">{counts.transfer} transfers between your accounts</span>}
       </div>
       {proof.length > 0 && <ul className="text-[11px] text-muted-foreground">{proof.map((p) => <li key={p}>✓ {p}</li>)}</ul>}
       {source !== 'phonepe' ? (
@@ -214,34 +215,37 @@ function Importer({ onDone }: { onDone: () => void }) {
                 </div>
                 <span className={`shrink-0 font-semibold tabular-nums ${credit ? 'text-emerald-600' : ''}`}>{credit ? '+' : '−'}{formatINR(r.amount)}</span>
               </div>
-              {(r.status === 'new' || on) && r.status !== 'merge' && (
+              {r.status === 'transfer' && r.transfer && (
+                <div className="pl-6 text-xs font-medium">{accountName(r.transfer.from)} → {accountName(r.transfer.to)}</div>
+              )}
+              {(r.status === 'new' || on) && r.status !== 'merge' && r.status !== 'transfer' && (
                 <div className="flex flex-wrap items-center gap-2 pl-6">
-                  {!credit && (
-                    <select value={cat[r.idx] ?? r.category ?? ''} onChange={(e) => setCat((c) => ({ ...c, [r.idx]: e.target.value }))} className={selectCls} aria-label="Category">
-                      {preview.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  )}
+                  <select value={cat[r.idx] ?? r.category ?? ''} onChange={(e) => setCat((c) => ({ ...c, [r.idx]: e.target.value }))} className={selectCls} aria-label="Category">
+                    {credit && <option value="">No category</option>}
+                    {preview.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
                   <select value={acc[r.idx] ?? r.account_id ?? ''} onChange={(e) => setAcc((a) => ({ ...a, [r.idx]: e.target.value }))} className={selectCls} aria-label="Account">
                     <option value="">New account</option>
                     {accountOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
+                  <LabelPicker labels={preview.labels} value={lab[r.idx] ?? []} onChange={(next) => setLab((m) => ({ ...m, [r.idx]: next }))} />
                 </div>
               )}
-              {r.status === 'transfer' && r.counterpartIds.length > 0 && !on && (
+              {r.status === 'transfer' && r.counterpartIds.length > 0 && on && (
                 <label className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
                   <input type="checkbox" checked={!!removeOther[r.idx]} onChange={(e) => setRemoveOther((m) => ({ ...m, [r.idx]: e.target.checked }))} className="size-3.5" />
-                  Also remove the entr{r.counterpartIds.length === 1 ? 'y' : 'ies'} imported earlier for this transfer
+                  Also remove the entr{r.counterpartIds.length === 1 ? 'y' : 'ies'} imported earlier for each side, so the transfer is not counted twice
                 </label>
               )}
             </li>
           );
         })}
       </ul>
-      <p className="text-xs text-muted-foreground">After importing, open any transaction to change its account or category, add a label, or split it.</p>
+      <p className="text-xs text-muted-foreground">Money moving between your own accounts is recorded once, as a transfer (not income or spending). After importing, open any transaction to change its account, category or labels, split it, or turn it into a transfer with the ⇄ button.</p>
       <div className="flex items-center justify-between gap-2">
         <button type="button" onClick={() => { setPreview(null); setExtracted(null); setFiles([]); setProof([]); }} className="text-xs text-muted-foreground underline">Start over</button>
-        <Button onClick={() => void commit()} disabled={!!busy || (addCount + mergeCount === 0 && counts.transfer === 0)}>
-          {busy ?? `Import ${addCount} new${mergeCount ? ` · merge ${mergeCount}` : ''}`}
+        <Button onClick={() => void commit()} disabled={!!busy || chosen.length === 0}>
+          {busy ?? `Import ${addCount}${mergeCount ? ` · merge ${mergeCount}` : ''}`}
         </Button>
       </div>
     </div>

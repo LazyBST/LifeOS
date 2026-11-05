@@ -409,7 +409,11 @@ export async function updateTransaction(id: UUID, patch: TxPatch): Promise<Trans
   if (patch.counterparty !== undefined) row.counterparty = patch.counterparty?.trim() || null;
   if (patch.account_id !== undefined) row.account_id = patch.account_id;
   if (patch.labels !== undefined) row.labels = cleanLabels(patch.labels);
-  if (patch.category_id !== undefined) row.category_id = t.kind === 'settlement' ? null : patch.category_id;
+  if (patch.category_id !== undefined) row.category_id = t.kind === 'settlement' || t.kind === 'transfer' ? null : patch.category_id;
+  if (patch.to_account_id !== undefined) {
+    if (t.kind !== 'transfer') throw new Error('Only a transfer has a destination account.');
+    row.to_account_id = patch.to_account_id;
+  }
 
   if (patch.amount !== undefined) {
     if (!Number.isFinite(patch.amount)) throw new Error('Enter a valid amount.');
@@ -429,7 +433,7 @@ export async function updateTransaction(id: UUID, patch: TxPatch): Promise<Trans
   }
   if (Object.keys(row).length === 0) return t;
   const { data, error } = await admin().from('transactions').update(row).eq('id', id).select('*').single();
-  if (error) throw new Error(`transaction_update: ${error.message}`);
+  if (error) throw new Error(error.message.includes('transactions_transfer_check') ? 'A transfer needs two different accounts.' : `transaction_update: ${error.message}`);
   return data as Transaction;
 }
 

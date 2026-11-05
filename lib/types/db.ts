@@ -15,7 +15,7 @@ export type EntityStatus = string;
 export type TaskStatus = string;
 export type Priority = 'P0' | 'P1' | 'P2' | 'P3';
 export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'any';
-export type TxKind = 'expense' | 'income' | 'settlement';
+export type TxKind = 'expense' | 'income' | 'settlement' | 'transfer';
 export type ChatChannel = 'web' | 'system';
 export type ChatRole = 'user' | 'assistant' | 'tool';
 export type EventSource = 'web' | 'chat' | 'gcal' | 'system';
@@ -250,6 +250,8 @@ export type Transaction = {
   /** where an imported transaction came from, and its bank reference (migration 0027) */
   source?: string | null;
   ext_ref?: string | null;
+  /** transfers only: the account the money went to (account_id is where it came from) */
+  to_account_id?: UUID | null;
   created_at: Instant;
   deleted_at: Instant | null;
 };

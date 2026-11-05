@@ -4,7 +4,7 @@
 // owed = paid - my_share (expenses); settlements subtract their signed amount.
 
 export type OwedRow = {
-  kind: 'expense' | 'income' | 'settlement';
+  kind: 'expense' | 'income' | 'settlement' | 'transfer';
   amount: number;
   my_share?: number | null;
   counterparty?: string | null;

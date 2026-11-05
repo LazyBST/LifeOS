@@ -1,12 +1,14 @@
 import { getDocumentProxy } from 'unpdf';
 import { admin } from '@/lib/supabase/admin';
 import { istDate } from '@/lib/time';
-import { listAccounts, listCategories } from './money';
+import { listAccounts, listCategories, listLabels } from './money';
+import { cleanLabels } from './money-filters';
 import {
   IMPORT_SOURCES, classifyRows, normalizeRef,
   type Classified, type ExistingTx, type ExtractedRow, type ImportSource,
 } from './statement-import-math';
 import { parseStatement, StatementError, type PdfItem } from './statement-pdf';
+import type { TxLabel } from '@/lib/types/db';
 
 export { StatementError };
 
@@ -41,6 +43,7 @@ export type ImportPreview = {
   rows: Classified[];
   accounts: { id: string; name: string }[];
   categories: string[];
+  labels: TxLabel[];
   /** which account each PhonePe "paid by" number maps to, when known */
   defaultAccountId: string | null;
   /** PhonePe "paid by" digits that match one of your accounts already */
@@ -52,7 +55,7 @@ export type ImportPreview = {
  * `accountFor` maps a PhonePe "paid by" number to an account id; `accountId` is the account for the whole file.
  */
 export async function previewImport(source: ImportSource, rows: ExtractedRow[], accountId: string | null, accountFor: Record<string, string> = {}, accountLast4: string | null = null): Promise<ImportPreview> {
-  const [accounts, categories] = await Promise.all([listAccounts(), listCategories()]);
+  const [accounts, categories, labels] = await Promise.all([listAccounts(), listCategories(), listLabels()]);
   // which account is this file for: the one that already carries its number, else one named like the bank
   const byNumber = accountLast4 ? accounts.find((a) => a.number_last4 === accountLast4)?.id ?? null : null;
   const guess = byNumber ?? accounts.find((a) => IMPORT_SOURCES[source].account.test(a.name))?.id ?? null;
@@ -85,9 +88,10 @@ export async function previewImport(source: ImportSource, rows: ExtractedRow[], 
     }
   }
   return {
-    rows: classifyRows(withAccount, existing, source, categories.map((c) => c.name), new Set(Object.keys(knownLast4).concat(accountLast4 ? [accountLast4] : []))),
+    rows: classifyRows(withAccount, existing, source, categories.map((c) => c.name), accountLast4 && fileAccount ? { ...knownLast4, [accountLast4]: fileAccount } : knownLast4),
     accounts: accounts.map((a) => ({ id: a.id, name: a.name })),
     categories: categories.map((c) => c.name),
+    labels,
     defaultAccountId: fileAccount,
     knownLast4,
   };
@@ -96,8 +100,9 @@ export async function previewImport(source: ImportSource, rows: ExtractedRow[], 
 export type CommitItem = {
   date: string; name: string; raw: string; direction: 'debit' | 'credit'; amount: number;
   ref: string | null; account_id: string | null; category: string | null;
-  /** a transfer between your own accounts: kept out of your books, but remembered so a later import does not add it */
-  remembered?: boolean;
+  labels?: string[];
+  /** a transfer between two of your accounts: recorded once, as a transfer (account_id is where it left, to_account_id where it arrived) */
+  transfer?: { from: string; to: string };
 };
 export type CommitMerge = { id: string; description?: string; category?: string; ext_ref?: string };
 export type CommitResult = { added: number; merged: number; removed: number };
@@ -119,27 +124,35 @@ export async function commitImport(source: ImportSource, items: CommitItem[], me
   const valid = new Set(accounts.map((a) => a.id));
   const rows = items.map((i) => {
     const expense = i.direction === 'debit';
+    if (i.transfer) {
+      if (!valid.has(i.transfer.from) || !valid.has(i.transfer.to) || i.transfer.from === i.transfer.to) throw new Error('A transfer needs two different accounts.');
+      return {
+        occurred_on: /^\d{4}-\d{2}-\d{2}$/.test(i.date) ? i.date : istDate(), kind: 'transfer', description: i.name.trim().slice(0, 200) || null,
+        category_id: null, account_id: i.transfer.from, to_account_id: i.transfer.to, amount: Math.abs(i.amount), my_share: null,
+        raw_text: i.raw.slice(0, 500) || null, source, ext_ref: normalizeRef(i.ref, i.raw),
+      };
+    }
     const account_id = i.account_id && valid.has(i.account_id) ? i.account_id : fallbackAccount;
     return {
       occurred_on: /^\d{4}-\d{2}-\d{2}$/.test(i.date) ? i.date : istDate(),
       kind: expense ? 'expense' : 'income',
       description: i.name.trim().slice(0, 200) || null,
-      category_id: expense ? catId(i.category) : catId(i.category),
+      category_id: catId(i.category),
       account_id,
       amount: Math.abs(i.amount),
       my_share: expense ? Math.abs(i.amount) : null,
       raw_text: i.raw.slice(0, 500) || null,
       source,
       ext_ref: normalizeRef(i.ref, i.raw),
-      ...(i.remembered ? { deleted_at: new Date().toISOString() } : {}),
+      ...(i.labels?.length ? { labels: cleanLabels(i.labels) } : {}),
     };
   });
   if (rows.some((r) => !(r.amount > 0))) throw new Error('A line has no amount.');
   let added = 0;
   for (let k = 0; k < rows.length; k += 200) {
     const { error } = await admin().from('transactions').insert(rows.slice(k, k + 200));
-    if (error) throw new Error(/ext_ref|source/.test(error.message) ? 'Run supabase/migrations/0027_statement_import.sql in Supabase, then try again.' : `import: ${error.message}`);
-    added += rows.slice(k, k + 200).filter((r) => !('deleted_at' in r)).length;
+    if (error) throw new Error(/ext_ref|source/.test(error.message) ? 'Run supabase/migrations/0027_statement_import.sql in Supabase, then try again.' : /to_account_id|transactions_(kind|transfer)_check/.test(error.message) ? 'Run supabase/migrations/0028_transfers.sql in Supabase, then try again.' : `import: ${error.message}`);
+    added += Math.min(200, rows.length - k);
   }
   // remember the account number's last digits, so PhonePe's "paid by …5047" finds this account next time
   if (source !== 'phonepe' && accountLast4) {

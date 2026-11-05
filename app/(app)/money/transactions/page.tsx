@@ -3,6 +3,7 @@ import { SetPageContext } from '@/components/chat/page-context';
 import { TransactionsExplorer } from '@/components/money/TransactionsExplorer';
 import { CategoriesDialog } from '@/components/money/CategoriesDialog';
 import { ImportDialog } from '@/components/money/ImportDialog';
+import { FindTransfers } from '@/components/money/FindTransfers';
 import { listAccounts, listCategories, listLabels } from '@/lib/domain/money';
 
 /** All transactions with filters. Every cell is editable in place. */
@@ -16,6 +17,7 @@ export default async function TransactionsPage() {
         <div className="flex items-center gap-2">
           <CategoriesDialog categories={categories} labels={labels} />
           <ImportDialog />
+          <FindTransfers />
           <Link href="/money" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted">← Money</Link>
         </div>
       </div>

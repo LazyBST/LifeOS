@@ -11,7 +11,7 @@ import { formatINR } from '@/lib/format';
 type Named = { id: string; name: string };
 type Totals = { count: number; spent: number; income: number; owed: number };
 
-const KINDS: { id: TxKind; label: string }[] = [{ id: 'expense', label: 'Expenses' }, { id: 'income', label: 'Income' }, { id: 'settlement', label: 'Settlements' }];
+const KINDS: { id: TxKind; label: string }[] = [{ id: 'expense', label: 'Expenses' }, { id: 'income', label: 'Income' }, { id: 'settlement', label: 'Settlements' }, { id: 'transfer', label: 'Transfers' }];
 const SORTS: { id: NonNullable<TxFilters['sort']>; label: string }[] = [
   { id: 'date_desc', label: 'Newest first' }, { id: 'date_asc', label: 'Oldest first' }, { id: 'amount_desc', label: 'Largest first' }, { id: 'amount_asc', label: 'Smallest first' },
 ];

@@ -36,6 +36,7 @@ const MIGRATION_FILES = [
   '0025_task_hierarchy_links.sql',
   '0026_miscellaneous_area.sql',
   '0027_statement_import.sql',
+  '0028_transfers.sql',
 ];
 
 // Supabase provides these for free; PGlite does not, so we stub the minimum

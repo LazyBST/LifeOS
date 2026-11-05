@@ -25,7 +25,7 @@ export type ExtractedRow = {
 export type ExistingTx = {
   id: string;
   occurred_on: string;
-  kind: 'expense' | 'income' | 'settlement';
+  kind: 'expense' | 'income' | 'settlement' | 'transfer';
   amount: number;
   account_id: string | null;
   ext_ref: string | null;
@@ -53,6 +53,8 @@ export type Classified = ExtractedRow & {
   patch: RowPatch | null;
   /** transfer: the entries imported earlier that are the two sides of this transfer, so they can be removed */
   counterpartIds: string[];
+  /** transfer: money moved from one of your accounts to another; recorded as a single transfer */
+  transfer: { from: string | null; to: string | null } | null;
 };
 
 export const IMPORT_SOURCES: Record<ImportSource, { label: string; account: RegExp }> = {
@@ -100,11 +102,11 @@ const KEYWORDS: [RegExp, string][] = [
   [/\brent\b/i, 'Rent'],
 ];
 
-/** A category for a payment: known merchant words first, then the card-network merchant code, else Misc. Credits stay uncategorised. */
+/** A category for a payment: known merchant words first, then the card-network merchant code, else Misc. Credits: Salary when it looks like pay, else none (a refund is spotted against the payment it reverses). */
 export function categorize(row: Pick<ExtractedRow, 'name' | 'raw' | 'direction'>, categoryNames: string[]): string | null {
-  if (row.direction === 'credit') return null;
   const has = (n: string) => categoryNames.find((c) => c.toLowerCase() === n.toLowerCase()) ?? null;
   const text = `${row.name} ${row.raw}`;
+  if (row.direction === 'credit') return /salary|payroll/i.test(text) || (/^NEFT CR-/i.test(row.raw) && /\b(PRIVATE|PVT|LTD|LIMITED|LLP|INC)\b/i.test(row.raw)) ? has('Salary') : null;
   for (const [re, name] of KEYWORDS) if (re.test(text)) return has(name) ?? has('Misc');
   const mcc = mccOf(row.raw);
   if (mcc && MCC_CATEGORY[mcc]) return has(MCC_CATEGORY[mcc]) ?? has('Misc');
@@ -117,42 +119,51 @@ const kindOf = (d: 'debit' | 'credit') => (d === 'debit' ? 'expense' : 'income')
 /**
  * Decide, for every line, whether it is new. A line is "already there" when an existing transaction has the same bank
  * reference; failing that, when a hand-entered one on the same account has the same amount within two days. The same
- * reference on the other side of a different account (money going out of one, in to another) is a transfer between
- * your own accounts, which is not income or spending.
+ * reference on the other side of a different account (money out of one, in to another) is a transfer between your own
+ * accounts: it is recorded once, as a transfer, instead of as spending plus income.
  */
 export function classifyRows(
   rows: (ExtractedRow & { account_id: string | null })[],
   existing: ExistingTx[],
   source: ImportSource,
   categoryNames: string[],
-  /** last digits of your own accounts: a PhonePe "Transfer to XXXXXXXXXX5047" to one of them is not spending */
-  ownLast4: ReadonlySet<string> = new Set(),
+  /** your own accounts by the last digits of their numbers: a PhonePe "Transfer to XXXXXXXXXX5047" to one of them is a transfer */
+  ownAccounts: Readonly<Record<string, string>> = {},
 ): Classified[] {
   const byRef = new Map<string, ExistingTx[]>();
   for (const e of existing) if (e.ext_ref) byRef.set(e.ext_ref, [...(byRef.get(e.ext_ref) ?? []), e]);
   const consumed = new Set<string>();
   const seenRefs = new Set<string>();
+  const has = (n: string) => categoryNames.find((c) => c.toLowerCase() === n.toLowerCase()) ?? null;
 
   return rows.map((r, idx) => {
     const ref = normalizeRef(r.ref, r.raw);
-    const category = categorize(r, categoryNames);
-    const base: Classified = { ...r, idx, ref, category, status: 'new', reason: '', matchId: null, patch: null, counterpartIds: [] };
+    let category = categorize(r, categoryNames);
+    // money coming back that matches a payment in the same statement is a refund
+    if (r.direction === 'credit' && !category && rows.some((o) => o.direction === 'debit' && Math.abs(o.amount - r.amount) < 0.005 && dayNumber(o.date) <= dayNumber(r.date) && dayNumber(r.date) - dayNumber(o.date) <= 14)) category = has('Refund');
+    const base: Classified = { ...r, idx, ref, category, status: 'new', reason: '', matchId: null, patch: null, counterpartIds: [], transfer: null };
 
     if (ref) {
       if (seenRefs.has(ref + r.direction)) return { ...base, status: 'duplicate', reason: 'Appears twice in this file' };
       seenRefs.add(ref + r.direction);
     }
 
-    if (r.transfer_to_last4 && ownLast4.has(r.transfer_to_last4)) {
-      const both = ref ? (byRef.get(ref) ?? []).filter((e) => isImported(e) && !e.deleted) : [];
-      return { ...base, status: 'transfer', matchId: both[0]?.id ?? null, counterpartIds: both.map((e) => e.id), reason: `Sent to your own account ending ${r.transfer_to_last4}` };
+    const toAccount = r.transfer_to_last4 ? ownAccounts[r.transfer_to_last4] : undefined;
+    if (toAccount && r.account_id && toAccount !== r.account_id) {
+      const sides = ref ? (byRef.get(ref) ?? []).filter((e) => !e.deleted && e.kind !== 'transfer' && isImported(e)) : [];
+      const done = ref ? (byRef.get(ref) ?? []).find((e) => e.kind === 'transfer') : undefined;
+      if (done) return { ...base, status: 'duplicate', matchId: done.id, reason: done.deleted ? 'You removed this earlier' : 'Already recorded as a transfer' };
+      return { ...base, status: 'transfer', category: null, matchId: sides[0]?.id ?? null, counterpartIds: sides.map((e) => e.id), transfer: { from: r.account_id, to: toAccount }, reason: 'Sent to your own account' };
     }
 
     if (ref && byRef.has(ref)) {
-      const same = byRef.get(ref)!.find((e) => e.kind === kindOf(r.direction) && !consumed.has(e.id));
+      const here = byRef.get(ref)!;
+      const done = here.find((e) => e.kind === 'transfer');
+      if (done) return { ...base, status: 'duplicate', matchId: done.id, reason: done.deleted ? 'You removed this earlier' : 'Already recorded as a transfer' };
+      const same = here.find((e) => e.kind === kindOf(r.direction) && !consumed.has(e.id));
       if (same) {
         consumed.add(same.id);
-        if (same.deleted) return { ...base, status: 'duplicate', reason: 'You removed this earlier (a transfer, or deleted by you)' };
+        if (same.deleted) return { ...base, status: 'duplicate', reason: 'You removed this earlier' };
         if (source === 'phonepe' && (same.source === 'federal' || same.source === 'hdfc') && same.description !== r.name) {
           const patch: RowPatch = { description: r.name };
           if (category) patch.category = category;
@@ -160,8 +171,13 @@ export function classifyRows(
         }
         return { ...base, status: 'duplicate', matchId: same.id, reason: 'Already recorded' };
       }
-      const other = byRef.get(ref)!.find((e) => !e.deleted && e.kind !== 'settlement' && e.kind !== kindOf(r.direction) && e.account_id !== r.account_id);
-      if (other) return { ...base, status: 'transfer', matchId: other.id, counterpartIds: isImported(other) ? [other.id] : [], reason: 'Money moved between your own accounts' };
+      const other = here.find((e) => !e.deleted && (e.kind === 'expense' || e.kind === 'income') && e.kind !== kindOf(r.direction) && e.account_id && e.account_id !== r.account_id);
+      if (other && r.account_id) {
+        // the other half is already on file: record one transfer, and take that entry out so nothing counts twice
+        if (!isImported(other)) return { ...base, status: 'duplicate', matchId: other.id, reason: `Matches "${other.description ?? 'an entry'}" you entered: use the transfer button on that row to convert it` };
+        const out = r.direction === 'debit';
+        return { ...base, status: 'transfer', category: null, matchId: other.id, counterpartIds: [other.id], transfer: out ? { from: r.account_id, to: other.account_id! } : { from: other.account_id!, to: r.account_id }, reason: 'Moved between your own accounts' };
+      }
     }
 
     const twin = existing.find((e) =>

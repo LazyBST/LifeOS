@@ -34,6 +34,7 @@ import {
 } from '@/lib/domain/money';
 import type { TxFilters, TxPatch } from '@/lib/domain/money-filters';
 import type { Account, AccountBalance, Category, DateStr, OwedByLabel, Transaction, TxLabel, UUID, Wallet } from '@/lib/types/db';
+import { convertFromTransfer, convertToTransfer, counterpartsOf, listTransferPairs, mergeTransferPairs, type NamedPair } from '@/lib/domain/transfers';
 import { commitImport, previewImport, type CommitItem, type CommitMerge, type CommitResult, type ImportPreview } from '@/lib/domain/statement-import';
 import type { ExtractedRow, ImportSource } from '@/lib/domain/statement-import-math';
 import { type ActionResult, run } from './_result';
@@ -197,4 +198,26 @@ export async function commitImportAction(source: ImportSource, items: CommitItem
     revalidatePath('/', 'layout');
     return r;
   });
+}
+
+// ---- transfers between your own accounts -------------------------------------------------------------------
+
+export async function convertToTransferAction(id: UUID, otherAccountId: UUID, removeId?: UUID | null): Promise<ActionResult<Transaction>> {
+  return run(async () => { await requireUser(); const t = await convertToTransfer(id, otherAccountId, removeId); revalidatePath('/', 'layout'); return t; });
+}
+
+export async function convertFromTransferAction(id: UUID, as: 'expense' | 'income'): Promise<ActionResult<Transaction>> {
+  return run(async () => { await requireUser(); const t = await convertFromTransfer(id, as); revalidatePath('/', 'layout'); return t; });
+}
+
+export async function transferCounterpartsAction(id: UUID): Promise<ActionResult<{ id: string; description: string | null; occurred_on: string; account_id: string | null; sure: boolean }[]>> {
+  return run(async () => { await requireUser(); return counterpartsOf(id); });
+}
+
+export async function findTransferPairsAction(): Promise<ActionResult<NamedPair[]>> {
+  return run(async () => { await requireUser(); return listTransferPairs(); });
+}
+
+export async function mergeTransferPairsAction(pairs: { expenseId: string; incomeId: string }[]): Promise<ActionResult<number>> {
+  return run(async () => { await requireUser(); const n = await mergeTransferPairs(pairs); revalidatePath('/', 'layout'); return n; });
 }

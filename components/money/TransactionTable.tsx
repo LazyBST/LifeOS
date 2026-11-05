@@ -10,11 +10,12 @@ import { formatDate } from '@/lib/time';
 import { formatINR } from '@/lib/format';
 import type { Transaction, TxLabel } from '@/lib/types/db';
 import { LabelPicker } from './LabelChips';
+import { ConvertTransfer } from './ConvertTransfer';
 
 export type TableTx = Transaction & { category_name?: string | null; account_name?: string | null };
 type Named = { id: string; name: string };
 
-const KIND = { expense: ['Expense', 'text-red-600 dark:text-red-400'], income: ['Income', 'text-emerald-600 dark:text-emerald-400'], settlement: ['Settle', 'text-sky-600 dark:text-sky-400'] } as const;
+const KIND = { expense: ['Expense', 'text-red-600 dark:text-red-400'], income: ['Income', 'text-emerald-600 dark:text-emerald-400'], settlement: ['Settle', 'text-sky-600 dark:text-sky-400'], transfer: ['Transfer', 'text-violet-600 dark:text-violet-400'] } as const;
 const NONE = '__none__';
 
 /**
@@ -76,15 +77,23 @@ export function TransactionTable({ transactions, categories, accounts, labels = 
                   </div>
                 </td>
                 <td className="px-2 py-1.5 text-muted-foreground">
-                  {t.kind === 'settlement' ? '—' : (
+                  {t.kind === 'settlement' || t.kind === 'transfer' ? '—' : (
                     <Editable label="category" value={t.category_id ?? NONE} display={cat.get(t.category_id ?? '') ?? t.category_name ?? '—'} options={[{ value: NONE, label: '— none' }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} onCommit={(v) => save(t.id, { category_id: v === NONE ? null : v })} />
                   )}
                 </td>
                 <td className="px-2 py-1.5">
-                  {t.kind === 'settlement' ? <span className="text-muted-foreground">—</span> : <LabelPicker labels={labels} value={t.labels ?? []} onChange={(next) => void save(t.id, { labels: next })} />}
+                  {t.kind === 'settlement' || t.kind === 'transfer' ? <span className="text-muted-foreground">—</span> : <LabelPicker labels={labels} value={t.labels ?? []} onChange={(next) => void save(t.id, { labels: next })} />}
                 </td>
                 <td className="px-2 py-1.5 text-muted-foreground">
-                  <Editable label="account" value={t.account_id ?? NONE} display={acc.get(t.account_id ?? '') ?? t.account_name ?? '—'} options={[{ value: NONE, label: '— none' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]} onCommit={(v) => save(t.id, { account_id: v === NONE ? null : v })} />
+                  <div className="flex items-center gap-1">
+                    <Editable label={t.kind === 'transfer' ? 'from account' : 'account'} value={t.account_id ?? NONE} display={acc.get(t.account_id ?? '') ?? t.account_name ?? '—'} options={[{ value: NONE, label: '— none' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]} onCommit={(v) => save(t.id, { account_id: v === NONE ? null : v })} />
+                    {t.kind === 'transfer' && (
+                      <>
+                        <span aria-hidden>→</span>
+                        <Editable label="to account" value={t.to_account_id ?? NONE} display={acc.get(t.to_account_id ?? '') ?? '—'} options={accounts.map((a) => ({ value: a.id, label: a.name }))} onCommit={(v) => save(t.id, { to_account_id: v === NONE ? null : v })} />
+                      </>
+                    )}
+                  </div>
                 </td>
                 <td className="px-2 py-1.5 text-right whitespace-nowrap">
                   <Editable label="amount" type="number" align="right" value={String(Number(t.amount))} display={formatINR(Number(t.amount))} onCommit={(v) => Number.isNaN(num(v)) ? 'Enter an amount' : save(t.id, { amount: num(v) })} />
@@ -96,7 +105,8 @@ export function TransactionTable({ transactions, categories, accounts, labels = 
                   <Editable label="person" value={t.counterparty ?? ''} placeholder="—" onCommit={(v) => save(t.id, { counterparty: v })} />
                 </td>
                 <td className={`px-2 py-1.5 text-right font-medium whitespace-nowrap ${owed === 0 ? 'text-muted-foreground' : owed > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{owed === 0 ? '—' : formatINR(owed)}</td>
-                <td className="px-1 py-1.5 text-right">
+                <td className="px-1 py-1.5 text-right whitespace-nowrap">
+                  {t.kind !== 'settlement' && <ConvertTransfer tx={t} accounts={accounts} onDone={(next) => setRows((prev) => prev.map((r) => (r.id === t.id ? { ...r, ...next } : r)))} />}
                   <button type="button" disabled={deleting === t.id} onClick={() => void remove(t.id)} aria-label="Delete transaction" title="Delete" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive disabled:opacity-50"><Trash2 className="size-3.5" /></button>
                 </td>
               </tr>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { categorize, classifyRows, mccOf, normalizeRef, type ExistingTx, type ExtractedRow } from '@/lib/domain/statement-import-math';
 
-const CATS = ['Food', 'Groceries', 'Transport', 'Rent', 'Bills', 'Shopping', 'Health', 'Entertainment', 'Family', 'Misc'];
+const CATS = ['Food', 'Groceries', 'Transport', 'Rent', 'Bills', 'Shopping', 'Health', 'Entertainment', 'Family', 'Misc', 'Salary', 'Refund'];
 const row = (o: Partial<ExtractedRow>): ExtractedRow => ({ date: '2026-10-28', name: 'X', raw: '', direction: 'debit', amount: 100, balance: null, ref: null, paid_by_last4: null, ...o });
 const ex = (o: Partial<ExistingTx>): ExistingTx => ({ id: 'e1', occurred_on: '2026-10-28', kind: 'expense', amount: 100, account_id: 'fed', ext_ref: null, source: null, description: null, category_id: null, ...o });
 const withAcc = (r: ExtractedRow, account_id = 'fed') => ({ ...r, account_id });
@@ -31,7 +31,7 @@ describe('categories', () => {
   });
   it('does not mistake words that merely contain a keyword, and leaves credits alone', () => {
     expect(cat('Cola corner')).toBe('Misc');
-    expect(categorize({ name: 'Salary', raw: '', direction: 'credit' }, CATS)).toBeNull();
+    expect(categorize({ name: 'Pankita', raw: '', direction: 'credit' }, CATS)).toBeNull();
     expect(mccOf('UPIOUT/1/x@ybl/Payment f/5814')).toBe('5814');
   });
 });
@@ -79,27 +79,46 @@ describe('already there, merge and transfer', () => {
       [ex({ id: 'fedIn', kind: 'income', amount: 10000, account_id: 'fed', ext_ref: '355118176741', source: 'federal' })], 'hdfc', CATS);
     expect(c.status).toBe('transfer');
     expect(c.counterpartIds).toEqual(['fedIn']);
+    expect(c.transfer).toEqual({ from: 'hdfc', to: 'fed' });
   });
-  it('never offers to remove a hand-entered counterpart', () => {
+  it('never removes a hand-entered counterpart: it points you to the transfer button instead', () => {
     const [c] = classifyRows([withAcc(row({ amount: 10000, ref: '355118176741' }), 'hdfc')], [ex({ kind: 'income', amount: 10000, ext_ref: '355118176741', source: null })], 'hdfc', CATS);
-    expect(c.status).toBe('transfer');
+    expect(c.status).toBe('duplicate');
+    expect(c.reason).toMatch(/transfer button/);
     expect(c.counterpartIds).toEqual([]);
+  });
+  it('a credit whose transfer is already recorded is a duplicate, from either side', () => {
+    const done = ex({ id: 't', kind: 'transfer', amount: 10000, account_id: 'hdfc', ext_ref: '355118176741', source: 'hdfc' });
+    expect(classifyRows([withAcc(row({ direction: 'credit', amount: 10000, ref: '355118176741' }), 'fed')], [done], 'federal', CATS)[0].status).toBe('duplicate');
   });
   it('drops a line repeated in the same file (overlapping screenshots)', () => {
     const r = classifyRows([withAcc(row({ ref: '333333333333' })), withAcc(row({ ref: '333333333333' }))], [], 'federal', CATS);
     expect(r.map((x) => x.status)).toEqual(['new', 'duplicate']);
   });
   it('a PhonePe "Transfer to" one of your own accounts is not spending, and both earlier entries can go', () => {
-    const own = new Set(['5047']);
+    const own = { '5047': 'fed' };
     const [c] = classifyRows(
       [withAcc(row({ name: 'Transfer to XXXXXXXXXX5047', amount: 10000, ref: '298466504591', transfer_to_last4: '5047' }), 'hdfc')],
       [ex({ id: 'h1', kind: 'expense', amount: 10000, account_id: 'hdfc', ext_ref: '298466504591', source: 'hdfc' }), ex({ id: 'f1', kind: 'income', amount: 10000, account_id: 'fed', ext_ref: '298466504591', source: 'federal' })],
       'phonepe', CATS, own);
     expect(c.status).toBe('transfer');
     expect(c.counterpartIds.sort()).toEqual(['f1', 'h1']);
+    expect(c.transfer).toEqual({ from: 'hdfc', to: 'fed' });
     // before you have imported the account that number belongs to, it cannot be told from a payment to someone else
     const [d] = classifyRows([withAcc(row({ amount: 10000, ref: '482360841714', transfer_to_last4: '5047' }), 'hdfc')], [], 'phonepe', CATS);
     expect(d.status).toBe('new');
+  });
+});
+
+describe('income categories', () => {
+  it('calls pay Salary and a payment coming straight back a Refund, and leaves other income unsorted', () => {
+    const credit = (o: Partial<ExtractedRow>) => row({ direction: 'credit', ...o });
+    const [pay] = classifyRows([withAcc(credit({ name: 'Deel Eor Private Limited', raw: 'NEFT CR-HSBC0560002-DEEL EOR PRIVATE LIMITED-AYUSH ARORA', amount: 304617 }))], [], 'hdfc', CATS);
+    expect(pay.category).toBe('Salary');
+    const [, back] = classifyRows([withAcc(row({ name: 'Powerlook', amount: 3272.15, date: '2026-11-04' })), withAcc(credit({ name: 'Powerlook', amount: 3272.15, date: '2026-11-04' }))], [], 'federal', CATS);
+    expect(back.category).toBe('Refund');
+    const [gift] = classifyRows([withAcc(credit({ name: 'Pankita', amount: 5000 }))], [], 'phonepe', CATS);
+    expect(gift.category).toBeNull();
   });
 });
 

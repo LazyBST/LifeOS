@@ -67,10 +67,10 @@ export function upcoming(list: ScheduledLike[], from: string, to: string): Occur
   return list.flatMap((s) => occurrences(s, from, to)).sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
 }
 
-type Tx = { occurred_on: string; kind: 'expense' | 'income' | 'settlement'; amount: number; my_share?: number | null };
+type Tx = { occurred_on: string; kind: 'expense' | 'income' | 'settlement' | 'transfer'; amount: number; my_share?: number | null };
 
 /** What a transaction does to the account balance. */
-export const balanceDelta = (t: Tx): number => (t.kind === 'expense' ? -t.amount : t.amount);
+export const balanceDelta = (t: Tx): number => (t.kind === 'transfer' ? 0 : t.kind === 'expense' ? -t.amount : t.amount); // a transfer only moves money between your own accounts
 
 const dayRange = (from: string, to: string): string[] => Array.from({ length: Math.max(0, daysBetween(from, to) + 1) }, (_, i) => addDays(from, i));
 
@@ -88,7 +88,7 @@ export function cumulativeByDay(txs: Tx[], from: string, to: string, kind: 'expe
   const end = upTo && upTo < to ? upTo : to;
   const per = new Map<string, number>();
   for (const t of txs) {
-    if (t.kind === 'settlement') continue;
+    if (t.kind === 'settlement' || t.kind === 'transfer') continue;
     if (kind === 'expense' && t.kind !== 'expense') continue;
     if (kind === 'income' && t.kind !== 'income') continue;
     const v = t.kind === 'expense' ? (t.my_share ?? t.amount) : t.amount;

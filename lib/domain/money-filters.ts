@@ -29,6 +29,8 @@ export type TxPatch = {
   counterparty?: string | null;
   note?: string | null;
   labels?: string[];
+  /** transfers: the account the money went to */
+  to_account_id?: string | null;
 };
 
 /** Trimmed, no blanks, no repeats (compared ignoring case). */
