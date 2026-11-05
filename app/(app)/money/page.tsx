@@ -20,6 +20,7 @@ import { formatINR } from '@/lib/format';
 import { WidgetGrid, type GridItem } from '@/components/widgets/WidgetGrid';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
 import { CategoriesDialog } from '@/components/money/CategoriesDialog';
+import { ImportDialog } from '@/components/money/ImportDialog';
 import { LabelSplit } from '@/components/money/LabelSplit';
 import { Gauge } from '@/components/money/Gauge';
 import { BalanceTrend, CategoryDonut, DailyBars, ForecastChart, MonthlyBars, PeriodComparison } from '@/components/money/MoneyCharts';
@@ -213,6 +214,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
         <h1 className="text-xl font-semibold">Money</h1>
         <div className="flex flex-wrap items-center gap-2">
         <CategoriesDialog categories={categories} labels={labels} />
+          <ImportDialog />
         <Link href="/money/transactions" className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">All transactions →</Link>
         <div className="flex gap-1 rounded-lg bg-muted p-0.5 text-sm">
           <Link href="/money?month=this" className={`rounded-md px-3 py-1.5 ${offset === 0 ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground'}`}>This month</Link>

@@ -34,6 +34,8 @@ import {
 } from '@/lib/domain/money';
 import type { TxFilters, TxPatch } from '@/lib/domain/money-filters';
 import type { Account, AccountBalance, Category, DateStr, OwedByLabel, Transaction, TxLabel, UUID, Wallet } from '@/lib/types/db';
+import { commitImport, previewImport, type CommitItem, type CommitMerge, type CommitResult, type ImportPreview } from '@/lib/domain/statement-import';
+import type { ExtractedRow, ImportSource } from '@/lib/domain/statement-import-math';
 import { type ActionResult, run } from './_result';
 
 export async function walletAction(): Promise<ActionResult<Wallet>> {
@@ -180,4 +182,19 @@ export async function deleteLabelAction(id: UUID): Promise<ActionResult<{ transa
 
 export async function spendByLabelAction(from: DateStr, to: DateStr): Promise<ActionResult<{ label: string; amount: number; count: number }[]>> {
   return run(async () => { await requireUser(); return spendByLabel(from, to); });
+}
+
+// ---- statement import --------------------------------------------------------------------------------------
+
+export async function previewImportAction(source: ImportSource, rows: ExtractedRow[], accountId: string | null, accountFor: Record<string, string>): Promise<ActionResult<ImportPreview>> {
+  return run(async () => { await requireUser(); return previewImport(source, rows, accountId, accountFor); });
+}
+
+export async function commitImportAction(source: ImportSource, items: CommitItem[], merges: CommitMerge[], removeIds: string[], newAccountName?: string): Promise<ActionResult<CommitResult>> {
+  return run(async () => {
+    await requireUser();
+    const r = await commitImport(source, items, merges, removeIds, newAccountName);
+    revalidatePath('/', 'layout');
+    return r;
+  });
 }

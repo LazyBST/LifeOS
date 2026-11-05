@@ -245,6 +245,9 @@ export type Transaction = {
   raw_text: string | null;
   /** label names (migration 0024) */
   labels?: string[];
+  /** where an imported transaction came from, and its bank reference (migration 0027) */
+  source?: string | null;
+  ext_ref?: string | null;
   created_at: Instant;
   deleted_at: Instant | null;
 };
