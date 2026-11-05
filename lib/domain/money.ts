@@ -292,6 +292,22 @@ export async function addIncome(input: IncomeInput): Promise<RecordedTransaction
  * A settlement moves cash without being spending: positive when he received
  * money, negative when he paid it (spec section 5).
  */
+export type TransferInput = { amount: number; from_account_id: UUID; to_account_id: UUID; date?: DateStr; description?: string | null };
+
+/** Money moved between two of your own accounts: not income, not spending. */
+export async function addTransfer(input: TransferInput): Promise<Transaction> {
+  if (!(input.amount > 0)) throw new Error('Enter an amount.');
+  if (!input.from_account_id || !input.to_account_id) throw new Error('Choose both accounts.');
+  if (input.from_account_id === input.to_account_id) throw new Error('A transfer needs two different accounts.');
+  const row = {
+    occurred_on: input.date ?? istDate(), kind: 'transfer' as const, description: input.description?.trim() || null,
+    category_id: null, account_id: input.from_account_id, to_account_id: input.to_account_id, amount: input.amount, my_share: null,
+  };
+  const { data, error } = await admin().from('transactions').insert(row).select('*').single();
+  if (error) throw new Error(/to_account_id|transactions_(kind|transfer)_check/.test(error.message) ? 'Run supabase/migrations/0028_transfers.sql in Supabase first.' : `transfer: ${error.message}`);
+  return data as Transaction;
+}
+
 export async function settle(input: SettleInput): Promise<RecordedTransaction> {
   const { account_id, account_name } = await resolveIds(input);
   const signed = input.direction === 'received' ? Math.abs(input.amount) : -Math.abs(input.amount);

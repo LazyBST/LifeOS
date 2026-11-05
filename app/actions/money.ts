@@ -6,6 +6,7 @@ import {
   accountBalances,
   addExpense,
   addIncome,
+  addTransfer,
   deleteTransaction,
   listAccounts,
   listCategories,
@@ -31,6 +32,7 @@ import {
   type IncomeInput,
   type RecordedTransaction,
   type SettleInput,
+  type TransferInput,
 } from '@/lib/domain/money';
 import type { TxFilters, TxPatch } from '@/lib/domain/money-filters';
 import type { Account, AccountBalance, Category, DateStr, OwedByLabel, Transaction, TxLabel, UUID, Wallet } from '@/lib/types/db';
@@ -94,6 +96,15 @@ export async function settleAction(input: SettleInput): Promise<ActionResult<Rec
   return run(async () => {
     await requireUser();
     const t = await settle(input);
+    revalidatePath('/', 'layout');
+    return t;
+  });
+}
+
+export async function addTransferAction(input: TransferInput): Promise<ActionResult<Transaction>> {
+  return run(async () => {
+    await requireUser();
+    const t = await addTransfer(input);
     revalidatePath('/', 'layout');
     return t;
   });

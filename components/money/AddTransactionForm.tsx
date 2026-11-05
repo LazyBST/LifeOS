@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { addExpenseAction, addIncomeAction, settleAction } from '@/app/actions/money';
+import { addExpenseAction, addIncomeAction, addTransferAction, settleAction } from '@/app/actions/money';
 import { splitEqually } from '@/lib/domain/money-math';
 import { istDate } from '@/lib/time';
 import type { Account, Category, TxLabel } from '@/lib/types/db';
@@ -48,6 +48,13 @@ export function AddTransactionForm({ categories, accounts, labels = [], onSaved 
   const [inAccount, setInAccount] = useState(NONE);
   const [inDate, setInDate] = useState(today);
   const [inLabels, setInLabels] = useState<string[]>([]);
+
+  // transfer state
+  const [trFrom, setTrFrom] = useState(NONE);
+  const [trTo, setTrTo] = useState(NONE);
+  const [trAmount, setTrAmount] = useState('');
+  const [trDate, setTrDate] = useState(today);
+  const [trDesc, setTrDesc] = useState('');
 
   // settle state
   const [stDirection, setStDirection] = useState<'received' | 'paid'>('received');
@@ -130,6 +137,22 @@ export function AddTransactionForm({ categories, accounts, labels = [], onSaved 
     onSaved?.();
   }
 
+  async function submitTransfer() {
+    const amount = Number(trAmount);
+    if (trFrom === NONE || trTo === NONE) { toast.error('Choose both accounts'); return; }
+    if (trFrom === trTo) { toast.error('Pick two different accounts'); return; }
+    if (!amount || amount <= 0) { toast.error('Enter an amount'); return; }
+    setSaving(true);
+    const res = await addTransferAction({ amount, from_account_id: trFrom, to_account_id: trTo, date: trDate, description: trDesc.trim() || null });
+    setSaving(false);
+    if (!res.ok) { toast.error(res.error || 'Could not add transfer'); return; }
+    toast.success('Transfer added');
+    setTrAmount('');
+    setTrDesc('');
+    router.refresh();
+    onSaved?.();
+  }
+
   async function submitSettle() {
     const amount = Number(stAmount);
     if (!amount || amount <= 0) {
@@ -166,6 +189,7 @@ export function AddTransactionForm({ categories, accounts, labels = [], onSaved 
         <TabsList>
           <TabsTrigger value="expense">Expense</TabsTrigger>
           <TabsTrigger value="income">Income</TabsTrigger>
+          <TabsTrigger value="transfer">Transfer</TabsTrigger>
           <TabsTrigger value="settle">Settle</TabsTrigger>
         </TabsList>
 
@@ -286,6 +310,42 @@ export function AddTransactionForm({ categories, accounts, labels = [], onSaved 
           {labels.length > 0 && <Field label="Labels"><LabelPicker inline labels={labels} value={inLabels} onChange={setInLabels} /></Field>}
           <Button type="button" className="h-11 w-full sm:h-8" disabled={saving} onClick={submitIncome}>
             Add income
+          </Button>
+        </TabsContent>
+
+        <TabsContent value="transfer" className="space-y-3 pt-3">
+          <div className="flex gap-2">
+            {([['From account', trFrom, setTrFrom], ['To account', trTo, setTrTo]] as const).map(([label, value, set]) => (
+              <Field key={label} label={label} className="flex-1">
+                <Select value={value} onValueChange={(v) => set(v ?? NONE)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose">{(v: string) => (v === NONE ? 'Choose' : accounts.find((a) => a.id === v)?.name ?? 'Choose')}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Field label="Amount" className="flex-1">
+              <Input type="number" inputMode="decimal" value={trAmount} onChange={(e) => setTrAmount(e.target.value)} placeholder="10000" />
+            </Field>
+            <Field label="Date" className="flex-1">
+              <Input type="date" value={trDate} onChange={(e) => setTrDate(e.target.value)} />
+            </Field>
+          </div>
+          <Field label="Note (optional)">
+            <Input value={trDesc} onChange={(e) => setTrDesc(e.target.value)} placeholder="Moving money to savings" />
+          </Field>
+          <p className="text-xs text-muted-foreground">Between your own accounts: not counted as income or spending.</p>
+          <Button type="button" className="h-11 w-full sm:h-8" disabled={saving} onClick={submitTransfer}>
+            Add transfer
           </Button>
         </TabsContent>
 
