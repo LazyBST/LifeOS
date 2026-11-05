@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { categorize, classifyRows, mccOf, normalizeRef, reconcileBalances, type ExistingTx, type ExtractedRow } from '@/lib/domain/statement-import-math';
+import { categorize, classifyRows, mccOf, normalizeRef, type ExistingTx, type ExtractedRow } from '@/lib/domain/statement-import-math';
 
 const CATS = ['Food', 'Groceries', 'Transport', 'Rent', 'Bills', 'Shopping', 'Health', 'Entertainment', 'Family', 'Misc'];
 const row = (o: Partial<ExtractedRow>): ExtractedRow => ({ date: '2026-10-28', name: 'X', raw: '', direction: 'debit', amount: 100, balance: null, ref: null, paid_by_last4: null, ...o });
@@ -33,29 +33,6 @@ describe('categories', () => {
     expect(cat('Cola corner')).toBe('Misc');
     expect(categorize({ name: 'Salary', raw: '', direction: 'credit' }, CATS)).toBeNull();
     expect(mccOf('UPIOUT/1/x@ybl/Payment f/5814')).toBe('5814');
-  });
-});
-
-describe('running balance check', () => {
-  it('fixes an amount the balance contradicts', () => {
-    const r = reconcileBalances([
-      row({ amount: 531, balance: 27143.95 }),
-      row({ amount: 112, direction: 'credit', balance: 27255.95 }),
-      row({ amount: 15, balance: 27104.95 }), // misread: really 151
-    ]);
-    expect(r.rows.map((x) => x.amount)).toEqual([531, 112, 151]);
-    expect(r.rows[2].corrected).toBe(true);
-    expect(r.fixed).toBe(1);
-  });
-  it('copes with a newest-first statement', () => {
-    const r = reconcileBalances([
-      row({ amount: 189, balance: 26803.95 }),
-      row({ amount: 151, balance: 26992.95 }),
-      row({ amount: 531, balance: 27143.95 }),
-    ]);
-    expect(r.fixed).toBe(0);
-    const bad = reconcileBalances([row({ amount: 18, balance: 26803.95 }), row({ amount: 151, balance: 26992.95 }), row({ amount: 531, balance: 27143.95 })]);
-    expect(bad.rows[0].amount).toBe(189);
   });
 });
 
@@ -101,15 +78,40 @@ describe('already there, merge and transfer', () => {
       [withAcc(row({ amount: 10000, ref: '0000355118176741' }), 'hdfc')],
       [ex({ id: 'fedIn', kind: 'income', amount: 10000, account_id: 'fed', ext_ref: '355118176741', source: 'federal' })], 'hdfc', CATS);
     expect(c.status).toBe('transfer');
-    expect(c.counterpartId).toBe('fedIn');
+    expect(c.counterpartIds).toEqual(['fedIn']);
   });
   it('never offers to remove a hand-entered counterpart', () => {
     const [c] = classifyRows([withAcc(row({ amount: 10000, ref: '355118176741' }), 'hdfc')], [ex({ kind: 'income', amount: 10000, ext_ref: '355118176741', source: null })], 'hdfc', CATS);
     expect(c.status).toBe('transfer');
-    expect(c.counterpartId).toBeNull();
+    expect(c.counterpartIds).toEqual([]);
   });
   it('drops a line repeated in the same file (overlapping screenshots)', () => {
     const r = classifyRows([withAcc(row({ ref: '333333333333' })), withAcc(row({ ref: '333333333333' }))], [], 'federal', CATS);
     expect(r.map((x) => x.status)).toEqual(['new', 'duplicate']);
+  });
+  it('a PhonePe "Transfer to" one of your own accounts is not spending, and both earlier entries can go', () => {
+    const own = new Set(['5047']);
+    const [c] = classifyRows(
+      [withAcc(row({ name: 'Transfer to XXXXXXXXXX5047', amount: 10000, ref: '298466504591', transfer_to_last4: '5047' }), 'hdfc')],
+      [ex({ id: 'h1', kind: 'expense', amount: 10000, account_id: 'hdfc', ext_ref: '298466504591', source: 'hdfc' }), ex({ id: 'f1', kind: 'income', amount: 10000, account_id: 'fed', ext_ref: '298466504591', source: 'federal' })],
+      'phonepe', CATS, own);
+    expect(c.status).toBe('transfer');
+    expect(c.counterpartIds.sort()).toEqual(['f1', 'h1']);
+    // before you have imported the account that number belongs to, it cannot be told from a payment to someone else
+    const [d] = classifyRows([withAcc(row({ amount: 10000, ref: '482360841714', transfer_to_last4: '5047' }), 'hdfc')], [], 'phonepe', CATS);
+    expect(d.status).toBe('new');
+  });
+});
+
+describe('what you removed stays removed', () => {
+  it('does not bring back an imported entry that was deleted, and does not merge into one', () => {
+    const gone = ex({ id: 'g', kind: 'income', amount: 10000, ext_ref: '355118176741', source: 'federal', deleted: true });
+    expect(classifyRows([withAcc(row({ direction: 'credit', amount: 10000, ref: '355118176741' }))], [gone], 'federal', CATS)[0].status).toBe('duplicate');
+    const goneBank = ex({ id: 'g2', amount: 248.2, ext_ref: '561031391672', source: 'federal', deleted: true });
+    expect(classifyRows([withAcc(row({ name: 'Zomato', amount: 248.2, ref: '561031391672' }))], [goneBank], 'phonepe', CATS)[0].status).toBe('duplicate');
+  });
+  it('a merge that already happened is just a duplicate', () => {
+    const done = ex({ ext_ref: '561031391672', amount: 248.2, source: 'federal', description: 'Zomato' });
+    expect(classifyRows([withAcc(row({ name: 'Zomato', amount: 248.2, ref: '561031391672' }))], [done], 'phonepe', CATS)[0].status).toBe('duplicate');
   });
 });

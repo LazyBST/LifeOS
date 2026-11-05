@@ -224,6 +224,8 @@ export type Account = {
   opening_balance: number;
   is_default: boolean;
   archived_at: Instant | null;
+  /** last 4 digits of the bank account number (set by a statement import, migration 0027) */
+  number_last4?: string | null;
 };
 
 export type Category = { id: UUID; name: string };

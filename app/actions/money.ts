@@ -186,14 +186,14 @@ export async function spendByLabelAction(from: DateStr, to: DateStr): Promise<Ac
 
 // ---- statement import --------------------------------------------------------------------------------------
 
-export async function previewImportAction(source: ImportSource, rows: ExtractedRow[], accountId: string | null, accountFor: Record<string, string>): Promise<ActionResult<ImportPreview>> {
-  return run(async () => { await requireUser(); return previewImport(source, rows, accountId, accountFor); });
+export async function previewImportAction(source: ImportSource, rows: ExtractedRow[], accountId: string | null, accountFor: Record<string, string>, accountLast4: string | null): Promise<ActionResult<ImportPreview>> {
+  return run(async () => { await requireUser(); return previewImport(source, rows, accountId, accountFor, accountLast4); });
 }
 
-export async function commitImportAction(source: ImportSource, items: CommitItem[], merges: CommitMerge[], removeIds: string[], newAccountName?: string): Promise<ActionResult<CommitResult>> {
+export async function commitImportAction(source: ImportSource, items: CommitItem[], merges: CommitMerge[], removeIds: string[], newAccountName?: string, accountLast4: string | null = null): Promise<ActionResult<CommitResult>> {
   return run(async () => {
     await requireUser();
-    const r = await commitImport(source, items, merges, removeIds, newAccountName);
+    const r = await commitImport(source, items, merges, removeIds, newAccountName, accountLast4);
     revalidatePath('/', 'layout');
     return r;
   });

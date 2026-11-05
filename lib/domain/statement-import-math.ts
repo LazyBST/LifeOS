@@ -18,6 +18,8 @@ export type ExtractedRow = {
   ref: string | null;
   /** PhonePe: last digits of the bank account the money left from or arrived in */
   paid_by_last4: string | null;
+  /** PhonePe "Transfer to XXXXXXXXXX5047": the last digits of the account the money was sent to */
+  transfer_to_last4?: string | null;
 };
 
 export type ExistingTx = {
@@ -30,6 +32,8 @@ export type ExistingTx = {
   source: string | null;
   description: string | null;
   category_id: string | null;
+  /** deleted, but remembered so an import does not bring it back */
+  deleted?: boolean;
 };
 
 export type RowStatus = 'new' | 'duplicate' | 'merge' | 'transfer';
@@ -47,10 +51,8 @@ export type Classified = ExtractedRow & {
   matchId: string | null;
   /** merge: what to fill in on that transaction */
   patch: RowPatch | null;
-  /** transfer: the other side, if it was imported earlier, so it can be removed */
-  counterpartId: string | null;
-  /** the amount was fixed using the running balance */
-  corrected: boolean;
+  /** transfer: the entries imported earlier that are the two sides of this transfer, so they can be removed */
+  counterpartIds: string[];
 };
 
 export const IMPORT_SOURCES: Record<ImportSource, { label: string; account: RegExp }> = {
@@ -61,7 +63,6 @@ export const IMPORT_SOURCES: Record<ImportSource, { label: string; account: RegE
 
 const MS_DAY = 86_400_000;
 const dayNumber = (d: string) => Math.floor(Date.parse(`${d}T00:00:00Z`) / MS_DAY);
-const money = (n: number) => Math.round(n * 100) / 100;
 
 /** The bank reference without padding: a UPI RRN is 12 digits whether it is printed as "0000355118176741" or "355118176741". */
 export function normalizeRef(ref: string | null | undefined, raw = ''): string | null {
@@ -110,39 +111,6 @@ export function categorize(row: Pick<ExtractedRow, 'name' | 'raw' | 'direction'>
   return has('Misc');
 }
 
-/**
- * Check each line against the running balance the statement prints. A line whose balance does not move by its amount
- * was misread: the balance wins, because it is printed in a fixed column. Works for oldest-first and newest-first
- * statements (picks the order that agrees with more lines).
- */
-export function reconcileBalances(rows: ExtractedRow[]): { rows: (ExtractedRow & { corrected: boolean })[]; checked: number; fixed: number } {
-  const signed = (r: ExtractedRow) => (r.direction === 'credit' ? r.amount : -r.amount);
-  const score = (list: ExtractedRow[]) => {
-    let ok = 0, n = 0;
-    for (let i = 1; i < list.length; i++) {
-      const a = list[i - 1].balance, b = list[i].balance;
-      if (a == null || b == null) continue;
-      n++;
-      if (Math.abs(money(b - a) - money(signed(list[i]))) < 0.011) ok++;
-    }
-    return { ok, n };
-  };
-  const forward = score(rows), backward = score([...rows].reverse());
-  const newestFirst = backward.ok > forward.ok;
-  const ordered = newestFirst ? [...rows].reverse() : rows.slice();
-  let checked = 0, fixed = 0;
-  const out = ordered.map((r, i) => {
-    const prev = i > 0 ? ordered[i - 1].balance : null;
-    if (r.balance == null || prev == null) return { ...r, corrected: false };
-    checked++;
-    const delta = money(r.balance - prev);
-    if (Math.abs(delta - money(signed(r))) < 0.011 || delta === 0) return { ...r, corrected: false };
-    fixed++;
-    return { ...r, amount: Math.abs(delta), direction: delta > 0 ? ('credit' as const) : ('debit' as const), corrected: true };
-  });
-  return { rows: newestFirst ? out.reverse() : out, checked, fixed };
-}
-
 const isImported = (e: ExistingTx) => e.source === 'federal' || e.source === 'hdfc' || e.source === 'phonepe';
 const kindOf = (d: 'debit' | 'credit') => (d === 'debit' ? 'expense' : 'income');
 
@@ -153,10 +121,12 @@ const kindOf = (d: 'debit' | 'credit') => (d === 'debit' ? 'expense' : 'income')
  * your own accounts, which is not income or spending.
  */
 export function classifyRows(
-  rows: (ExtractedRow & { account_id: string | null; corrected?: boolean })[],
+  rows: (ExtractedRow & { account_id: string | null })[],
   existing: ExistingTx[],
   source: ImportSource,
   categoryNames: string[],
+  /** last digits of your own accounts: a PhonePe "Transfer to XXXXXXXXXX5047" to one of them is not spending */
+  ownLast4: ReadonlySet<string> = new Set(),
 ): Classified[] {
   const byRef = new Map<string, ExistingTx[]>();
   for (const e of existing) if (e.ext_ref) byRef.set(e.ext_ref, [...(byRef.get(e.ext_ref) ?? []), e]);
@@ -166,30 +136,36 @@ export function classifyRows(
   return rows.map((r, idx) => {
     const ref = normalizeRef(r.ref, r.raw);
     const category = categorize(r, categoryNames);
-    const base: Classified = { ...r, idx, ref, category, status: 'new', reason: '', matchId: null, patch: null, counterpartId: null, corrected: !!r.corrected };
+    const base: Classified = { ...r, idx, ref, category, status: 'new', reason: '', matchId: null, patch: null, counterpartIds: [] };
 
     if (ref) {
       if (seenRefs.has(ref + r.direction)) return { ...base, status: 'duplicate', reason: 'Appears twice in this file' };
       seenRefs.add(ref + r.direction);
     }
 
+    if (r.transfer_to_last4 && ownLast4.has(r.transfer_to_last4)) {
+      const both = ref ? (byRef.get(ref) ?? []).filter((e) => isImported(e) && !e.deleted) : [];
+      return { ...base, status: 'transfer', matchId: both[0]?.id ?? null, counterpartIds: both.map((e) => e.id), reason: `Sent to your own account ending ${r.transfer_to_last4}` };
+    }
+
     if (ref && byRef.has(ref)) {
       const same = byRef.get(ref)!.find((e) => e.kind === kindOf(r.direction) && !consumed.has(e.id));
       if (same) {
         consumed.add(same.id);
-        if (source === 'phonepe' && (same.source === 'federal' || same.source === 'hdfc')) {
+        if (same.deleted) return { ...base, status: 'duplicate', reason: 'You removed this earlier (a transfer, or deleted by you)' };
+        if (source === 'phonepe' && (same.source === 'federal' || same.source === 'hdfc') && same.description !== r.name) {
           const patch: RowPatch = { description: r.name };
           if (category) patch.category = category;
           return { ...base, status: 'merge', matchId: same.id, patch, reason: 'On your bank statement already: fills in the merchant name' };
         }
         return { ...base, status: 'duplicate', matchId: same.id, reason: 'Already recorded' };
       }
-      const other = byRef.get(ref)!.find((e) => e.kind !== 'settlement' && e.kind !== kindOf(r.direction) && e.account_id !== r.account_id);
-      if (other) return { ...base, status: 'transfer', matchId: other.id, counterpartId: isImported(other) ? other.id : null, reason: 'Money moved between your own accounts' };
+      const other = byRef.get(ref)!.find((e) => !e.deleted && e.kind !== 'settlement' && e.kind !== kindOf(r.direction) && e.account_id !== r.account_id);
+      if (other) return { ...base, status: 'transfer', matchId: other.id, counterpartIds: isImported(other) ? [other.id] : [], reason: 'Money moved between your own accounts' };
     }
 
     const twin = existing.find((e) =>
-      !consumed.has(e.id) && !e.ext_ref && e.kind === kindOf(r.direction) && e.account_id === r.account_id &&
+      !e.deleted && !consumed.has(e.id) && !e.ext_ref && e.kind === kindOf(r.direction) && e.account_id === r.account_id &&
       Math.abs(Number(e.amount) - r.amount) < 0.005 && Math.abs(dayNumber(e.occurred_on) - dayNumber(r.date)) <= 2);
     if (twin) {
       consumed.add(twin.id);

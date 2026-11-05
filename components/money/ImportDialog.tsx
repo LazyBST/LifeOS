@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { commitImportAction, previewImportAction } from '@/app/actions/money';
 import { formatINR } from '@/lib/format';
 import { IMPORT_SOURCES, type Classified, type ExtractedRow, type ImportSource } from '@/lib/domain/statement-import-math';
-import type { ImportPreview } from '@/lib/domain/statement-import';
+import type { CommitItem, ImportPreview } from '@/lib/domain/statement-import';
 
 const LS_MAP = 'lifeos:import:phonepe-accounts';
 const SOURCES: ImportSource[] = ['federal', 'hdfc', 'phonepe'];
@@ -19,21 +19,7 @@ const BADGE: Record<Classified['status'], { text: string; cls: string }> = {
 };
 const selectCls = 'h-8 min-w-0 rounded-lg border border-input bg-transparent px-2 text-xs';
 
-/** Big phone screenshots are shrunk before upload so a few of them fit in one request. */
-async function shrink(file: File): Promise<File> {
-  if (!/^image\//.test(file.type) || file.size < 2_500_000) return file;
-  try {
-    const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, 2200 / Math.max(bmp.width, bmp.height));
-    const c = document.createElement('canvas');
-    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
-    c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
-    const blob: Blob | null = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.85));
-    return blob ? new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }) : file;
-  } catch { return file; }
-}
-
-/** Bring in a bank or PhonePe statement: read it, see what is new, then add only that. */
+/** Bring in a Federal, HDFC or PhonePe statement PDF: read it, see what is new, then add only that. */
 export function ImportDialog() {
   const [open, setOpen] = useState(false);
   return (
@@ -57,6 +43,8 @@ function Importer({ onDone }: { onDone: () => void }) {
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedRow[] | null>(null);
+  const [last4, setLast4] = useState<string | null>(null);
+  const [proof, setProof] = useState<string[]>([]);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [phoneMap, setPhoneMap] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem(LS_MAP) ?? '{}'); } catch { return {}; } });
@@ -65,13 +53,13 @@ function Importer({ onDone }: { onDone: () => void }) {
   const [acc, setAcc] = useState<Record<number, string>>({});
   const [removeOther, setRemoveOther] = useState<Record<number, boolean>>({});
 
-  async function run(rows: ExtractedRow[], aId: string | null, map: Record<string, string>) {
-    const r = await previewImportAction(source, rows, aId, map);
+  async function run(rows: ExtractedRow[], aId: string | null, map: Record<string, string>, l4: string | null) {
+    const r = await previewImportAction(source, rows, aId, map, l4);
     if (!r.ok) { toast.error(r.error); return false; }
     setPreview(r.data);
     setAccountId(aId ?? r.data.defaultAccountId);
     setPicked(Object.fromEntries(r.data.rows.map((x) => [x.idx, x.status === 'new' || x.status === 'merge'])));
-    setRemoveOther(Object.fromEntries(r.data.rows.filter((x) => x.counterpartId).map((x) => [x.idx, true])));
+    setRemoveOther(Object.fromEntries(r.data.rows.filter((x) => x.counterpartIds.length).map((x) => [x.idx, true])));
     setCat({}); setAcc({});
     return true;
   }
@@ -79,21 +67,26 @@ function Importer({ onDone }: { onDone: () => void }) {
   async function read() {
     if (!files.length) { toast.error('Choose a file first.'); return; }
     const all: ExtractedRow[] = [];
+    const notes: string[] = [];
+    let l4: string | null = null;
     try {
       for (let i = 0; i < files.length; i++) {
-        setBusy(`Reading file ${i + 1} of ${files.length}… long statements can take a minute or two.`);
+        setBusy(`Reading file ${i + 1} of ${files.length}…`);
         const form = new FormData();
-        form.set('file', await shrink(files[i]));
+        form.set('file', files[i]);
         form.set('source', source);
         const res = await fetch('/api/money/extract', { method: 'POST', body: form });
-        const j = (await res.json().catch(() => null)) as { ok: boolean; rows?: ExtractedRow[]; error?: string } | null;
+        const j = (await res.json().catch(() => null)) as { ok: boolean; rows?: ExtractedRow[]; accountLast4?: string | null; summary?: string; error?: string } | null;
         if (!j?.ok) throw new Error(j?.error ?? `Could not read ${files[i].name}.`);
+        if (j.accountLast4 && l4 && j.accountLast4 !== l4) throw new Error('These files are from different bank accounts. Import one account at a time.');
+        l4 = j.accountLast4 ?? l4;
         all.push(...(j.rows ?? []));
+        notes.push(`${files[i].name}: ${j.summary}`);
       }
       if (!all.length) { toast.error('No transactions found in that file.'); return; }
       setBusy('Checking against what you already have…');
-      setExtracted(all);
-      await run(all, null, phoneMap);
+      setExtracted(all); setLast4(l4); setProof(notes);
+      await run(all, null, phoneMap, l4);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not read the file.');
     } finally { setBusy(null); }
@@ -115,24 +108,27 @@ function Importer({ onDone }: { onDone: () => void }) {
     const map = next.map ?? phoneMap;
     if (next.map) { setPhoneMap(map); try { localStorage.setItem(LS_MAP, JSON.stringify(map)); } catch {} }
     setBusy('Checking against what you already have…');
-    await run(extracted, next.accountId !== undefined ? next.accountId : accountId, map);
+    await run(extracted, next.accountId !== undefined ? next.accountId : accountId, map, last4);
     setBusy(null);
   }
 
   async function commit() {
     if (!preview) return;
     setBusy('Adding…');
-    const items = chosen.filter((r) => r.status !== 'merge').map((r) => ({
+    const items: CommitItem[] = chosen.filter((r) => r.status !== 'merge').map((r) => ({
       date: r.date, name: r.name, raw: r.raw, direction: r.direction, amount: r.amount, ref: r.ref,
       account_id: acc[r.idx] ?? r.account_id, category: r.direction === 'credit' ? null : cat[r.idx] ?? r.category,
     }));
+    for (const r of rows.filter((x) => x.status === 'transfer' && !picked[x.idx])) {
+      items.push({ date: r.date, name: r.name, raw: r.raw, direction: r.direction, amount: r.amount, ref: r.ref, account_id: r.account_id, category: null, remembered: true });
+    }
     const merges = [
       ...chosen.filter((r) => r.status === 'merge' && r.matchId).map((r) => ({ id: r.matchId!, ...(r.patch ?? {}) })),
       // remembering the reference on an entry you typed yourself costs nothing and stops a later duplicate
       ...rows.filter((r) => r.status === 'duplicate' && r.matchId && r.patch?.ext_ref).map((r) => ({ id: r.matchId!, ext_ref: r.patch!.ext_ref })),
     ];
-    const removeIds = rows.filter((r) => r.counterpartId && removeOther[r.idx] && !picked[r.idx]).map((r) => r.counterpartId!);
-    const res = await commitImportAction(source, items, merges, removeIds, IMPORT_SOURCES[source].label);
+    const removeIds = rows.filter((r) => r.counterpartIds.length && removeOther[r.idx] && !picked[r.idx]).flatMap((r) => r.counterpartIds);
+    const res = await commitImportAction(source, items, merges, removeIds, IMPORT_SOURCES[source].label, last4);
     setBusy(null);
     if (!res.ok) { toast.error(res.error); return; }
     const { added, merged, removed } = res.data;
@@ -150,9 +146,9 @@ function Importer({ onDone }: { onDone: () => void }) {
           ))}
         </div>
         <label className="block space-y-1">
-          <span className="font-medium">Statement file</span>
-          <input type="file" multiple accept="application/pdf,image/*,.csv,.txt,text/csv" onChange={(e) => setFiles([...(e.target.files ?? [])])} className="block w-full text-xs file:mr-3 file:rounded-lg file:border file:bg-transparent file:px-3 file:py-1.5 file:text-xs hover:file:bg-muted" />
-          <span className="block text-xs text-muted-foreground">A PDF, a screenshot or a CSV. Several screenshots of one statement are fine. Nothing is added until you review it.</span>
+          <span className="font-medium">Statement PDF</span>
+          <input type="file" multiple accept="application/pdf,.pdf" onChange={(e) => setFiles([...(e.target.files ?? [])])} className="block w-full text-xs file:mr-3 file:rounded-lg file:border file:bg-transparent file:px-3 file:py-1.5 file:text-xs hover:file:bg-muted" />
+          <span className="block text-xs text-muted-foreground">The PDF you download from the bank or PhonePe (unlocked, not a photo). It is read exactly as printed and checked against the statement&apos;s own balances. Nothing is added until you review it.</span>
         </label>
         <p className="rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
           Payments already on file are skipped: the same bank reference is matched first (Federal and PhonePe share it), then the same account, amount and date. Money you move between your own accounts is flagged, not counted as spending.
@@ -172,8 +168,8 @@ function Importer({ onDone }: { onDone: () => void }) {
         {counts.merge > 0 && <span className="text-sky-700 dark:text-sky-300">{counts.merge} to merge</span>}
         <span className="text-muted-foreground">{counts.duplicate} already there</span>
         {counts.transfer > 0 && <span className="text-amber-700 dark:text-amber-300">{counts.transfer} own transfers</span>}
-        {preview.balanceFixed > 0 && <span className="text-amber-700 dark:text-amber-300">{preview.balanceFixed} amounts corrected from the running balance</span>}
       </div>
+      {proof.length > 0 && <ul className="text-[11px] text-muted-foreground">{proof.map((p) => <li key={p}>✓ {p}</li>)}</ul>}
       {source !== 'phonepe' ? (
         <label className="flex items-center gap-2 text-xs"><span className="font-medium">Account</span>
           <select value={accountId ?? ''} onChange={(e) => void remap({ accountId: e.target.value || null })} className={selectCls}>
@@ -187,7 +183,7 @@ function Importer({ onDone }: { onDone: () => void }) {
           {phoneDigits.length === 0 && <span className="text-muted-foreground">No bank numbers found: lines go to the account below.</span>}
           {phoneDigits.map((d) => (
             <label key={d} className="flex items-center gap-2"><span className="w-28 text-muted-foreground">account ending {d}</span>
-              <select value={phoneMap[d] ?? ''} onChange={(e) => void remap({ map: { ...phoneMap, [d]: e.target.value } })} className={selectCls}>
+              <select value={phoneMap[d] ?? preview.knownLast4[d] ?? ''} onChange={(e) => void remap({ map: { ...phoneMap, [d]: e.target.value } })} className={selectCls}>
                 <option value="">{preview.defaultAccountId ? 'Default account' : 'New account "PhonePe"'}</option>
                 {accountOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
@@ -213,7 +209,6 @@ function Importer({ onDone }: { onDone: () => void }) {
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className="truncate font-medium">{r.name}</span>
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${BADGE[r.status].cls}`}>{BADGE[r.status].text}</span>
-                    {r.corrected && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">amount fixed</span>}
                   </div>
                   <div className="text-xs text-muted-foreground">{r.date}{r.reason ? ` · ${r.reason}` : ''}</div>
                 </div>
@@ -232,10 +227,10 @@ function Importer({ onDone }: { onDone: () => void }) {
                   </select>
                 </div>
               )}
-              {r.status === 'transfer' && r.counterpartId && !on && (
+              {r.status === 'transfer' && r.counterpartIds.length > 0 && !on && (
                 <label className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
                   <input type="checkbox" checked={!!removeOther[r.idx]} onChange={(e) => setRemoveOther((m) => ({ ...m, [r.idx]: e.target.checked }))} className="size-3.5" />
-                  Also remove the matching entry imported earlier (the other side of this transfer)
+                  Also remove the entr{r.counterpartIds.length === 1 ? 'y' : 'ies'} imported earlier for this transfer
                 </label>
               )}
             </li>
@@ -244,8 +239,8 @@ function Importer({ onDone }: { onDone: () => void }) {
       </ul>
       <p className="text-xs text-muted-foreground">After importing, open any transaction to change its account or category, add a label, or split it.</p>
       <div className="flex items-center justify-between gap-2">
-        <button type="button" onClick={() => { setPreview(null); setExtracted(null); setFiles([]); }} className="text-xs text-muted-foreground underline">Start over</button>
-        <Button onClick={() => void commit()} disabled={!!busy || (addCount + mergeCount === 0 && !Object.entries(removeOther).some(([i, v]) => v && !picked[Number(i)]))}>
+        <button type="button" onClick={() => { setPreview(null); setExtracted(null); setFiles([]); setProof([]); }} className="text-xs text-muted-foreground underline">Start over</button>
+        <Button onClick={() => void commit()} disabled={!!busy || (addCount + mergeCount === 0 && counts.transfer === 0)}>
           {busy ?? `Import ${addCount} new${mergeCount ? ` · merge ${mergeCount}` : ''}`}
         </Button>
       </div>
