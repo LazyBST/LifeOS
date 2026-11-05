@@ -1,5 +1,5 @@
 import type { AccountBalance } from '@/lib/types/db';
-import { formatINR } from '@/lib/format';
+import { Amt } from '@/components/money/Amt';
 
 
 type AccountsPanelProps = {
@@ -18,7 +18,7 @@ export function AccountsPanel({ balances }: AccountsPanelProps) {
           {balances.map((a) => (
             <li key={a.id} className="flex items-center justify-between text-sm">
               <span className="truncate">{a.name}</span>
-              <span className={`font-medium ${a.balance < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>{formatINR(a.balance)}</span>
+              <span className={`font-medium ${a.balance < 0 ? 'text-red-600 dark:text-red-400' : ''}`}><Amt value={a.balance} /></span>
             </li>
           ))}
         </ul>

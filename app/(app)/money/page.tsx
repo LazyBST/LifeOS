@@ -16,6 +16,9 @@ import {
   wallet,
 } from '@/lib/domain/money';
 import { istDate, formatDate } from '@/lib/time';
+import { resolveRange } from '@/lib/domain/money-range';
+import { Amt } from '@/components/money/Amt';
+import { RangePicker } from '@/components/money/RangePicker';
 import { formatINR } from '@/lib/format';
 import { WidgetGrid, type GridItem } from '@/components/widgets/WidgetGrid';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
@@ -24,7 +27,7 @@ import { ImportDialog } from '@/components/money/ImportDialog';
 import { FindTransfers } from '@/components/money/FindTransfers';
 import { LabelSplit } from '@/components/money/LabelSplit';
 import { Gauge } from '@/components/money/Gauge';
-import { BalanceTrend, CategoryDonut, DailyBars, ForecastChart, MonthlyBars, PeriodComparison } from '@/components/money/MoneyCharts';
+import { BalanceTrend, CategoryDonut, DailyBars, ForecastChart, MonthlyBars, PayeeBars, PeriodComparison, WeekdayBars } from '@/components/money/MoneyCharts';
 import { BudgetsCard } from '@/components/money/BudgetsCard';
 import { ScheduledCard } from '@/components/money/ScheduledCard';
 import { budgetStatus } from '@/lib/domain/budgeting';
@@ -33,38 +36,17 @@ import { getOrder } from '@/lib/domain/order';
 import { getUiState } from '@/lib/domain/uistate';
 import type { ResponsiveLayouts } from 'react-grid-layout';
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
-function monthRange(offset: number) {
-  const today = istDate();
-  const [y, m] = today.split('-').map(Number);
-  let year = y;
-  let month = m - 1 + offset; // 0-based
-  while (month < 0) {
-    month += 12;
-    year -= 1;
-  }
-  while (month > 11) {
-    month -= 12;
-    year += 1;
-  }
-  const from = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const to = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-  return { from, to, label: `${MONTH_NAMES[month]} ${year}` };
-}
-
 type MoneyPageProps = {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string; month?: string }>;
 };
 
 export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   const sp = await searchParams;
-  const offset = sp.month === 'last' ? -1 : 0;
-  const { from, to, label } = monthRange(offset);
+  const range = resolveRange(sp, istDate());
+  const { from, to, label } = range;
+  // budgets are monthly: they are checked against the month the period ends in
+  const bFrom = `${to.slice(0, 7)}-01`;
+  const bTo = `${to.slice(0, 7)}-${String(new Date(Date.UTC(Number(to.slice(0, 4)), Number(to.slice(5, 7)), 0)).getUTCDate()).padStart(2, '0')}`;
 
   const budgetOrder = await getOrder('money-budgets');
   const [w, owed, balances, accounts, categories, spend, transactions, insights, budgets, savedLayout, prevSpend, labels, labelSpend] = await Promise.all([
@@ -75,10 +57,10 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     listCategories(),
     spendByCategory(from, to),
     listTransactions({ from, to, limit: 500 }),
-    moneyInsights(from),
-    budgetStatus(from, to),
+    moneyInsights(range),
+    budgetStatus(bFrom, bTo),
     getUiState<ResponsiveLayouts>('money-layout').catch(() => null),
-    spendByCategory(monthRange(offset - 1).from, monthRange(offset - 1).to),
+    spendByCategory(range.prevFrom, range.prevTo),
     listLabels(),
     spendByLabel(from, to),
   ]);
@@ -103,7 +85,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   const f = insights.forecast;
   const at = (n: number) => f[Math.min(n, f.length - 1)];
   const low = f.reduce((m, p) => (p.expected < m.expected ? p : m), f[0]);
-  const prevLabel = monthRange(offset - 1).label;
+  const prevLabel = range.prevLabel;
 
   // the speedometers: where the needle sits is 0 (left) to 1 (right)
   const peak = Math.max(1, ...insights.balanceTrend.map((x) => x.balance), insights.balanceNow);
@@ -111,19 +93,39 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   const totalBudget = budgets.rows.reduce((s2, r) => s2 + (r.budget ?? 0), 0);
   const spendRef = totalBudget > 0 ? totalBudget : insights.prevExpense;
   const saving = insights.income > 0 ? (insights.income - insights.expense) / insights.income : 0;
-  const MiniStat = ({ label: l, value, bad }: { label: string; value: string; bad?: boolean }) => (
+  const MiniStat = ({ label: l, value, bad }: { label: string; value: React.ReactNode; bad?: boolean }) => (
     <div className="rounded-xl bg-muted/50 px-3 py-2"><div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{l}</div><div className={`text-base font-bold tracking-tight ${bad ? neg : ''}`}>{value}</div></div>
   );
   const topExpenses = rows.filter((r) => r.kind === 'expense').sort((x, y) => Number(y.my_share ?? y.amount) - Number(x.my_share ?? x.amount)).slice(0, 6);
   const chartBody = 'flex flex-col';
 
+  const k = insights.kpis;
+  const topCat = spend[0];
+  const Tile = ({ label: l, value, sub: sb, badge }: { label: string; value: React.ReactNode; sub?: React.ReactNode; badge?: React.ReactNode }) => (
+    <div className="rounded-xl bg-muted/50 px-3 py-2.5"><div className="flex items-center justify-between gap-2"><span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{l}</span>{badge}</div><div className="mt-0.5 text-lg font-bold tracking-tight">{value}</div>{sb && <div className="truncate text-[11px] text-muted-foreground">{sb}</div>}</div>
+  );
+
   const items: GridItem[] = [
+    { id: 'kpis', w: 12, h: 6, minW: 4, minH: 4, node: (
+      <WidgetCard title="This period" sub={`${label} · ${k.elapsedDays} day${k.elapsedDays === 1 ? '' : 's'} so far`}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+          <Tile label="Income" value={<Amt value={insights.income} />} badge={pct(insights.incomePct, true)} sub={<>before <Amt value={insights.prevIncome} /></>} />
+          <Tile label="Spent" value={<Amt value={insights.expense} />} badge={pct(insights.expensePct, false)} sub={<>before <Amt value={insights.prevExpense} /></>} />
+          <Tile label="Net" value={<Amt value={net} />} sub={net >= 0 ? 'more in than out' : 'more out than in'} />
+          <Tile label="Saved" value={k.savingsRate === null ? '—' : `${Math.round(k.savingsRate * 100)}%`} sub="of income kept" />
+          <Tile label="Per day" value={<Amt value={k.avgPerDay} />} sub="average spending" />
+          <Tile label="Biggest day" value={k.biggestDay ? <Amt value={k.biggestDay.amount} /> : '—'} sub={k.biggestDay ? formatDate(k.biggestDay.date) : 'no spending'} />
+          <Tile label="Top category" value={topCat ? topCat.category : '—'} sub={topCat ? <><Amt value={topCat.amount} /> · {Math.round((topCat.amount / Math.max(1, insights.expense)) * 100)}%</> : ''} />
+          <Tile label="Transactions" value={String(k.txCount)} sub="income and spending" />
+        </div>
+      </WidgetCard>
+    ) },
     { id: 'gauges', w: 8, h: 8, minW: 4, minH: 6, node: (
       <WidgetCard title="At a glance" sub={label}>
         <div className="flex flex-wrap items-start justify-around gap-x-2 gap-y-4 pt-1">
-          <Gauge label="Balance" position={insights.balanceNow / (peak * 1.1)} value={formatINR(insights.balanceNow)} hint={`peak ${formatINR(peak)}`} />
-          <Gauge label="Cash flow" position={0.5 + (0.5 * net) / flowMax} value={formatINR(net)} hint={net >= 0 ? 'more in than out' : 'more out than in'} />
-          <Gauge label="Spending" invert position={spendRef > 0 ? insights.expense / spendRef : insights.expense > 0 ? 1 : 0} value={formatINR(insights.expense)} hint={spendRef > 0 ? `${totalBudget > 0 ? 'budget' : 'last period'} ${formatINR(spendRef)}` : 'nothing to compare'} />
+          <Gauge label="Balance" position={insights.balanceNow / (peak * 1.1)} value={<Amt value={insights.balanceNow} />} hint={`peak ${formatINR(peak)}`} />
+          <Gauge label="Cash flow" position={0.5 + (0.5 * net) / flowMax} value={<Amt value={net} />} hint={net >= 0 ? 'more in than out' : 'more out than in'} />
+          <Gauge label="Spending" invert position={spendRef > 0 ? insights.expense / spendRef : insights.expense > 0 ? 1 : 0} value={<Amt value={insights.expense} />} hint={spendRef > 0 ? `${totalBudget > 0 ? 'budget' : 'last period'} ${formatINR(spendRef)}` : 'nothing to compare'} />
           <Gauge label="Saved" position={Math.max(0, saving)} value={`${Math.round(saving * 100)}%`} hint="of income kept" />
         </div>
       </WidgetCard>
@@ -136,11 +138,11 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     ) },
     { id: 'cashflow', w: 6, h: 8, minW: 3, minH: 7, node: (
       <WidgetCard title="Cash flow" sub={`${label} vs previous period`}>
-        <div><div className="text-xs text-muted-foreground">Net</div><div className={`text-2xl font-bold tracking-tight ${net >= 0 ? pos : neg}`}>{formatINR(net)}</div></div>
+        <div><div className="text-xs text-muted-foreground">Net</div><div className={`text-2xl font-bold tracking-tight ${net >= 0 ? pos : neg}`}><Amt value={net} /></div></div>
         <div className="mt-4 space-y-4 text-sm">
           {([['Income', insights.income, insights.prevIncome, insights.incomePct, true, 'bg-emerald-500'], ['Expense', insights.expense, insights.prevExpense, insights.expensePct, false, 'bg-red-500']] as const).map(([name, now, before, change, up, color]) => (
             <div key={name}>
-              <div className="mb-1 flex items-center justify-between"><span>{name}</span><span className="flex items-center gap-2">{pct(change, up)}<b>{formatINR(now)}</b></span></div>
+              <div className="mb-1 flex items-center justify-between"><span>{name}</span><span className="flex items-center gap-2">{pct(change, up)}<b><Amt value={now} /></b></span></div>
               <div className="relative h-3 rounded-full bg-muted">
                 <div className={`h-full rounded-full ${color}`} style={{ width: `${(now / maxFlow) * 100}%` }} />
                 <div className="absolute -top-1 h-5 w-0.5 rounded bg-foreground/70" style={{ left: `calc(${(before / maxFlow) * 100}% - 1px)` }} title={`Previous period: ${formatINR(before)}`} />
@@ -152,29 +154,35 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
       </WidgetCard>
     ) },
     { id: 'balance', w: 6, h: 8, minW: 3, minH: 7, node: (
-      <WidgetCard bodyClassName={chartBody} title="Balance trend" sub={`${label}${insights.prevBalanceEnd !== null ? ` · ${formatINR(insights.prevBalanceEnd)} at the end of the previous month` : ''}`}>
-        <div className="mb-1 text-2xl font-bold tracking-tight">{formatINR(insights.balanceNow)}</div>
+      <WidgetCard expandable bodyClassName={chartBody} title="Balance trend" sub={`${label}${insights.prevBalanceEnd !== null ? ` · ${formatINR(insights.prevBalanceEnd)} before this period` : ''}`}>
+        <div className="mb-1 text-2xl font-bold tracking-tight"><Amt value={insights.balanceNow} /></div>
         <BalanceTrend points={insights.balanceTrend} />
       </WidgetCard>
     ) },
     { id: 'monthly', w: 6, h: 10, minW: 4, minH: 8, node: (
-      <WidgetCard bodyClassName={chartBody} title="Last 6 months" sub="Income, expense and net"><MonthlyBars rows={insights.monthly} /></WidgetCard>
+      <WidgetCard expandable bodyClassName={chartBody} title="Last 6 months" sub="Income, expense and net"><MonthlyBars rows={insights.monthly} /></WidgetCard>
     ) },
-    { id: 'categories', w: 6, h: 10, minW: 4, minH: 7, node: <WidgetCard title="Spending by category" sub={`${label} · change vs previous period`}><CategoryDonut rows={spend} previous={prevSpend} /></WidgetCard> },
-    { id: 'labels', w: 6, h: 10, minW: 3, minH: 6, node: <WidgetCard title="Spending by label" sub={`${label} · my share, e.g. necessity vs luxury`}><LabelSplit rows={labelSpend} labels={labels} /></WidgetCard> },
+    { id: 'categories', w: 6, h: 10, minW: 4, minH: 7, node: <WidgetCard expandable title="Spending by category" sub={`${label} · change vs previous period`}><CategoryDonut rows={spend} previous={prevSpend} /></WidgetCard> },
+    { id: 'labels', w: 6, h: 10, minW: 3, minH: 6, node: <WidgetCard expandable title="Spending by label" sub={`${label} · my share, e.g. necessity vs luxury`}><LabelSplit rows={labelSpend} labels={labels} /></WidgetCard> },
     { id: 'period', w: 6, h: 10, minW: 4, minH: 8, node: (
-      <WidgetCard bodyClassName={chartBody} title="Period to period comparison" sub="Running total by day"><PeriodComparison {...insights.comparison} currentLabel={label} previousLabel={prevLabel} /></WidgetCard>
+      <WidgetCard expandable bodyClassName={chartBody} title="Period to period comparison" sub={`Running total by day · ${label} vs ${prevLabel}`}><PeriodComparison {...insights.comparison} currentLabel={label} previousLabel={prevLabel} /></WidgetCard>
     ) },
     { id: 'daily', w: 6, h: 10, minW: 4, minH: 8, node: (
-      <WidgetCard bodyClassName={chartBody} title="Daily spending" sub={`${label} · my share`}><DailyBars rows={insights.daily} /></WidgetCard>
+      <WidgetCard expandable bodyClassName={chartBody} title="Daily spending" sub={`${label} · my share`}><DailyBars rows={insights.daily} /></WidgetCard>
+    ) },
+    { id: 'weekday', w: 6, h: 10, minW: 4, minH: 8, node: (
+      <WidgetCard expandable bodyClassName={chartBody} title="By day of the week" sub={`${label} · my share`}><WeekdayBars rows={insights.weekday} /></WidgetCard>
+    ) },
+    { id: 'payees', w: 6, h: 10, minW: 3, minH: 6, node: (
+      <WidgetCard expandable title="Top payees" sub={`${label} · where the money went, by name`}><PayeeBars rows={insights.payees} /></WidgetCard>
     ) },
     { id: 'forecast', w: 8, h: 13, minW: 5, minH: 10, node: (
-      <WidgetCard bodyClassName={chartBody} title="Forecast" sub="Next 90 days, from your scheduled payments and usual spending">
+      <WidgetCard expandable bodyClassName={chartBody} title="Forecast" sub="Next 90 days, from your scheduled payments and usual spending">
         <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <MiniStat label="In 30 days" value={formatINR(at(30).expected)} bad={at(30).expected < 0} />
-          <MiniStat label="In 60 days" value={formatINR(at(60).expected)} bad={at(60).expected < 0} />
-          <MiniStat label="In 90 days" value={formatINR(at(90).expected)} bad={at(90).expected < 0} />
-          <MiniStat label={`Lowest · ${formatDate(low.date)}`} value={formatINR(low.expected)} bad={low.expected < 0} />
+          <MiniStat label="In 30 days" value={<Amt value={at(30).expected} />} bad={at(30).expected < 0} />
+          <MiniStat label="In 60 days" value={<Amt value={at(60).expected} />} bad={at(60).expected < 0} />
+          <MiniStat label="In 90 days" value={<Amt value={at(90).expected} />} bad={at(90).expected < 0} />
+          <MiniStat label={`Lowest · ${formatDate(low.date)}`} value={<Amt value={low.expected} />} bad={low.expected < 0} />
         </div>
         <ForecastChart points={f} />
         <p className="mt-1 text-xs text-muted-foreground">Usual spending is {formatINR(insights.dailySpend)} a day (last 60 days, without payments you have scheduled).</p>
@@ -186,7 +194,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
       </WidgetCard>
     ) },
     { id: 'budgets', w: 4, h: 12, minW: 3, minH: 8, node: (
-      <WidgetCard title="Budgets" sub={`Monthly, ${label}`}>
+      <WidgetCard title="Budgets" sub={`Monthly, ${bFrom.slice(0, 7)}`}>
         <BudgetsCard rows={budgets.rows} categories={categories} ready={budgets.ready} order={budgetOrder} />
       </WidgetCard>
     ) },
@@ -218,12 +226,9 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
           <ImportDialog />
           <FindTransfers />
         <Link href="/money/transactions" className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">All transactions →</Link>
-        <div className="flex gap-1 rounded-lg bg-muted p-0.5 text-sm">
-          <Link href="/money?month=this" className={`rounded-md px-3 py-1.5 ${offset === 0 ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground'}`}>This month</Link>
-          <Link href="/money?month=last" className={`rounded-md px-3 py-1.5 ${offset === -1 ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground'}`}>Last month</Link>
-        </div>
         </div>
       </div>
+      <RangePicker range={range} />
       <WidgetGrid items={items} layoutKey="money-layout" initial={savedLayout} />
     </div>
   );

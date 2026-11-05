@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Reorderable } from '@/components/widgets/Reorderable';
 import { setBudgetAction } from '@/app/actions/budgeting';
 import { formatINR } from '@/lib/format';
+import { Amt } from '@/components/money/Amt';
 
 export type BudgetItem = { category_id: string; category: string; budget: number | null; spent: number };
 
@@ -29,7 +30,7 @@ export function BudgetsCard({ rows, categories, ready, order = [] }: { rows: Bud
     <div className="space-y-3">
       {budgeted.length > 0 && (
         <div className="text-sm">
-          <span className="font-semibold">{formatINR(totalSpent)}</span> of {formatINR(totalBudget)} budgeted
+          <span className="font-semibold"><Amt value={totalSpent} /></span> of <Amt value={totalBudget} /> budgeted
           <span className={`ml-2 text-xs ${totalSpent > totalBudget ? 'text-red-600' : 'text-muted-foreground'}`}>{totalSpent > totalBudget ? `${formatINR(totalSpent - totalBudget)} over` : `${formatINR(totalBudget - totalSpent)} left`}</span>
         </div>
       )}

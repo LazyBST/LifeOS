@@ -328,6 +328,19 @@ export async function settle(input: SettleInput): Promise<RecordedTransaction> {
   return { ...t, category_name: null, account_name, owed: -signed };
 }
 
+/** Every transaction in a period, however many there are (the database hands out 1000 at a time). */
+export async function listTransactionsAll(from: DateStr, to: DateStr): Promise<Transaction[]> {
+  const out: Transaction[] = [];
+  for (let page = 0; page < 30; page++) {
+    const { data, error } = await admin().from('transactions').select('*').is('deleted_at', null).gte('occurred_on', from).lte('occurred_on', to)
+      .order('occurred_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(page * 1000, page * 1000 + 999);
+    if (error) throw new Error(`transactions: ${error.message}`);
+    out.push(...((data ?? []) as Transaction[]));
+    if ((data ?? []).length < 1000) break;
+  }
+  return out;
+}
+
 export async function listTransactions(opts: { from?: DateStr; to?: DateStr; limit?: number; counterparty?: string } = {}): Promise<Transaction[]> {
   let q = admin().from('transactions').select('*').is('deleted_at', null);
   if (opts.from) q = q.gte('occurred_on', opts.from);
@@ -386,13 +399,14 @@ export type SpendRow = { occurred_on: DateStr; category_id: UUID | null; amount:
 
 /** Analytics use my share, never the cash paid (spec section 5). */
 export async function mySpending(from: DateStr, to: DateStr): Promise<SpendRow[]> {
-  const { data, error } = await admin()
-    .from('v_my_spending')
-    .select('*')
-    .gte('occurred_on', from)
-    .lte('occurred_on', to);
-  if (error) throw new Error(`v_my_spending: ${error.message}`);
-  return ((data ?? []) as SpendRow[]).map((r) => ({ ...r, amount: Number(r.amount) }));
+  const out: SpendRow[] = [];
+  for (let page = 0; page < 30; page++) {
+    const { data, error } = await admin().from('v_my_spending').select('*').gte('occurred_on', from).lte('occurred_on', to).range(page * 1000, page * 1000 + 999);
+    if (error) throw new Error(`v_my_spending: ${error.message}`);
+    out.push(...((data ?? []) as SpendRow[]).map((r) => ({ ...r, amount: Number(r.amount) })));
+    if ((data ?? []).length < 1000) break;
+  }
+  return out;
 }
 
 export async function spendByCategory(from: DateStr, to: DateStr): Promise<{ category: string; amount: number }[]> {

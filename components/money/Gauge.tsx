@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { formatINR } from '@/lib/format';
 
 const R = 78, CX = 100, CY = 100, W = 22;
@@ -12,7 +13,7 @@ function arc(from: number, to: number) {
  * A speedometer: red, amber and green zones with a needle. `position` is 0 (far left) to 1 (far right);
  * with `invert` the zones run green to red, for things where less is better, like spending.
  */
-export function Gauge({ label, position, value, hint, invert = false }: { label: string; position: number; value: string; hint?: string; invert?: boolean }) {
+export function Gauge({ label, position, value, hint, invert = false }: { label: string; position: number; value: ReactNode; hint?: string; invert?: boolean }) {
   const p = Math.min(1, Math.max(0, Number.isFinite(position) ? position : 0));
   const angle = 180 - p * 180;
   const [nx, ny] = pt(angle, R - 14);
@@ -20,7 +21,7 @@ export function Gauge({ label, position, value, hint, invert = false }: { label:
   const segs: [number, number][] = [[180, 122], [118, 62], [58, 0]];
   return (
     <figure className="flex min-w-0 flex-1 flex-col items-center">
-      <svg viewBox="0 0 200 118" className="w-full max-w-[220px]" role="img" aria-label={`${label}: ${value}`}>
+      <svg viewBox="0 0 200 118" className="w-full max-w-[220px]" role="img" aria-label={label}>
         {segs.map(([a, b], i) => <path key={i} d={arc(a, b)} fill="none" stroke={zones[i]} strokeWidth={W} strokeLinecap="round" />)}
         <line x1={CX} y1={CY} x2={nx} y2={ny} stroke="currentColor" strokeWidth={4} strokeLinecap="round" className="text-foreground" style={{ transition: 'all 0.6s ease' }} />
         <circle cx={CX} cy={CY} r={7} fill="currentColor" className="text-foreground" />

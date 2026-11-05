@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OwedList } from '@/components/money/OwedList';
 import type { OwedByLabel, Wallet } from '@/lib/types/db';
-import { formatINR } from '@/lib/format';
+import { Amt } from '@/components/money/Amt';
 
 
 type WalletSummaryProps = {
@@ -21,10 +21,10 @@ export function WalletSummary({ wallet, owed }: WalletSummaryProps) {
   return (
     <div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Cash on hand" value={formatINR(wallet.cash_on_hand)} />
-        <Stat label="Owed to me" value={formatINR(wallet.owed_to_me)} tone="green" />
-        <Stat label="I owe" value={formatINR(wallet.i_owe)} tone="red" />
-        <Stat label="Net" value={formatINR(wallet.net)} tone={wallet.net >= 0 ? 'green' : 'red'} />
+        <Stat label="Cash on hand" value={<Amt value={wallet.cash_on_hand} />} />
+        <Stat label="Owed to me" value={<Amt value={wallet.owed_to_me} />} tone="green" />
+        <Stat label="I owe" value={<Amt value={wallet.i_owe} />} tone="red" />
+        <Stat label="Net" value={<Amt value={wallet.net} />} tone={wallet.net >= 0 ? 'green' : 'red'} />
       </div>
 
       <Button
@@ -48,7 +48,7 @@ export function WalletSummary({ wallet, owed }: WalletSummaryProps) {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: 'green' | 'red' }) {
+function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: 'green' | 'red' }) {
   const color =
     tone === 'green'
       ? 'text-emerald-600 dark:text-emerald-400'
