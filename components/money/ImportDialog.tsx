@@ -42,6 +42,7 @@ function Importer({ onDone }: { onDone: () => void }) {
   const router = useRouter();
   const [source, setSource] = useState<ImportSource>('federal');
   const [files, setFiles] = useState<File[]>([]);
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedRow[] | null>(null);
   const [last4, setLast4] = useState<string | null>(null);
@@ -77,6 +78,7 @@ function Importer({ onDone }: { onDone: () => void }) {
         const form = new FormData();
         form.set('file', files[i]);
         form.set('source', source);
+        if (password) form.set('password', password);
         const res = await fetch('/api/money/extract', { method: 'POST', body: form });
         const j = (await res.json().catch(() => null)) as { ok: boolean; rows?: ExtractedRow[]; accountLast4?: string | null; summary?: string; error?: string } | null;
         if (!j?.ok) throw new Error(j?.error ?? `Could not read ${files[i].name}.`);
@@ -149,6 +151,11 @@ function Importer({ onDone }: { onDone: () => void }) {
           <span className="font-medium">Statement PDF</span>
           <input type="file" multiple accept="application/pdf,.pdf" onChange={(e) => setFiles([...(e.target.files ?? [])])} className="block w-full text-xs file:mr-3 file:rounded-lg file:border file:bg-transparent file:px-3 file:py-1.5 file:text-xs hover:file:bg-muted" />
           <span className="block text-xs text-muted-foreground">The PDF you download from the bank or PhonePe (unlocked, not a photo). It is read exactly as printed and checked against the statement&apos;s own balances. Nothing is added until you review it.</span>
+        </label>
+        <label className="block space-y-1">
+          <span className="font-medium">Password <span className="font-normal text-muted-foreground">(only if the PDF is protected)</span></span>
+          <input type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Leave empty if there is none" className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" />
+          <span className="block text-xs text-muted-foreground">Used only to open the file now. It is not saved. Bank statements are often locked with something like your date of birth or customer ID.</span>
         </label>
         <p className="rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
           Payments already on file are skipped: the same bank reference is matched first (Federal and PhonePe share it), then the same account, amount and date. Money you move between your own accounts is flagged, not counted as spending.

@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
     if (!(file instanceof File) || !['federal', 'hdfc', 'phonepe'].includes(source)) return NextResponse.json({ ok: false, error: 'Choose a bank and a PDF.' }, { status: 400 });
     if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') return NextResponse.json({ ok: false, error: 'Only PDF statements can be imported.' }, { status: 415 });
     if (file.size > 12 * 1024 * 1024) return NextResponse.json({ ok: false, error: 'That file is too large (12 MB at most).' }, { status: 413 });
-    const read = await readStatementPdf(source, new Uint8Array(await file.arrayBuffer()));
+    // an empty password means the file is not protected; the password is used for this read only and never stored or logged
+    const password = String(form.get('password') ?? '');
+    const read = await readStatementPdf(source, new Uint8Array(await file.arrayBuffer()), password);
     return NextResponse.json({ ok: true, ...read });
   } catch (e) {
     const known = e instanceof StatementError;

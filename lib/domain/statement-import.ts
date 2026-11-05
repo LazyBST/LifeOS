@@ -13,10 +13,14 @@ import type { TxLabel } from '@/lib/types/db';
 export { StatementError };
 
 /** Every piece of text on every page, with its position. Statements are laid out in fixed columns, so position is what reads them. */
-async function pdfItems(data: Uint8Array): Promise<PdfItem[]> {
+async function pdfItems(data: Uint8Array, password?: string): Promise<PdfItem[]> {
   let pdf;
-  try { pdf = await getDocumentProxy(data); } catch (e) {
-    if (/password/i.test(String((e as Error)?.name) + String((e as Error)?.message))) throw new StatementError('This PDF is password protected. Unlock it first, then import it.');
+  try { pdf = await getDocumentProxy(data, password ? { password } : {}); } catch (e) {
+    const err = e as { name?: string; message?: string; code?: number };
+    if (/password/i.test(`${err?.name} ${err?.message}`)) {
+      // pdf.js: code 1 = a password is needed, code 2 = the one given is wrong
+      throw new StatementError(password || err.code === 2 || /incorrect/i.test(err.message ?? '') ? 'That password is not right.' : 'This PDF is password protected. Enter its password and try again.');
+    }
     throw new StatementError('That file is not a readable PDF.');
   }
   const out: PdfItem[] = [];
@@ -31,9 +35,9 @@ async function pdfItems(data: Uint8Array): Promise<PdfItem[]> {
 
 export type ReadStatement = { rows: ExtractedRow[]; accountLast4: string | null; summary: string };
 
-/** Read one statement PDF: the lines, the account it belongs to, and proof that the lines add up. */
-export async function readStatementPdf(source: ImportSource, data: Uint8Array): Promise<ReadStatement> {
-  const items = await pdfItems(data);
+/** Read one statement PDF (with its password if it has one): the lines, the account it belongs to, and proof that the lines add up. */
+export async function readStatementPdf(source: ImportSource, data: Uint8Array, password?: string): Promise<ReadStatement> {
+  const items = await pdfItems(data, password?.trim() ? password : undefined);
   if (!items.length) throw new StatementError('This PDF has no text in it (a scan or a photo). Download the statement as a PDF from the bank or the app.');
   const { rows, accountLast4, summary } = parseStatement(source, items);
   return { rows, accountLast4, summary };
