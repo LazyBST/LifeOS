@@ -94,7 +94,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   const spendRef = totalBudget > 0 ? totalBudget : insights.prevExpense;
   const saving = insights.income > 0 ? (insights.income - insights.expense) / insights.income : 0;
   const MiniStat = ({ label: l, value, bad }: { label: string; value: React.ReactNode; bad?: boolean }) => (
-    <div className="rounded-xl bg-muted/50 px-3 py-2"><div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{l}</div><div className={`text-base font-bold tracking-tight ${bad ? neg : ''}`}>{value}</div></div>
+    <div className="min-w-0 rounded-xl bg-muted/50 px-3 py-2"><div className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{l}</div><div className={`truncate text-base font-bold tracking-tight ${bad ? neg : ''}`}>{value}</div></div>
   );
   const topExpenses = rows.filter((r) => r.kind === 'expense').sort((x, y) => Number(y.my_share ?? y.amount) - Number(x.my_share ?? x.amount)).slice(0, 6);
   const chartBody = 'flex flex-col';
@@ -102,13 +102,13 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   const k = insights.kpis;
   const topCat = spend[0];
   const Tile = ({ label: l, value, sub: sb, badge }: { label: string; value: React.ReactNode; sub?: React.ReactNode; badge?: React.ReactNode }) => (
-    <div className="rounded-xl bg-muted/50 px-3 py-2.5"><div className="flex items-center justify-between gap-2"><span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{l}</span>{badge}</div><div className="mt-0.5 text-lg font-bold tracking-tight">{value}</div>{sb && <div className="truncate text-[11px] text-muted-foreground">{sb}</div>}</div>
+    <div className="min-w-0 rounded-xl bg-muted/50 px-3 py-2.5"><div className="flex items-center justify-between gap-2"><span className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{l}</span>{badge}</div><div className="mt-0.5 truncate text-lg font-bold tracking-tight">{value}</div>{sb && <div className="truncate text-[11px] text-muted-foreground">{sb}</div>}</div>
   );
 
   const items: GridItem[] = [
     { id: 'kpis', w: 12, h: 6, minW: 4, minH: 4, node: (
       <WidgetCard title="This period" sub={`${label} · ${k.elapsedDays} day${k.elapsedDays === 1 ? '' : 's'} so far`}>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-2">
           <Tile label="Income" value={<Amt value={insights.income} />} badge={pct(insights.incomePct, true)} sub={<>before <Amt value={insights.prevIncome} /></>} />
           <Tile label="Spent" value={<Amt value={insights.expense} />} badge={pct(insights.expensePct, false)} sub={<>before <Amt value={insights.prevExpense} /></>} />
           <Tile label="Net" value={<Amt value={net} />} sub={net >= 0 ? 'more in than out' : 'more out than in'} />
@@ -178,7 +178,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     ) },
     { id: 'forecast', w: 8, h: 13, minW: 5, minH: 10, node: (
       <WidgetCard expandable bodyClassName={chartBody} title="Forecast" sub="Next 90 days, from your scheduled payments and usual spending">
-        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mb-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-2">
           <MiniStat label="In 30 days" value={<Amt value={at(30).expected} />} bad={at(30).expected < 0} />
           <MiniStat label="In 60 days" value={<Amt value={at(60).expected} />} bad={at(60).expected < 0} />
           <MiniStat label="In 90 days" value={<Amt value={at(90).expected} />} bad={at(90).expected < 0} />

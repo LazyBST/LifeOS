@@ -20,7 +20,7 @@ export function WalletSummary({ wallet, owed }: WalletSummaryProps) {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] items-start gap-x-4 gap-y-3">
         <Stat label="Cash on hand" value={<Amt value={wallet.cash_on_hand} />} />
         <Stat label="Owed to me" value={<Amt value={wallet.owed_to_me} />} tone="green" />
         <Stat label="I owe" value={<Amt value={wallet.i_owe} />} tone="red" />
@@ -56,9 +56,9 @@ function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: 
         ? 'text-red-600 dark:text-red-400'
         : 'text-foreground';
   return (
-    <div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`text-lg font-semibold ${color}`}>{value}</div>
+    <div className="min-w-0">
+      <div className="truncate text-xs text-muted-foreground">{label}</div>
+      <div className={`text-lg font-semibold leading-tight tabular-nums ${color}`}>{value}</div>
     </div>
   );
 }
