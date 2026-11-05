@@ -108,7 +108,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   const items: GridItem[] = [
     { id: 'kpis', w: 12, h: 6, minW: 4, minH: 4, node: (
       <WidgetCard title="This period" sub={`${label} · ${k.elapsedDays} day${k.elapsedDays === 1 ? '' : 's'} so far`}>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-2">
           <Tile label="Income" value={<Amt value={insights.income} />} badge={pct(insights.incomePct, true)} sub={<>before <Amt value={insights.prevIncome} /></>} />
           <Tile label="Spent" value={<Amt value={insights.expense} />} badge={pct(insights.expensePct, false)} sub={<>before <Amt value={insights.prevExpense} /></>} />
           <Tile label="Net" value={<Amt value={net} />} sub={net >= 0 ? 'more in than out' : 'more out than in'} />
@@ -122,7 +122,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     ) },
     { id: 'gauges', w: 8, h: 8, minW: 4, minH: 6, node: (
       <WidgetCard title="At a glance" sub={label}>
-        <div className="flex flex-wrap items-start justify-around gap-x-2 gap-y-4 pt-1">
+        <div className="grid grid-cols-2 items-start gap-x-3 gap-y-5 pt-1 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
           <Gauge label="Balance" position={insights.balanceNow / (peak * 1.1)} value={<Amt value={insights.balanceNow} />} hint={`peak ${formatINR(peak)}`} />
           <Gauge label="Cash flow" position={0.5 + (0.5 * net) / flowMax} value={<Amt value={net} />} hint={net >= 0 ? 'more in than out' : 'more out than in'} />
           <Gauge label="Spending" invert position={spendRef > 0 ? insights.expense / spendRef : insights.expense > 0 ? 1 : 0} value={<Amt value={insights.expense} />} hint={spendRef > 0 ? `${totalBudget > 0 ? 'budget' : 'last period'} ${formatINR(spendRef)}` : 'nothing to compare'} />
@@ -178,7 +178,7 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
     ) },
     { id: 'forecast', w: 8, h: 13, minW: 5, minH: 10, node: (
       <WidgetCard expandable bodyClassName={chartBody} title="Forecast" sub="Next 90 days, from your scheduled payments and usual spending">
-        <div className="mb-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-2">
+        <div className="mb-3 grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-2">
           <MiniStat label="In 30 days" value={<Amt value={at(30).expected} />} bad={at(30).expected < 0} />
           <MiniStat label="In 60 days" value={<Amt value={at(60).expected} />} bad={at(60).expected < 0} />
           <MiniStat label="In 90 days" value={<Amt value={at(90).expected} />} bad={at(90).expected < 0} />
@@ -219,13 +219,13 @@ export default async function MoneyPage({ searchParams }: MoneyPageProps) {
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <SetPageContext ctx={{ route: '/money', entity_type: 'none' }} />
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold">Money</h1>
-        <div className="flex flex-wrap items-center gap-2">
-        <CategoriesDialog categories={categories} labels={labels} />
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center [&>*]:w-full sm:[&>*]:w-auto">
+          <CategoriesDialog categories={categories} labels={labels} />
           <ImportDialog />
           <FindTransfers />
-        <Link href="/money/transactions" className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">All transactions →</Link>
+          <Link href="/money/transactions" className="rounded-lg border px-3 py-1.5 text-center text-sm font-medium hover:bg-muted">All transactions →</Link>
         </div>
       </div>
       <RangePicker range={range} />

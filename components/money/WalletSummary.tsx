@@ -20,7 +20,7 @@ export function WalletSummary({ wallet, owed }: WalletSummaryProps) {
 
   return (
     <div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] items-start gap-x-4 gap-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] items-start gap-x-4 gap-y-3">
         <Stat label="Cash on hand" value={<Amt value={wallet.cash_on_hand} />} />
         <Stat label="Owed to me" value={<Amt value={wallet.owed_to_me} />} tone="green" />
         <Stat label="I owe" value={<Amt value={wallet.i_owe} />} tone="red" />
