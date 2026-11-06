@@ -27,6 +27,7 @@ import {
   counterpartyLabels,
   updateTransaction,
   type TxRow,
+  withBalances,
   wallet,
   type ExpenseInput,
   type IncomeInput,
@@ -160,7 +161,7 @@ export async function searchTransactionsAction(filters: TxFilters, page = 0): Pr
       page === 0 ? transactionTotals(filters).catch(() => null) : Promise.resolve(null),
       page === 0 ? counterpartyLabels().catch(() => []) : Promise.resolve([] as string[]),
     ]);
-    return { ...r, totals, counterparties };
+    return { ...r, rows: await withBalances(r.rows), totals, counterparties };
   });
 }
 

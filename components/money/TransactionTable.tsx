@@ -12,7 +12,7 @@ import type { Transaction, TxLabel } from '@/lib/types/db';
 import { LabelPicker } from './LabelChips';
 import { ConvertTransfer } from './ConvertTransfer';
 
-export type TableTx = Transaction & { category_name?: string | null; account_name?: string | null };
+export type TableTx = Transaction & { category_name?: string | null; account_name?: string | null; balance_after?: number | null; to_balance_after?: number | null };
 type Named = { id: string; name: string };
 
 const KIND = { expense: ['Expense', 'text-red-600 dark:text-red-400'], income: ['Income', 'text-emerald-600 dark:text-emerald-400'], settlement: ['Settle', 'text-sky-600 dark:text-sky-400'], transfer: ['Transfer', 'text-violet-600 dark:text-violet-400'] } as const;
@@ -97,6 +97,12 @@ export function TransactionTable({ transactions, categories, accounts, labels = 
                 </td>
                 <td className="px-2 py-1.5 text-right whitespace-nowrap">
                   <Editable label="amount" type="number" align="right" value={String(Number(t.amount))} display={formatINR(Number(t.amount))} onCommit={(v) => Number.isNaN(num(v)) ? 'Enter an amount' : save(t.id, { amount: num(v) })} />
+                  {t.balance_after != null && (
+                    <div className="text-[10px] font-normal leading-tight text-muted-foreground/70" title={t.kind === 'transfer' ? 'Balance after this transfer' : 'Account balance right after this transaction'}>
+                      bal {formatINR(t.balance_after)}
+                      {t.kind === 'transfer' && t.to_balance_after != null && <> → {formatINR(t.to_balance_after)}</>}
+                    </div>
+                  )}
                 </td>
                 <td className="px-2 py-1.5 text-right whitespace-nowrap text-muted-foreground">
                   {t.kind === 'expense' ? <Editable label="my share" type="number" align="right" value={String(Number(t.my_share ?? t.amount))} display={formatINR(Number(t.my_share ?? t.amount))} onCommit={(v) => Number.isNaN(num(v)) ? 'Enter your share' : save(t.id, { my_share: num(v) })} /> : '—'}

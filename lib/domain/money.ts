@@ -422,6 +422,7 @@ export async function spendByCategory(from: DateStr, to: DateStr): Promise<{ cat
 
 // ---- editing and searching transactions -------------------------------------------------------------------
 
+import { balanceTrail, type TrailTx } from './balance-trail';
 import { cleanLabels, cleanQuery, shareAfterAmountEdit, type TxFilters, type TxPatch } from './money-filters';
 
 /** Edit one transaction in place. Keeps the rules the database checks: shares only on expenses, signed settlements. */
@@ -496,7 +497,23 @@ function applyFilters(q: any, f: TxFilters, view: boolean) { // eslint-disable-l
   return q;
 }
 
-export type TxRow = Transaction & { owed: number };
+export type TxRow = Transaction & { owed: number; /** the account's balance right after this transaction */ balance_after?: number | null; /** transfers: the receiving account's balance right after */ to_balance_after?: number | null };
+
+/** Adds the running balance to each row. Looks at the whole ledger, so filters and paging do not change the numbers. */
+export async function withBalances(rows: TxRow[]): Promise<TxRow[]> {
+  if (rows.length === 0) return rows;
+  const all: TrailTx[] = [];
+  for (let page = 0; page < 30; page++) {
+    const { data, error } = await admin().from('transactions').select('id,kind,amount,account_id,to_account_id,occurred_on,created_at').is('deleted_at', null)
+      .order('occurred_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(page * 1000, page * 1000 + 999);
+    if (error) throw new Error(`transactions: ${error.message}`);
+    all.push(...((data ?? []) as TrailTx[]));
+    if ((data ?? []).length < 1000) break;
+  }
+  const current = new Map((await accountBalances()).map((a) => [a.id, a.balance]));
+  const trail = balanceTrail(all, current);
+  return rows.map((r) => { const b = trail.get(r.id); return { ...r, balance_after: b?.account ?? null, to_balance_after: b?.toAccount ?? null }; });
+}
 
 export async function searchTransactions(f: TxFilters, page = 0, size = 100): Promise<{ rows: TxRow[]; total: number; owedFilter: boolean }> {
   const run = async (view: boolean) => {
