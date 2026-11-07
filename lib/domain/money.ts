@@ -422,6 +422,7 @@ export async function spendByCategory(from: DateStr, to: DateStr): Promise<{ cat
 
 // ---- editing and searching transactions -------------------------------------------------------------------
 
+import { splitProblem, splitShares, type SplitPart } from './split-math';
 import { balanceTrail, type TrailTx } from './balance-trail';
 import { cleanLabels, cleanQuery, shareAfterAmountEdit, type TxFilters, type TxPatch } from './money-filters';
 
@@ -550,4 +551,35 @@ export async function transactionTotals(f: TxFilters): Promise<{ count: number; 
 export async function counterpartyLabels(): Promise<string[]> {
   const { data } = await admin().from('transactions').select('counterparty').is('deleted_at', null).not('counterparty', 'is', null).limit(1000);
   return [...new Set(((data ?? []) as { counterparty: string }[]).map((r) => r.counterparty))].sort();
+}
+
+
+/** Split one expense or income into several parts. The first part stays on the original row (so its bank reference
+ *  and history stay put); the others are new rows on the same date and account. The parts must add up to the total. */
+export async function splitTransaction(id: UUID, parts: SplitPart[]): Promise<Transaction[]> {
+  const { data: cur, error: e0 } = await admin().from('transactions').select('*').eq('id', id).is('deleted_at', null).single();
+  if (e0 || !cur) throw new Error('That transaction no longer exists.');
+  const t = cur as Transaction;
+  if (t.kind !== 'expense' && t.kind !== 'income') throw new Error('Only an expense or income can be split.');
+  const problem = splitProblem(Number(t.amount), parts.map((p) => Number(p.amount)));
+  if (problem) throw new Error(problem);
+  const shares = t.kind === 'expense' ? splitShares(Number(t.amount), Number(t.my_share ?? t.amount), parts.map((p) => Number(p.amount))) : parts.map(() => null);
+  const fields = (p: SplitPart, i: number) => ({
+    amount: Number(p.amount), my_share: shares[i],
+    description: p.description?.trim() ? p.description.trim().slice(0, 200) : t.description,
+    category_id: p.category_id === undefined ? t.category_id : p.category_id,
+    labels: p.labels ? cleanLabels(p.labels) : (t.labels ?? []),
+  });
+  const { data: first, error: e1 } = await admin().from('transactions').update(fields(parts[0], 0)).eq('id', id).select('*').single();
+  if (e1) throw new Error(`transaction_split: ${e1.message}`);
+  const extra = parts.slice(1).map((p, i) => ({
+    ...fields(p, i + 1), occurred_on: t.occurred_on, kind: t.kind, account_id: t.account_id, counterparty: t.counterparty, note: t.note,
+    raw_text: t.raw_text, source: t.source ?? null, ext_ref: null,
+  }));
+  const { data: made, error: e2 } = await admin().from('transactions').insert(extra).select('*');
+  if (e2) {
+    await admin().from('transactions').update({ amount: t.amount, my_share: t.my_share, description: t.description, category_id: t.category_id, labels: t.labels ?? [] }).eq('id', id); // put the original back
+    throw new Error(`transaction_split: ${e2.message}`);
+  }
+  return [first as Transaction, ...((made ?? []) as Transaction[])];
 }

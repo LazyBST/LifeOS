@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { commitImportAction, previewImportAction } from '@/app/actions/money';
 import { LabelPicker } from './LabelChips';
+import { draftAmounts, draftProblem, SplitEditor, startingParts, type DraftPart } from './SplitEditor';
 import { formatINR } from '@/lib/format';
 import { IMPORT_SOURCES, type Classified, type ExtractedRow, type ImportSource } from '@/lib/domain/statement-import-math';
 import type { CommitItem, ImportPreview } from '@/lib/domain/statement-import';
@@ -56,6 +57,7 @@ function Importer({ onDone }: { onDone: () => void }) {
   const [removeOther, setRemoveOther] = useState<Record<number, boolean>>({});
   const [lab, setLab] = useState<Record<number, string[]>>({});
   const [fromDate, setFromDate] = useState('');
+  const [splits, setSplits] = useState<Record<number, DraftPart[]>>({});
 
   async function run(rows: ExtractedRow[], aId: string | null, map: Record<string, string>, l4: string | null) {
     const r = await previewImportAction(source, rows, aId, map, l4);
@@ -64,7 +66,7 @@ function Importer({ onDone }: { onDone: () => void }) {
     setAccountId(aId ?? r.data.defaultAccountId);
     setPicked(Object.fromEntries(r.data.rows.map((x) => [x.idx, x.status === 'new' || x.status === 'merge' || x.status === 'transfer'])));
     setRemoveOther(Object.fromEntries(r.data.rows.filter((x) => x.counterpartIds.length).map((x) => [x.idx, true])));
-    setCat({}); setAcc({}); setLab({});
+    setCat({}); setAcc({}); setLab({}); setSplits({});
     return true;
   }
 
@@ -108,6 +110,7 @@ function Importer({ onDone }: { onDone: () => void }) {
   const phoneDigits = useMemo(() => [...new Set(rows.map((r) => r.paid_by_last4).filter((x): x is string => !!x))], [rows]);
   const chosen = rows.filter((r) => picked[r.idx]);
   const addCount = chosen.filter((r) => r.status !== 'merge').length;
+  const badSplit = chosen.some((r) => splits[r.idx] && draftProblem(r.amount, splits[r.idx]!));
   const mergeCount = chosen.filter((r) => r.status === 'merge').length;
   const selectable = rows.filter((r) => r.status !== 'duplicate'); // lines already on file are never re-added
   const allOn = selectable.length > 0 && selectable.every((r) => picked[r.idx]);
@@ -125,11 +128,19 @@ function Importer({ onDone }: { onDone: () => void }) {
   async function commit() {
     if (!preview) return;
     setBusy('Adding…');
-    const items: CommitItem[] = chosen.filter((r) => r.status !== 'merge').map((r) => ({
-      date: r.date, name: r.name, raw: r.raw, direction: r.direction, amount: r.amount, ref: r.ref,
-      account_id: acc[r.idx] ?? r.account_id, category: (cat[r.idx] ?? r.category) || null, labels: lab[r.idx] ?? [],
-      ...(r.status === 'transfer' && r.transfer?.from && r.transfer.to ? { transfer: { from: r.transfer.from, to: r.transfer.to } } : {}),
-    }));
+    const items: CommitItem[] = chosen.filter((r) => r.status !== 'merge').flatMap((r): CommitItem[] => {
+      const base = { date: r.date, raw: r.raw, direction: r.direction, ref: r.ref, account_id: acc[r.idx] ?? r.account_id };
+      const parts = r.status === 'new' ? splits[r.idx] : undefined;
+      if (parts) {
+        const nums = draftAmounts(parts);
+        // the first part carries the bank reference, so a later import still sees the payment as already there
+        return parts.map((p, i) => ({ ...base, name: p.description.trim() || r.name, amount: nums[i], category: p.category || null, labels: p.labels, ...(i > 0 ? { noRef: true } : {}) }));
+      }
+      return [{
+        ...base, name: r.name, amount: r.amount, category: (cat[r.idx] ?? r.category) || null, labels: lab[r.idx] ?? [],
+        ...(r.status === 'transfer' && r.transfer?.from && r.transfer.to ? { transfer: { from: r.transfer.from, to: r.transfer.to } } : {}),
+      }];
+    });
     const merges = [
       ...chosen.filter((r) => r.status === 'merge' && r.matchId).map((r) => ({ id: r.matchId!, ...(r.patch ?? {}) })),
       // remembering the reference on an entry you typed yourself costs nothing and stops a later duplicate
@@ -243,17 +254,31 @@ function Importer({ onDone }: { onDone: () => void }) {
                 <div className="pl-6 text-xs font-medium">{accountName(r.transfer.from)} → {accountName(r.transfer.to)}</div>
               )}
               {(r.status === 'new' || on) && r.status !== 'merge' && r.status !== 'transfer' && (
+                <>
                 <div className="flex flex-wrap items-center gap-2 pl-6">
-                  <select value={cat[r.idx] ?? r.category ?? ''} onChange={(e) => setCat((c) => ({ ...c, [r.idx]: e.target.value }))} className={selectCls} aria-label="Category">
-                    {credit && <option value="">No category</option>}
-                    {preview.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  {!splits[r.idx] && (
+                    <>
+                      <select value={cat[r.idx] ?? r.category ?? ''} onChange={(e) => setCat((c) => ({ ...c, [r.idx]: e.target.value }))} className={selectCls} aria-label="Category">
+                        {credit && <option value="">No category</option>}
+                        {preview.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </>
+                  )}
                   <select value={acc[r.idx] ?? r.account_id ?? ''} onChange={(e) => setAcc((a) => ({ ...a, [r.idx]: e.target.value }))} className={selectCls} aria-label="Account">
                     <option value="">New account</option>
                     {accountOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
-                  <LabelPicker labels={preview.labels} value={lab[r.idx] ?? []} onChange={(next) => setLab((m) => ({ ...m, [r.idx]: next }))} />
+                  {!splits[r.idx] && <LabelPicker labels={preview.labels} value={lab[r.idx] ?? []} onChange={(next) => setLab((m) => ({ ...m, [r.idx]: next }))} />}
+                  {r.status === 'new' && (splits[r.idx]
+                    ? <button type="button" onClick={() => setSplits((m) => { const n = { ...m }; delete n[r.idx]; return n; })} className="text-xs text-muted-foreground underline">Don&apos;t split</button>
+                    : <button type="button" onClick={() => setSplits((m) => ({ ...m, [r.idx]: startingParts(r.amount, cat[r.idx] ?? r.category ?? '', lab[r.idx] ?? []) }))} className="rounded-lg border px-2 py-1 text-xs hover:bg-muted">Split</button>)}
                 </div>
+                {r.status === 'new' && splits[r.idx] && (
+                  <div className="pl-6">
+                    <SplitEditor total={r.amount} parts={splits[r.idx]} onChange={(next) => setSplits((m) => ({ ...m, [r.idx]: next }))} categories={preview.categories.map((c) => ({ value: c, label: c }))} labels={preview.labels} noCategoryLabel="No category" />
+                  </div>
+                )}
+                </>
               )}
               {r.status === 'transfer' && r.counterpartIds.length > 0 && on && (
                 <label className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
@@ -268,7 +293,7 @@ function Importer({ onDone }: { onDone: () => void }) {
       <p className="text-xs text-muted-foreground">Money moving between your own accounts is recorded once, as a transfer (not income or spending). After importing, open any transaction to change its account, category or labels, split it, or turn it into a transfer with the ⇄ button.</p>
       <div className="flex items-center justify-between gap-2">
         <button type="button" onClick={() => { setPreview(null); setExtracted(null); setFiles([]); setProof([]); setFromDate(''); }} className="text-xs text-muted-foreground underline">Start over</button>
-        <Button onClick={() => void commit()} disabled={!!busy || chosen.length === 0}>
+        <Button onClick={() => void commit()} disabled={!!busy || chosen.length === 0 || badSplit}>
           {busy ?? `Import ${addCount}${mergeCount ? ` · merge ${mergeCount}` : ''}`}
         </Button>
       </div>

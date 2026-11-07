@@ -105,6 +105,8 @@ export type CommitItem = {
   date: string; name: string; raw: string; direction: 'debit' | 'credit'; amount: number;
   ref: string | null; account_id: string | null; category: string | null;
   labels?: string[];
+  /** an extra part of a split payment: it does not carry the bank reference (the first part does) */
+  noRef?: boolean;
   /** a transfer between two of your accounts: recorded once, as a transfer (account_id is where it left, to_account_id where it arrived) */
   transfer?: { from: string; to: string };
 };
@@ -147,7 +149,7 @@ export async function commitImport(source: ImportSource, items: CommitItem[], me
       my_share: expense ? Math.abs(i.amount) : null,
       raw_text: i.raw.slice(0, 500) || null,
       source,
-      ext_ref: normalizeRef(i.ref, i.raw),
+      ext_ref: i.noRef ? null : normalizeRef(i.ref, i.raw),
       ...(i.labels?.length ? { labels: cleanLabels(i.labels) } : {}),
     };
   });

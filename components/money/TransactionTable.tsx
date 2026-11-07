@@ -11,6 +11,7 @@ import { formatINR } from '@/lib/format';
 import type { Transaction, TxLabel } from '@/lib/types/db';
 import { LabelPicker } from './LabelChips';
 import { ConvertTransfer } from './ConvertTransfer';
+import { SplitTransaction } from './SplitTransaction';
 
 export type TableTx = Transaction & { category_name?: string | null; account_name?: string | null; balance_after?: number | null; to_balance_after?: number | null };
 type Named = { id: string; name: string };
@@ -112,6 +113,7 @@ export function TransactionTable({ transactions, categories, accounts, labels = 
                 </td>
                 <td className={`px-2 py-1.5 text-right font-medium whitespace-nowrap ${owed === 0 ? 'text-muted-foreground' : owed > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{owed === 0 ? '—' : formatINR(owed)}</td>
                 <td className="px-1 py-1.5 text-right whitespace-nowrap">
+                  <SplitTransaction tx={t} categories={categories} labels={labels} onDone={(made) => { setRows((prev) => prev.flatMap((r) => (r.id === t.id ? made : [r]))); router.refresh(); }} />
                   {t.kind !== 'settlement' && <ConvertTransfer tx={t} accounts={accounts} onDone={(next) => setRows((prev) => prev.map((r) => (r.id === t.id ? { ...r, ...next } : r)))} />}
                   <button type="button" disabled={deleting === t.id} onClick={() => void remove(t.id)} aria-label="Delete transaction" title="Delete" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive disabled:opacity-50"><Trash2 className="size-3.5" /></button>
                 </td>

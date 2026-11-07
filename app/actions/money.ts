@@ -28,6 +28,7 @@ import {
   updateTransaction,
   type TxRow,
   withBalances,
+  splitTransaction,
   wallet,
   type ExpenseInput,
   type IncomeInput,
@@ -35,6 +36,7 @@ import {
   type SettleInput,
   type TransferInput,
 } from '@/lib/domain/money';
+import type { SplitPart } from '@/lib/domain/split-math';
 import type { TxFilters, TxPatch } from '@/lib/domain/money-filters';
 import type { Account, AccountBalance, Category, DateStr, OwedByLabel, Transaction, TxLabel, UUID, Wallet } from '@/lib/types/db';
 import { convertFromTransfer, convertToTransfer, counterpartsOf, listTransferPairs, mergeTransferPairs, type NamedPair } from '@/lib/domain/transfers';
@@ -232,4 +234,13 @@ export async function findTransferPairsAction(): Promise<ActionResult<NamedPair[
 
 export async function mergeTransferPairsAction(pairs: { expenseId: string; incomeId: string }[]): Promise<ActionResult<number>> {
   return run(async () => { await requireUser(); const n = await mergeTransferPairs(pairs); revalidatePath('/', 'layout'); return n; });
+}
+
+export async function splitTransactionAction(id: UUID, parts: SplitPart[]): Promise<ActionResult<TxRow[]>> {
+  return run(async () => {
+    await requireUser();
+    const rows = await splitTransaction(id, parts);
+    revalidatePath('/', 'layout');
+    return withBalances(rows.map((r) => ({ ...r, owed: r.kind === 'expense' ? Number(r.amount) - Number(r.my_share ?? r.amount) : 0 })));
+  });
 }
