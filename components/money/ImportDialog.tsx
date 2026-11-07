@@ -55,6 +55,7 @@ function Importer({ onDone }: { onDone: () => void }) {
   const [acc, setAcc] = useState<Record<number, string>>({});
   const [removeOther, setRemoveOther] = useState<Record<number, boolean>>({});
   const [lab, setLab] = useState<Record<number, string[]>>({});
+  const [fromDate, setFromDate] = useState('');
 
   async function run(rows: ExtractedRow[], aId: string | null, map: Record<string, string>, l4: string | null) {
     const r = await previewImportAction(source, rows, aId, map, l4);
@@ -96,7 +97,9 @@ function Importer({ onDone }: { onDone: () => void }) {
     } finally { setBusy(null); }
   }
 
-  const rows = useMemo(() => preview?.rows ?? [], [preview]);
+  const allRows = useMemo(() => preview?.rows ?? [], [preview]);
+  // only lines on or after the chosen date are shown, counted and imported
+  const rows = useMemo(() => (fromDate ? allRows.filter((r) => r.date >= fromDate) : allRows), [allRows, fromDate]);
   const counts = useMemo(() => {
     const c = { new: 0, merge: 0, duplicate: 0, transfer: 0 };
     for (const r of rows) c[r.status]++;
@@ -106,6 +109,9 @@ function Importer({ onDone }: { onDone: () => void }) {
   const chosen = rows.filter((r) => picked[r.idx]);
   const addCount = chosen.filter((r) => r.status !== 'merge').length;
   const mergeCount = chosen.filter((r) => r.status === 'merge').length;
+  const selectable = rows.filter((r) => r.status !== 'duplicate'); // lines already on file are never re-added
+  const allOn = selectable.length > 0 && selectable.every((r) => picked[r.idx]);
+  const setAll = (on: boolean) => setPicked((p) => ({ ...p, ...Object.fromEntries(selectable.map((r) => [r.idx, on])) }));
 
   async function remap(next: { accountId?: string | null; map?: Record<string, string> }) {
     if (!extracted) return;
@@ -127,7 +133,7 @@ function Importer({ onDone }: { onDone: () => void }) {
     const merges = [
       ...chosen.filter((r) => r.status === 'merge' && r.matchId).map((r) => ({ id: r.matchId!, ...(r.patch ?? {}) })),
       // remembering the reference on an entry you typed yourself costs nothing and stops a later duplicate
-      ...rows.filter((r) => r.status === 'duplicate' && r.matchId && r.patch?.ext_ref).map((r) => ({ id: r.matchId!, ext_ref: r.patch!.ext_ref })),
+      ...allRows.filter((r) => r.status === 'duplicate' && r.matchId && r.patch?.ext_ref).map((r) => ({ id: r.matchId!, ext_ref: r.patch!.ext_ref })),
     ];
     const removeIds = rows.filter((r) => r.counterpartIds.length && removeOther[r.idx] && picked[r.idx]).flatMap((r) => r.counterpartIds);
     const res = await commitImportAction(source, items, merges, removeIds, IMPORT_SOURCES[source].label, last4);
@@ -171,7 +177,7 @@ function Importer({ onDone }: { onDone: () => void }) {
   return (
     <div className="space-y-3 text-sm">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        <span className="font-medium">{rows.length} lines from {IMPORT_SOURCES[source].label}:</span>
+        <span className="font-medium">{rows.length}{rows.length !== allRows.length ? ` of ${allRows.length}` : ''} lines from {IMPORT_SOURCES[source].label}:</span>
         <span className="text-emerald-700 dark:text-emerald-300">{counts.new} new</span>
         {counts.merge > 0 && <span className="text-sky-700 dark:text-sky-300">{counts.merge} to merge</span>}
         <span className="text-muted-foreground">{counts.duplicate} already there</span>
@@ -205,6 +211,17 @@ function Importer({ onDone }: { onDone: () => void }) {
           </label>
         </div>
       )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+        <label className="flex items-center gap-2"><span className="font-medium">From date</span>
+          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} min={allRows.length ? allRows.reduce((m, r) => (r.date < m ? r.date : m), allRows[0].date) : undefined} className="h-8 rounded-lg border border-input bg-transparent px-2 text-xs" aria-label="Only import from this date onwards" />
+        </label>
+        {fromDate && <button type="button" onClick={() => setFromDate('')} className="text-muted-foreground underline">Show all dates</button>}
+        <span className="ml-auto flex items-center gap-1">
+          <button type="button" onClick={() => setAll(true)} disabled={allOn} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-50">Select all</button>
+          <button type="button" onClick={() => setAll(false)} disabled={!selectable.some((r) => picked[r.idx])} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-50">Select none</button>
+        </span>
+      </div>
+      {rows.length === 0 && <p className="rounded-xl border border-dashed p-3 text-xs text-muted-foreground">No lines on or after that date.</p>}
       <ul className="max-h-[46vh] divide-y overflow-y-auto rounded-xl border">
         {rows.map((r) => {
           const on = !!picked[r.idx];
@@ -250,7 +267,7 @@ function Importer({ onDone }: { onDone: () => void }) {
       </ul>
       <p className="text-xs text-muted-foreground">Money moving between your own accounts is recorded once, as a transfer (not income or spending). After importing, open any transaction to change its account, category or labels, split it, or turn it into a transfer with the ⇄ button.</p>
       <div className="flex items-center justify-between gap-2">
-        <button type="button" onClick={() => { setPreview(null); setExtracted(null); setFiles([]); setProof([]); }} className="text-xs text-muted-foreground underline">Start over</button>
+        <button type="button" onClick={() => { setPreview(null); setExtracted(null); setFiles([]); setProof([]); setFromDate(''); }} className="text-xs text-muted-foreground underline">Start over</button>
         <Button onClick={() => void commit()} disabled={!!busy || chosen.length === 0}>
           {busy ?? `Import ${addCount}${mergeCount ? ` · merge ${mergeCount}` : ''}`}
         </Button>
