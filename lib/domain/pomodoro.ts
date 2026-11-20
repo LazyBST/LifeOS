@@ -60,14 +60,21 @@ export async function focusWeek(today: string, days = 7): Promise<{ date: string
 // ---- the running timer, shared by every device -----------------------------------------------------------
 
 export type RunDoc = { timer: Record<string, unknown> | null; rev: number };
+/** `rejected`: an automatic phase change was refused because someone changed the timer (paused it, say) in the meantime. */
+export type SaveResult = RunDoc & { rejected?: boolean };
 
 export async function getRun(): Promise<RunDoc> {
   const v = await getUiState<RunDoc>('pomodoro-run').catch(() => null);
   return v && typeof v.rev === 'number' ? v : { timer: null, rev: 0 };
 }
 
-/** Keep the newest write: a device with an older view of the timer never overwrites a newer one. Returns what is stored. */
-export async function saveRun(timer: Record<string, unknown> | null, rev: number): Promise<RunDoc> {
+/**
+ * Keep the newest write: a device with an older view of the timer never overwrites a newer one. Returns what is stored.
+ * `baseRev` marks an automatic phase change (a phase ran out). It is stamped with the moment the phase ended, which is
+ * in the past, so on its own it could overwrite a pause made after that. It is therefore only accepted when nothing
+ * has changed since the revision the device started from.
+ */
+export async function saveRun(timer: Record<string, unknown> | null, rev: number, baseRev?: number): Promise<SaveResult> {
   if (timer !== null) {
     const cfg = timer.cfg as { workMin?: unknown; breakMin?: unknown } | undefined;
     const plan = (timer.cfg as { plan?: unknown } | undefined)?.plan;
@@ -77,6 +84,7 @@ export async function saveRun(timer: Record<string, unknown> | null, rev: number
   if (!Number.isFinite(rev)) throw new Error('Bad revision.');
   const cur = await getRun();
   if (rev < cur.rev) return cur;
+  if (baseRev !== undefined && cur.rev > baseRev) return { ...cur, rejected: true };
   await setUiState('pomodoro-run', { timer, rev });
   return { timer, rev };
 }

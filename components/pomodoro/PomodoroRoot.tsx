@@ -284,7 +284,7 @@ export function PomodoroRoot() {
       }
     }, 250);
     return () => clearInterval(id);
-  }, [timer?.status, timer?.phaseStartedAt, timer?.runId, commit, log, announce]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [timer?.status, timer?.phaseStartedAt, timer?.runId, commit, log, announce, syncFromServer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // the tab title shows the time, so it can be glanced at from another tab
   useEffect(() => {

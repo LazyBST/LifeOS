@@ -1,7 +1,7 @@
 'use server';
 
 import { requireUser } from '@/lib/auth';
-import { focusDay, focusWeek, getRun, logSegment, saveRun, type FocusDay, type RunDoc } from '@/lib/domain/pomodoro';
+import { focusDay, focusWeek, getRun, logSegment, saveRun, type FocusDay, type RunDoc, type SaveResult } from '@/lib/domain/pomodoro';
 import type { Segment } from '@/lib/domain/pomodoro-math';
 import { istDate } from '@/lib/time';
 import { type ActionResult, run } from './_result';
@@ -24,6 +24,6 @@ export async function pomodoroGetRunAction(): Promise<ActionResult<RunDoc & { no
   return run(async () => { await requireUser(); return { ...(await getRun()), now: Date.now() }; });
 }
 
-export async function pomodoroSaveRunAction(timer: Record<string, unknown> | null, rev: number): Promise<ActionResult<RunDoc>> {
-  return run(async () => { await requireUser(); return saveRun(timer, rev); });
+export async function pomodoroSaveRunAction(timer: Record<string, unknown> | null, rev: number, baseRev?: number): Promise<ActionResult<SaveResult>> {
+  return run(async () => { await requireUser(); return saveRun(timer, rev, baseRev); });
 }
