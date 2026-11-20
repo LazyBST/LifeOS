@@ -1,4 +1,5 @@
 import 'server-only';
+import { isGoogleConnected } from '@/lib/google/auth';
 import { admin } from '@/lib/supabase/admin';
 import { addDays } from '@/lib/time';
 import { istInstant } from '@/lib/time';
@@ -19,6 +20,7 @@ export async function weekData(weekStart: string): Promise<WeekData> {
   const from = istInstant(weekStart, '00:00').toISOString();
   const to = istInstant(addDays(weekStart, 7), '00:00').toISOString();
   const loadEvents = async () => {
+    if (!(await isGoogleConnected())) return { data: [], error: null }; // not connected: the events cached earlier are hidden
     const q = (cols: string) => admin().from('calendar_events').select(cols).lt('starts_at', to).gte('ends_at', from).limit(300);
     const full = await q('google_event_id,summary,starts_at,ends_at,all_day,description,location,recurring,can_edit');
     return full.error ? await q('google_event_id,summary,starts_at,ends_at,all_day') : full; // migration 0011 not run yet
@@ -91,6 +93,6 @@ export async function weekData(weekStart: string): Promise<WeekData> {
   } catch { /* habits are optional on this view */ }
 
   const { data: st } = await admin().from('calendar_sync_state').select('last_error,last_ok_at,cached_events').maybeSingle();
-  const sync = st ? { error: (st.last_error as string | null) ?? null, okAt: (st.last_ok_at as string | null) ?? null, cached: Number(st.cached_events ?? 0) } : null;
+  const sync = st && (await isGoogleConnected()) ? { error: (st.last_error as string | null) ?? null, okAt: (st.last_ok_at as string | null) ?? null, cached: Number(st.cached_events ?? 0) } : null;
   return { weekStart, blocks, allDay, bars, untimed, sync };
 }

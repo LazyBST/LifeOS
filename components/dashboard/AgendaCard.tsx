@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { admin } from '@/lib/supabase/admin';
+import { isGoogleConnected } from '@/lib/google/auth';
 import { istDate } from '@/lib/time';
 import type { Task } from '@/lib/types/db';
 
@@ -22,6 +23,7 @@ async function loadAgenda(): Promise<{ timedTasks: Task[]; events: EventRow[] }>
   }
   let events: EventRow[] = [];
   try {
+    if (!(await isGoogleConnected())) return { timedTasks, events: [] };
     const { data } = await admin()
       .from('calendar_events')
       .select('google_event_id,summary,starts_at')

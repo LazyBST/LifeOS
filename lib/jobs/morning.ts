@@ -6,6 +6,7 @@ import 'server-only';
 import { generateText } from 'ai';
 import { cheapModel } from '@/lib/agent/model';
 import { admin } from '@/lib/supabase/admin';
+import { isGoogleConnected } from '@/lib/google/auth';
 import { notify } from '@/lib/notify';
 import { addDays, daysBetween, istInstant, istParts } from '@/lib/time';
 import { listTasks } from '@/lib/domain/tasks';
@@ -26,6 +27,7 @@ const WORKDAY_MIN = 10 * 60;
 
 async function calendarEventsToday(date: string): Promise<CalendarEventRow[]> {
   try {
+    if (!(await isGoogleConnected())) return [];
     const from = istInstant(date, '00:00').toISOString();
     const to = istInstant(addDays(date, 1), '00:00').toISOString();
     const { data, error } = await admin()

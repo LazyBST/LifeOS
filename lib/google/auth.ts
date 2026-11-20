@@ -68,6 +68,11 @@ async function getTokenRow(): Promise<TokenRow | null> {
   return (data as TokenRow) ?? null;
 }
 
+/** True while Google is connected. When it is not, events cached from an earlier connection must not be shown. */
+export async function isGoogleConnected(): Promise<boolean> {
+  try { return !!(await getTokenRow())?.refresh_token; } catch { return false; }
+}
+
 /** OAuth consent URL. Always requests a refresh token (spec section 9 setup). */
 export function authUrl(origin?: string): string {
   const client = newOAuthClient(origin);
