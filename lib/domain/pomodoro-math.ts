@@ -91,6 +91,33 @@ export function advance(t: PomoTimer, now: number, label: string, completed = tr
   return { segment, next: lastWork ? { ...t, status: 'done' } : fresh('work', t.cycle + 1) };
 }
 
+export type SettleStep = { finished: PomoTimer; next: PomoTimer; segment: Segment; endedAt: number; away: boolean };
+
+/**
+ * Bring a timer up to date with the clock: every phase that has run out by `now` is closed and the next one started,
+ * working only from the timestamps. Any device gets the same answer from the same stored timer, so devices never have
+ * to agree on who ends a phase. A timer that has been left more than `maxAwayMs` past a phase's end is closed rather
+ * than carrying on through sessions nobody sat through.
+ */
+export function settle(t: PomoTimer, now: number, workLabel: string, maxAwayMs = 5 * MIN_MS): { timer: PomoTimer; steps: SettleStep[] } {
+  const steps: SettleStep[] = [];
+  let cur = t;
+  for (let i = 0; i < 6 && cur.status === 'running' && remainingMs(cur, now) <= 0; i++) {
+    const end = endInstant(cur);
+    if (now - end > maxAwayMs) {
+      const done: PomoTimer = { ...cur, status: 'done' };
+      steps.push({ finished: cur, next: done, segment: segmentOf(cur, end, true), endedAt: end, away: true });
+      cur = done;
+      break;
+    }
+    const r = advance(cur, end, cur.phase === 'work' ? 'Break' : workLabel, true);
+    const next = { ...r.next, label: r.next.phase === 'work' ? workLabel : 'Break' };
+    steps.push({ finished: cur, next, segment: r.segment, endedAt: end, away: false });
+    cur = next;
+  }
+  return { timer: cur, steps };
+}
+
 /** Break now: end focus early (what was done is logged by the caller) and rest `min` minutes, then pick the same session back up. */
 export function breakNow(t: PomoTimer, now: number, min: number, label = 'Break'): { segment: Segment; next: PomoTimer } | null {
   if (t.status === 'done' || t.phase !== 'work' || !(min > 0)) return null;

@@ -1,7 +1,7 @@
 'use server';
 
 import { requireUser } from '@/lib/auth';
-import { focusDay, focusWeek, getRun, logSegment, saveRun, type FocusDay, type RunDoc, type SaveResult } from '@/lib/domain/pomodoro';
+import { focusDay, focusWeek, logSegment, type FocusDay } from '@/lib/domain/pomodoro';
 import type { Segment } from '@/lib/domain/pomodoro-math';
 import { istDate } from '@/lib/time';
 import { type ActionResult, run } from './_result';
@@ -19,11 +19,3 @@ export async function focusDayAction(date?: string): Promise<ActionResult<FocusD
   });
 }
 
-/** The timer that is running (or not) for this account, with the server's clock so every device agrees on the time. */
-export async function pomodoroGetRunAction(): Promise<ActionResult<RunDoc & { now: number }>> {
-  return run(async () => { await requireUser(); return { ...(await getRun()), now: Date.now() }; });
-}
-
-export async function pomodoroSaveRunAction(timer: Record<string, unknown> | null, rev: number, baseRev?: number): Promise<ActionResult<SaveResult>> {
-  return run(async () => { await requireUser(); return saveRun(timer, rev, baseRev); });
-}

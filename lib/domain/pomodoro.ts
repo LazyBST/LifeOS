@@ -1,7 +1,6 @@
 import 'server-only';
 import { admin } from '@/lib/supabase/admin';
 import { addDays, istDate, istInstant } from '@/lib/time';
-import { getUiState, setUiState } from './uistate';
 import { summariseDay, type DaySummary, type Segment } from './pomodoro-math';
 
 export type StoredSegment = Segment & { id: string; day: string };
@@ -59,32 +58,53 @@ export async function focusWeek(today: string, days = 7): Promise<{ date: string
 
 // ---- the running timer, shared by every device -----------------------------------------------------------
 
-export type RunDoc = { timer: Record<string, unknown> | null; rev: number };
-/** `rejected`: an automatic phase change was refused because someone changed the timer (paused it, say) in the meantime. */
-export type SaveResult = RunDoc & { rejected?: boolean };
+/** `ver` goes up by one with every save; `op` names the save that wrote it. */
+export type RunDoc = { timer: Record<string, unknown> | null; ver: number; op?: string | null };
+export type SaveResult = { ok: true; ver: number } | { ok: false; doc: RunDoc };
+const KEY = 'pomodoro-run';
 
-export async function getRun(): Promise<RunDoc> {
-  const v = await getUiState<RunDoc>('pomodoro-run').catch(() => null);
-  return v && typeof v.rev === 'number' ? v : { timer: null, rev: 0 };
+async function readRun(): Promise<{ doc: RunDoc; stamp: string | null; exists: boolean }> {
+  const { data } = await admin().from('ui_state').select('value,updated_at').eq('key', KEY).maybeSingle();
+  if (!data) return { doc: { timer: null, ver: 0 }, stamp: null, exists: false };
+  const v = (data.value ?? {}) as { timer?: Record<string, unknown> | null; ver?: number; op?: string | null };
+  return { doc: { timer: v.timer ?? null, ver: typeof v.ver === 'number' ? v.ver : 0, op: v.op ?? null }, stamp: (data.updated_at as string | null) ?? null, exists: true };
+}
+
+export async function getRun(): Promise<RunDoc> { return (await readRun()).doc; }
+
+/** Whether a save that started from `baseVer` may go ahead. */
+export const canSave = (cur: RunDoc, baseVer: number): boolean => cur.ver === baseVer;
+
+function checkTimer(timer: Record<string, unknown> | null): void {
+  if (timer === null) return;
+  const cfg = timer.cfg as { workMin?: unknown; breakMin?: unknown } | undefined;
+  const plan = (timer.cfg as { plan?: unknown } | undefined)?.plan;
+  if (plan !== undefined && (!Array.isArray(plan) || plan.length < 1 || plan.length > 20 || plan.some((x) => typeof x?.workMin !== 'number' || typeof x?.breakMin !== 'number'))) throw new Error('Bad timer.');
+  if (typeof timer.runId !== 'string' || typeof timer.phaseStartedAt !== 'number' || !cfg || typeof cfg.workMin !== 'number' || typeof cfg.breakMin !== 'number') throw new Error('Bad timer.');
 }
 
 /**
- * Keep the newest write: a device with an older view of the timer never overwrites a newer one. Returns what is stored.
- * `baseRev` marks an automatic phase change (a phase ran out). It is stamped with the moment the phase ended, which is
- * in the past, so on its own it could overwrite a pause made after that. It is therefore only accepted when nothing
- * has changed since the revision the device started from.
+ * Save the timer if nobody has saved since `baseVer` (the version this device last saw). Otherwise nothing is written
+ * and the newer timer comes back, so the device can replay what it wanted on top of it. The write itself only goes
+ * through if the row is still the one that was just read.
  */
-export async function saveRun(timer: Record<string, unknown> | null, rev: number, baseRev?: number): Promise<SaveResult> {
-  if (timer !== null) {
-    const cfg = timer.cfg as { workMin?: unknown; breakMin?: unknown } | undefined;
-    const plan = (timer.cfg as { plan?: unknown } | undefined)?.plan;
-    if (plan !== undefined && (!Array.isArray(plan) || plan.length < 1 || plan.length > 20 || plan.some((x) => typeof x?.workMin !== 'number' || typeof x?.breakMin !== 'number'))) throw new Error('Bad timer.');
-    if (typeof timer.runId !== 'string' || typeof timer.phaseStartedAt !== 'number' || !cfg || typeof cfg.workMin !== 'number' || typeof cfg.breakMin !== 'number') throw new Error('Bad timer.');
+export async function saveRun(timer: Record<string, unknown> | null, baseVer: number, op: string): Promise<SaveResult> {
+  checkTimer(timer);
+  if (!Number.isInteger(baseVer) || typeof op !== 'string' || op.length < 1 || op.length > 64) throw new Error('Bad request.');
+  const cur = await readRun();
+  if (!canSave(cur.doc, baseVer)) return { ok: false, doc: cur.doc };
+  const ver = cur.doc.ver + 1;
+  const value = { timer, ver, op };
+  const updated_at = new Date().toISOString();
+  if (!cur.exists) {
+    const { error } = await admin().from('ui_state').insert({ key: KEY, value, updated_at });
+    if (error) return { ok: false, doc: (await readRun()).doc }; // someone created it first
+  } else {
+    let q = admin().from('ui_state').update({ value, updated_at }).eq('key', KEY);
+    q = cur.stamp === null ? q.is('updated_at', null) : q.eq('updated_at', cur.stamp);
+    const { data, error } = await q.select('key');
+    if (error) throw new Error(error.message);
+    if (!data?.length) return { ok: false, doc: (await readRun()).doc }; // changed between the read and the write
   }
-  if (!Number.isFinite(rev)) throw new Error('Bad revision.');
-  const cur = await getRun();
-  if (rev < cur.rev) return cur;
-  if (baseRev !== undefined && cur.rev > baseRev) return { ...cur, rejected: true };
-  await setUiState('pomodoro-run', { timer, rev });
-  return { timer, rev };
+  return { ok: true, ver };
 }
