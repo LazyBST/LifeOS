@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advance, breakNow, celebrationFor, extendBreak, phaseMs, planConfig, clock, elapsedMs, endInstant, pause, remainingMs, resume, segmentOf, startRun, summariseDay } from '@/lib/domain/pomodoro-math';
+import { extendWork, advance, breakNow, celebrationFor, extendBreak, phaseMs, planConfig, clock, elapsedMs, endInstant, pause, remainingMs, resume, segmentOf, startRun, summariseDay } from '@/lib/domain/pomodoro-math';
 
 const MIN = 60_000;
 const cfg = { workMin: 25, breakMin: 5, repeats: 2 };
@@ -129,5 +129,18 @@ describe('mixed sessions and breaks on demand', () => {
     expect(after.phase).toBe('break');
     expect(phaseMs(after) / MIN).toBe(10); // the planned break, not the early one
     expect(breakNow(r.next, 0, 5)).toBeNull();
+  });
+});
+
+describe('extend focus', () => {
+  it('lengthens the running session and the break after it starts later', () => {
+    const t = startRun(planConfig([{ workMin: 25, breakMin: 5 }, { workMin: 25, breakMin: 5 }]), 0, 'r', 'x');
+    const e = extendWork(extendWork(t, 10), 5);
+    expect(phaseMs(e)).toBe(40 * 60_000);
+    expect(extendWork(t, 7)).toBe(t);
+    const r = advance(e, 40 * 60_000, 'Break');
+    expect(r.next.phase).toBe('break');
+    expect(phaseMs(r.next)).toBe(5 * 60_000);
+    expect(phaseMs(advance(r.next, 45 * 60_000, 'x').next)).toBe(25 * 60_000);
   });
 });

@@ -132,6 +132,12 @@ export function extendBreak(t: PomoTimer, min: number): PomoTimer {
   return { ...t, extraMs: (t.extraMs ?? 0) + min * MIN_MS };
 }
 
+/** Add 5, 10, 15 or 20 minutes to the focus session that is running; the breaks and sessions after it simply start later. */
+export function extendWork(t: PomoTimer, min: number): PomoTimer {
+  if (t.phase !== 'work' || t.status === 'done' || ![5, 10, 15, 20].includes(min)) return t;
+  return { ...t, workOverrideMs: phaseMs(t) + min * MIN_MS };
+}
+
 export const clock = (ms: number): string => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;

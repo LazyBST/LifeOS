@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { getCalendarWeekAction } from '@/app/actions/calweek';
 import { logPomodoroSegmentAction } from '@/app/actions/pomodoro';
 import { PomoSync, type Api, type Doc } from '@/lib/pomodoro-sync';
-import { advance, breakNow, settle, celebrationFor, clock, elapsedMs, extendBreak, pause, phaseMs, planConfig, remainingMs, resume, segmentOf, type SettleStep, startRun, stepOf, type Celebration as CelebrationKind, type CelebrationMode, type PomoConfig, type PomoStep, type PomoTimer, type Segment } from '@/lib/domain/pomodoro-math';
+import { advance, breakNow, settle, celebrationFor, clock, elapsedMs, extendBreak, extendWork, pause, phaseMs, planConfig, remainingMs, resume, segmentOf, type SettleStep, startRun, stepOf, type Celebration as CelebrationKind, type CelebrationMode, type PomoConfig, type PomoStep, type PomoTimer, type Segment } from '@/lib/domain/pomodoro-math';
 import { istDate, istParts } from '@/lib/time';
 import { weekStart } from '@/lib/domain/lifecal-math';
 import type { WeekBlock } from '@/lib/domain/calweek';
@@ -371,6 +371,7 @@ export function PomodoroRoot() {
     });
   };
   const extend = (min: number) => { sync.apply({ guard: 'phase', run: (cur) => (cur ? { timer: extendBreak(cur, min) } : null) }); };
+  const extendFocus = (min: number) => { sync.apply({ guard: 'phase', run: (cur) => (cur ? { timer: extendWork(cur, min) } : null) }); };
   const closeRun = () => { sync.apply({ guard: 'run', run: () => ({ timer: null }) }); };
   const stop = () => {
     sync.apply({
@@ -404,6 +405,9 @@ export function PomodoroRoot() {
         <>
           <span className="text-xs text-white/75">Break now:</span>
           {[5, 10, 15, 20].map((m) => <button key={m} type="button" onClick={() => takeBreak(m)} className={chip} aria-label={`Take a ${m} minute break now`}>{m} min</button>)}
+          <span className="w-full" />
+          <span className="text-xs text-white/75">Extend focus:</span>
+          {[5, 10, 15, 20].map((m) => <button key={m} type="button" onClick={() => extendFocus(m)} className={chip} aria-label={`Extend the focus session by ${m} minutes`}>+{m}</button>)}
         </>
       ) : (
         <>
