@@ -22,7 +22,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh">
       <Sidebar areas={navAreas} />
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
-        <main className="min-w-0 flex-1 pb-16 md:pb-0"><div className="mx-auto w-full lg:w-4/5">{children}</div></main>
+        <main className="min-w-0 flex-1 pb-16 md:pb-0"><div className="mx-auto w-full lg:w-[90%]">{children}</div></main>
         <BottomNav />
       </div>
       <ChatPanel />
