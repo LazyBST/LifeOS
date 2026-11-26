@@ -261,6 +261,18 @@ export function CalendarWeek() {
     const want = a.y - ((a.min - startH * 60) / 60) * row;
     el.scrollTop += top - want;
   }, [row, startH]);
+  // on first showing, scroll so the current time sits in the middle of the view
+  const centred = useRef(false);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const grid = el?.querySelector('[data-timegrid]') as HTMLElement | null;
+    if (centred.current || !el || !grid || !data) return;
+    centred.current = true;
+    const p = istParts();
+    const nowMin = p.hour * 60 + p.minute;
+    const gridTop = grid.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+    el.scrollTop = Math.max(0, gridTop + topOf(nowMin) - el.clientHeight / 2);
+  });
   const minuteAt = useCallback((clientY: number) => {
     const grid = scrollRef.current?.querySelector('[data-timegrid]') as HTMLElement | null;
     if (!grid) return null;
