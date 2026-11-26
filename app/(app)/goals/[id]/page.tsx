@@ -50,7 +50,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const unsorted = goalTasks.filter((t) => !t.project_id);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-4 md:p-6">
       <SetPageContext
         ctx={{ route: `/goals/${goal.id}`, entity_type: 'goal', entity_id: goal.id, area_id: goal.area_id }}
       />

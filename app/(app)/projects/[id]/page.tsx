@@ -41,7 +41,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const area = areas.find((a) => a.id === project.area_id) ?? null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-4 md:p-6">
       <SetPageContext
         ctx={{ route: `/projects/${project.id}`, entity_type: 'project', entity_id: project.id, area_id: project.area_id }}
       />

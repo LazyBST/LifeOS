@@ -29,7 +29,7 @@ export default async function BooksPage() {
   const pages30 = sessions.reduce((n, s) => n + s.pages, 0);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-4 md:p-6">
       <SetPageContext ctx={{ route: '/books', entity_type: 'none' }} />
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Books</h1>

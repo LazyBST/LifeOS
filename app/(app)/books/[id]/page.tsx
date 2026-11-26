@@ -34,7 +34,7 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   const save = (field: string, mode?: 'text' | 'nullable' | 'int') => ({ entity: 'book' as const, id, field, ...(mode ? { mode } : {}) });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-4 md:p-6">
       <SetPageContext ctx={{ route: `/books/${id}`, entity_type: 'book', entity_id: id, area_id: book.area_id }} />
       <PropertiesHeader
         trail={<Trail items={[{ kind: 'books', label: 'Books', href: '/books' }, ...(book.area_id && areas.find((a) => a.id === book.area_id) ? [{ kind: 'area' as const, label: areas.find((a) => a.id === book.area_id)!.name, color: areaColor(areas.find((a) => a.id === book.area_id)) }] : [])]} />}

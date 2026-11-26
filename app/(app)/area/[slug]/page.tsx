@@ -56,7 +56,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   const color = areaColor(area);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-4 md:p-6">
       <SetPageContext ctx={{ route: `/area/${slug}`, entity_type: 'area', entity_id: area.id, area_id: area.id }} />
 
       <PropertiesHeader

@@ -10,7 +10,7 @@ import { listAccounts, listCategories, listLabels } from '@/lib/domain/money';
 export default async function TransactionsPage() {
   const [categories, accounts, labels] = await Promise.all([listCategories(), listAccounts(), listLabels()]);
   return (
-    <div className="mx-auto max-w-[1400px] space-y-4 p-4 sm:p-6">
+    <div className="space-y-4 p-4 sm:p-6">
       <SetPageContext ctx={{ route: '/money/transactions', entity_type: 'none' }} />
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">Transactions</h1>
